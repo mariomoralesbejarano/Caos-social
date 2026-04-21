@@ -3,20 +3,21 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: API specification for CAOS SOCIAL multiplayer rooms
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: rooms
+    description: Multiplayer game rooms
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +25,271 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /rooms:
+    post:
+      operationId: createRoom
+      tags: [rooms]
+      summary: Create a new game room
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoomBody"
+      responses:
+        "201":
+          description: Room created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinResult"
+
+  /rooms/{code}/join:
+    post:
+      operationId: joinRoom
+      tags: [rooms]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinRoomBody"
+      responses:
+        "200":
+          description: Joined
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinResult"
+        "404":
+          description: Room not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /rooms/{code}:
+    get:
+      operationId: getRoom
+      tags: [rooms]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: playerId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Room snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomState"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /rooms/{code}/tags:
+    post:
+      operationId: setMyTags
+      tags: [rooms]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetTagsBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomState"
+
+  /rooms/{code}/start:
+    post:
+      operationId: startGame
+      tags: [rooms]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlayerActionBody"
+      responses:
+        "200":
+          description: Started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomState"
+
+  /rooms/{code}/draw:
+    post:
+      operationId: drawCard
+      tags: [rooms]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlayerActionBody"
+      responses:
+        "200":
+          description: Drew a card
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DrawResult"
+        "400":
+          description: Cannot draw
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /rooms/{code}/throw:
+    post:
+      operationId: throwCard
+      tags: [rooms]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ThrowCardBody"
+      responses:
+        "200":
+          description: Thrown
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomState"
+        "400":
+          description: Invalid throw
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /rooms/{code}/respond:
+    post:
+      operationId: respondToThrow
+      tags: [rooms]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RespondBody"
+      responses:
+        "200":
+          description: Resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomState"
+        "400":
+          description: Bad input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /rooms/{code}/panic-vote:
+    post:
+      operationId: panicVote
+      tags: [rooms]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PanicVoteBody"
+      responses:
+        "200":
+          description: Vote registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomState"
+
+  /rooms/{code}/reset:
+    post:
+      operationId: resetRoom
+      tags: [rooms]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlayerActionBody"
+      responses:
+        "200":
+          description: Reset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomState"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +297,251 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    CardCategory:
+      type: string
+      enum: [reto, beber, ligar, fisico, poder, social]
+
+    CardTag:
+      type: string
+      enum: [abstemio, pareja, hardcore]
+
+    PackId:
+      type: string
+      enum: [clasico, discoteca, cena, gimnasio, allin]
+
+    GameCard:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        effect:
+          type: string
+        power:
+          type: string
+        category:
+          $ref: "#/components/schemas/CardCategory"
+        points:
+          type: integer
+        isPower:
+          type: boolean
+        blockedBy:
+          type: array
+          items:
+            $ref: "#/components/schemas/CardTag"
+      required: [id, title, effect, power, category, points]
+
+    PendingThrow:
+      type: object
+      properties:
+        id:
+          type: string
+        fromPlayerId:
+          type: string
+        fromName:
+          type: string
+        toPlayerId:
+          type: string
+        cardId:
+          type: string
+        card:
+          $ref: "#/components/schemas/GameCard"
+        createdAt:
+          type: integer
+        panicAgainst:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - fromPlayerId
+        - fromName
+        - toPlayerId
+        - cardId
+        - card
+        - createdAt
+        - panicAgainst
+
+    RoomPlayer:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/CardTag"
+        handCount:
+          type: integer
+        score:
+          type: integer
+        multiplier:
+          type: integer
+        shieldUntil:
+          type: integer
+        challengesCompleted:
+          type: integer
+        connected:
+          type: boolean
+      required:
+        - id
+        - name
+        - tags
+        - handCount
+        - score
+        - multiplier
+        - shieldUntil
+        - challengesCompleted
+        - connected
+
+    RoomState:
+      type: object
+      properties:
+        code:
+          type: string
+        ownerId:
+          type: string
+        pack:
+          $ref: "#/components/schemas/PackId"
+        status:
+          type: string
+          enum: [lobby, active]
+        players:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoomPlayer"
+        log:
+          type: array
+          items:
+            type: string
+        myHand:
+          type: array
+          items:
+            $ref: "#/components/schemas/GameCard"
+        myInbox:
+          type: array
+          items:
+            $ref: "#/components/schemas/PendingThrow"
+        cooldowns:
+          type: object
+          additionalProperties:
+            type: integer
+        version:
+          type: integer
+      required:
+        - code
+        - ownerId
+        - pack
+        - status
+        - players
+        - log
+        - myHand
+        - myInbox
+        - cooldowns
+        - version
+
+    JoinResult:
+      type: object
+      properties:
+        playerId:
+          type: string
+        room:
+          $ref: "#/components/schemas/RoomState"
+      required: [playerId, room]
+
+    CreateRoomBody:
+      type: object
+      properties:
+        name:
+          type: string
+        pack:
+          $ref: "#/components/schemas/PackId"
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/CardTag"
+      required: [name, pack]
+
+    JoinRoomBody:
+      type: object
+      properties:
+        name:
+          type: string
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/CardTag"
+      required: [name]
+
+    SetTagsBody:
+      type: object
+      properties:
+        playerId:
+          type: string
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/CardTag"
+      required: [playerId, tags]
+
+    PlayerActionBody:
+      type: object
+      properties:
+        playerId:
+          type: string
+      required: [playerId]
+
+    DrawResult:
+      type: object
+      properties:
+        room:
+          $ref: "#/components/schemas/RoomState"
+        drawnCard:
+          $ref: "#/components/schemas/GameCard"
+      required: [room, drawnCard]
+
+    ThrowCardBody:
+      type: object
+      properties:
+        playerId:
+          type: string
+        toPlayerId:
+          type: string
+        cardId:
+          type: string
+      required: [playerId, toPlayerId, cardId]
+
+    RespondBody:
+      type: object
+      properties:
+        playerId:
+          type: string
+        throwId:
+          type: string
+        action:
+          type: string
+          enum: [accept, reject, reversa, espejo, bloqueo, robo-carta]
+      required: [playerId, throwId, action]
+
+    PanicVoteBody:
+      type: object
+      properties:
+        playerId:
+          type: string
+        throwId:
+          type: string
+        against:
+          type: boolean
+      required: [playerId, throwId, against]

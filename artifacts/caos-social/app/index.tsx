@@ -1,30 +1,122 @@
 import { Feather } from "@expo/vector-icons";
+import {
+  CardTag,
+  PackId,
+  useCreateRoom,
+  useJoinRoom,
+} from "@workspace/api-client-react";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { NeonButton } from "@/components/NeonButton";
 import { PACKS } from "@/constants/cards";
-import { useGame } from "@/contexts/GameContext";
+import { useRoom } from "@/contexts/RoomContext";
 import { useColors } from "@/hooks/useColors";
+
+const TAGS: { id: CardTag; label: string }[] = [
+  { id: "abstemio", label: "Abstemio" },
+  { id: "pareja", label: "Con pareja" },
+  { id: "hardcore", label: "Hardcore" },
+];
 
 export default function HomeScreen() {
   const router = useRouter();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { players, pack, setPack, startGame } = useGame();
   const isWeb = Platform.OS === "web";
+  const { session, room, hydrated, setSession } = useRoom();
 
-  const canPlay = players.length >= 2;
+  const [mode, setMode] = useState<"create" | "join">("create");
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [pack, setPack] = useState<PackId>("allin");
+  const [tags, setTags] = useState<CardTag[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const createMut = useCreateRoom();
+  const joinMut = useJoinRoom();
+
+  // If session already loaded, jump to right screen
+  useEffect(() => {
+    if (!hydrated || !session || !room) return;
+    if (room.status === "active") router.replace("/game");
+    else router.replace("/players");
+  }, [hydrated, session, room, router]);
+
+  function toggleTag(tag: CardTag) {
+    setTags((prev) => {
+      const has = prev.includes(tag);
+      let next = has ? prev.filter((t) => t !== tag) : [...prev, tag];
+      if (!has && tag === "hardcore") next = ["hardcore"];
+      else if (!has) next = next.filter((t) => t !== "hardcore");
+      return next;
+    });
+  }
+
+  async function handleCreate() {
+    setError(null);
+    if (!name.trim()) {
+      setError("Pon tu nombre");
+      return;
+    }
+    try {
+      const res = await createMut.mutateAsync({
+        data: { name: name.trim(), pack, tags },
+      });
+      await setSession({
+        roomCode: res.room.code,
+        playerId: res.playerId,
+        name: name.trim(),
+      });
+      router.replace("/players");
+    } catch (e) {
+      setError(extractErr(e));
+    }
+  }
+
+  async function handleJoin() {
+    setError(null);
+    if (!name.trim() || !code.trim()) {
+      setError("Necesitas nombre y código");
+      return;
+    }
+    try {
+      const res = await joinMut.mutateAsync({
+        code: code.trim().toUpperCase(),
+        data: { name: name.trim(), tags },
+      });
+      await setSession({
+        roomCode: res.room.code,
+        playerId: res.playerId,
+        name: name.trim(),
+      });
+      router.replace(res.room.status === "active" ? "/game" : "/players");
+    } catch (e) {
+      setError(extractErr(e));
+    }
+  }
+
+  if (!hydrated) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  const busy = createMut.isPending || joinMut.isPending;
 
   return (
     <ScrollView
@@ -39,144 +131,249 @@ export default function HomeScreen() {
     >
       <View style={styles.hero}>
         <Text style={[styles.tag, { color: colors.primary }]}>
-          PARTY GAME · 18+
+          PARTY ONLINE · 18+
         </Text>
         <Text style={[styles.title, { color: colors.foreground }]}>
           CAOS{"\n"}
           <Text style={{ color: colors.secondary }}>SOCIAL</Text>
         </Text>
         <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-          Lanza retos. Activa poderes. Desata el caos entre amigos.
+          Crea una sala, comparte el código y mandad cartas a vuestros amigos
+          desde cada móvil cuando queráis.
         </Text>
       </View>
 
+      <View style={styles.tabs}>
+        <Pressable
+          onPress={() => setMode("create")}
+          style={[
+            styles.tab,
+            {
+              borderColor: mode === "create" ? colors.primary : colors.border,
+              backgroundColor: mode === "create" ? colors.primary + "22" : colors.card,
+            },
+          ]}
+        >
+          <Feather
+            name="plus-circle"
+            size={16}
+            color={mode === "create" ? colors.primary : colors.mutedForeground}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              { color: mode === "create" ? colors.primary : colors.mutedForeground },
+            ]}
+          >
+            Crear sala
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setMode("join")}
+          style={[
+            styles.tab,
+            {
+              borderColor: mode === "join" ? colors.secondary : colors.border,
+              backgroundColor: mode === "join" ? colors.secondary + "22" : colors.card,
+            },
+          ]}
+        >
+          <Feather
+            name="log-in"
+            size={16}
+            color={mode === "join" ? colors.secondary : colors.mutedForeground}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              { color: mode === "join" ? colors.secondary : colors.mutedForeground },
+            ]}
+          >
+            Unirme
+          </Text>
+        </Pressable>
+      </View>
+
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Feather name="users" size={18} color={colors.primary} />
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-            Jugadores
-          </Text>
-          <Text style={[styles.count, { color: colors.mutedForeground }]}>
-            {players.length}
-          </Text>
-        </View>
-        {players.length === 0 ? (
-          <Text style={[styles.empty, { color: colors.mutedForeground }]}>
-            Añade al menos 2 jugadores para empezar.
-          </Text>
-        ) : (
-          <View style={styles.playersGrid}>
-            {players.map((p) => (
-              <View
-                key={p.id}
-                style={[
-                  styles.playerChip,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                ]}
-              >
-                <Text style={[styles.chipName, { color: colors.foreground }]}>
-                  {p.name}
-                </Text>
-                {p.tags.length > 0 && (
-                  <Text style={[styles.chipTags, { color: colors.primary }]}>
-                    {p.tags.join(" · ")}
-                  </Text>
-                )}
-              </View>
-            ))}
-          </View>
-        )}
-        <NeonButton
-          label="Gestionar jugadores"
-          variant="ghost"
-          onPress={() => router.push("/players")}
-          style={{ marginTop: 12 }}
+        <Text style={[styles.label, { color: colors.mutedForeground }]}>
+          TU NOMBRE
+        </Text>
+        <TextInput
+          value={name}
+          onChangeText={setName}
+          placeholder="Cómo te llaman"
+          placeholderTextColor={colors.mutedForeground}
+          autoCapitalize="words"
+          style={[
+            styles.input,
+            {
+              color: colors.foreground,
+              borderColor: colors.border,
+              backgroundColor: colors.card,
+            },
+          ]}
         />
       </View>
 
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Feather name="layers" size={18} color={colors.secondary} />
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-            Pack de cartas
+      {mode === "join" && (
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: colors.mutedForeground }]}>
+            CÓDIGO DE SALA
           </Text>
+          <TextInput
+            value={code}
+            onChangeText={(t) => setCode(t.toUpperCase())}
+            placeholder="ABCDE"
+            placeholderTextColor={colors.mutedForeground}
+            autoCapitalize="characters"
+            maxLength={5}
+            style={[
+              styles.input,
+              styles.codeInput,
+              {
+                color: colors.primary,
+                borderColor: colors.primary,
+                backgroundColor: colors.card,
+              },
+            ]}
+          />
         </View>
-        {PACKS.map((p) => {
-          const active = pack === p.id;
-          return (
-            <Pressable
-              key={p.id}
-              onPress={() => setPack(p.id)}
-              style={({ pressed }) => [
-                styles.packCard,
-                {
-                  borderColor: active ? colors.primary : colors.border,
-                  backgroundColor: colors.card,
-                  shadowColor: active ? colors.primary : "transparent",
-                },
-                pressed && { transform: [{ scale: 0.98 }] },
-              ]}
-            >
-              <LinearGradient
-                colors={
-                  active ? ["#1a4d0a", "#15042A"] : ["#15042A", "#15042A"]
-                }
-                style={StyleSheet.absoluteFill}
-              />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.packName, { color: colors.foreground }]}>
-                  {p.name}
-                </Text>
+      )}
+
+      <View style={styles.section}>
+        <Text style={[styles.label, { color: colors.mutedForeground }]}>
+          ROL (puedes cambiarlo después)
+        </Text>
+        <View style={styles.tagRow}>
+          {TAGS.map((t) => {
+            const active = tags.includes(t.id);
+            return (
+              <Pressable
+                key={t.id}
+                onPress={() => toggleTag(t.id)}
+                style={[
+                  styles.tagChip,
+                  {
+                    borderColor: active ? colors.primary : colors.border,
+                    backgroundColor: active ? colors.primary + "22" : "transparent",
+                  },
+                ]}
+              >
                 <Text
-                  style={[styles.packDesc, { color: colors.mutedForeground }]}
+                  style={[
+                    styles.tagChipText,
+                    { color: active ? colors.primary : colors.mutedForeground },
+                  ]}
                 >
-                  {p.description}
+                  {t.label}
                 </Text>
-              </View>
-              {active && (
-                <Feather name="check-circle" size={22} color={colors.primary} />
-              )}
-            </Pressable>
-          );
-        })}
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
+      {mode === "create" && (
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: colors.mutedForeground }]}>
+            PACK DE CARTAS
+          </Text>
+          {PACKS.map((p) => {
+            const active = pack === p.id;
+            return (
+              <Pressable
+                key={p.id}
+                onPress={() => setPack(p.id)}
+                style={[
+                  styles.packCard,
+                  {
+                    borderColor: active ? colors.primary : colors.border,
+                    backgroundColor: colors.card,
+                    shadowColor: active ? colors.primary : "transparent",
+                  },
+                ]}
+              >
+                <LinearGradient
+                  colors={
+                    active
+                      ? p.id === "allin"
+                        ? ["#3d0a1e", "#15042A"]
+                        : ["#1a4d0a", "#15042A"]
+                      : ["#15042A", "#15042A"]
+                  }
+                  style={StyleSheet.absoluteFill}
+                />
+                <View style={{ flex: 1 }}>
+                  <View style={styles.packHead}>
+                    <Text style={[styles.packName, { color: colors.foreground }]}>
+                      {p.name}
+                    </Text>
+                    {p.id === "allin" && (
+                      <Text
+                        style={[
+                          styles.packBadge,
+                          {
+                            color: colors.destructive,
+                            borderColor: colors.destructive,
+                          },
+                        ]}
+                      >
+                        TODO MEZCLADO
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={[styles.packDesc, { color: colors.mutedForeground }]}>
+                    {p.description}
+                  </Text>
+                </View>
+                {active && (
+                  <Feather name="check-circle" size={22} color={colors.primary} />
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+
+      {error && (
+        <View style={[styles.errorBox, { borderColor: colors.destructive }]}>
+          <Text style={{ color: colors.destructive, textAlign: "center" }}>
+            {error}
+          </Text>
+        </View>
+      )}
+
       <NeonButton
-        label={canPlay ? "INICIAR PARTIDA" : "Necesitas 2+ jugadores"}
-        disabled={!canPlay}
-        onPress={() => {
-          startGame();
-          router.push("/game");
-        }}
-        style={{ marginTop: 8 }}
+        label={
+          busy
+            ? "..."
+            : mode === "create"
+              ? "CREAR SALA"
+              : "ENTRAR EN LA SALA"
+        }
+        onPress={mode === "create" ? handleCreate : handleJoin}
+        disabled={busy}
+        variant={mode === "create" ? "primary" : "secondary"}
+        style={{ marginTop: 4 }}
       />
 
-      <Pressable
-        onPress={() => router.push("/ranking")}
-        style={styles.linkRow}
-      >
-        <Feather name="award" size={16} color={colors.mutedForeground} />
-        <Text style={[styles.link, { color: colors.mutedForeground }]}>
-          Ver ranking histórico
-        </Text>
-      </Pressable>
+      <Text style={[styles.footer, { color: colors.mutedForeground }]}>
+        Sin alcohol, sin riesgos, sin gastos. Solo caos del bueno.
+      </Text>
     </ScrollView>
   );
 }
 
+function extractErr(e: unknown): string {
+  const err = e as { data?: { error?: string }; message?: string };
+  return err?.data?.error ?? err?.message ?? "Error inesperado";
+}
+
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 20,
-    gap: 28,
-  },
-  hero: {
-    gap: 8,
-  },
-  tag: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 12,
-    letterSpacing: 3,
-  },
+  container: { paddingHorizontal: 20, gap: 22 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  hero: { gap: 8 },
+  tag: { fontFamily: "Inter_700Bold", fontSize: 12, letterSpacing: 3 },
   title: {
     fontFamily: "Inter_700Bold",
     fontSize: 56,
@@ -185,53 +382,54 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontFamily: "Inter_400Regular",
-    fontSize: 15,
-    lineHeight: 22,
-    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 4,
   },
-  section: {
-    gap: 12,
-  },
-  sectionHeader: {
+  tabs: { flexDirection: "row", gap: 8 },
+  tab: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-  },
-  sectionTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 18,
-    flex: 1,
-  },
-  count: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 14,
-  },
-  empty: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    fontStyle: "italic",
-  },
-  playersGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  playerChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
     borderRadius: 12,
+    borderWidth: 2,
+  },
+  tabText: { fontFamily: "Inter_700Bold", fontSize: 13 },
+  section: { gap: 8 },
+  label: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    letterSpacing: 1.5,
+  },
+  input: {
     borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontFamily: "Inter_500Medium",
+    fontSize: 16,
   },
-  chipName: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
+  codeInput: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 28,
+    letterSpacing: 8,
+    textAlign: "center",
+    borderWidth: 2,
   },
-  chipTags: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    marginTop: 2,
-    letterSpacing: 0.5,
+  tagRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  tagChip: {
+    flex: 1,
+    minWidth: 90,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
   },
+  tagChipText: { fontFamily: "Inter_700Bold", fontSize: 12 },
   packCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -243,26 +441,35 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
     shadowRadius: 12,
+    marginBottom: 8,
   },
-  packName: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 16,
-  },
-  packDesc: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    marginTop: 4,
-  },
-  linkRow: {
+  packHead: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    justifyContent: "center",
-    marginTop: 8,
+    gap: 8,
+    flexWrap: "wrap",
   },
-  link: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    textDecorationLine: "underline",
+  packName: { fontFamily: "Inter_700Bold", fontSize: 16 },
+  packBadge: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 9,
+    letterSpacing: 1,
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  packDesc: { fontFamily: "Inter_400Regular", fontSize: 13, marginTop: 4 },
+  errorBox: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+  },
+  footer: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    textAlign: "center",
+    marginTop: 8,
+    fontStyle: "italic",
   },
 });

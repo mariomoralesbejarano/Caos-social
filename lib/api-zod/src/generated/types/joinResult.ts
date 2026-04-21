@@ -5,7 +5,9 @@
  * API specification for CAOS SOCIAL multiplayer rooms
  * OpenAPI spec version: 0.1.0
  */
+import type { RoomState } from "./roomState";
 
-export interface HealthStatus {
-  status: string;
+export interface JoinResult {
+  playerId: string;
+  room: RoomState;
 }

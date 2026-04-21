@@ -6,6 +6,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { setBaseUrl } from "@workspace/api-client-react";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
@@ -15,11 +16,18 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { GameProvider } from "@/contexts/GameContext";
+import { RoomProvider } from "@/contexts/RoomContext";
 
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: false, refetchOnWindowFocus: false },
+  },
+});
+
+const domain = process.env.EXPO_PUBLIC_DOMAIN;
+if (domain) setBaseUrl(`https://${domain}`);
 
 function RootLayoutNav() {
   return (
@@ -32,7 +40,7 @@ function RootLayoutNav() {
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="players" options={{ title: "Jugadores" }} />
+      <Stack.Screen name="players" options={{ title: "Sala" }} />
       <Stack.Screen name="game" options={{ headerShown: false }} />
       <Stack.Screen name="ranking" options={{ title: "Ranking" }} />
     </Stack>
@@ -59,14 +67,16 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <GameProvider>
-            <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#0A0014" }}>
+          <RoomProvider>
+            <GestureHandlerRootView
+              style={{ flex: 1, backgroundColor: "#0A0014" }}
+            >
               <KeyboardProvider>
                 <StatusBar style="light" />
                 <RootLayoutNav />
               </KeyboardProvider>
             </GestureHandlerRootView>
-          </GameProvider>
+          </RoomProvider>
         </QueryClientProvider>
       </ErrorBoundary>
     </SafeAreaProvider>

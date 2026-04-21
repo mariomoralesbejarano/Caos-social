@@ -1,38 +1,133 @@
 import { Feather } from "@expo/vector-icons";
-import React, { useState } from "react";
 import {
+  CardTag,
+  getGetRoomQueryKey,
+  useResetRoom,
+  useSetMyTags,
+  useStartGame,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { NeonButton } from "@/components/NeonButton";
-import { CardTag } from "@/constants/cards";
-import { useGame } from "@/contexts/GameContext";
+import { useRoom } from "@/contexts/RoomContext";
 import { useColors } from "@/hooks/useColors";
 
 const TAG_INFO: { id: CardTag; label: string; desc: string }[] = [
-  { id: "abstemio", label: "Abstemio", desc: "No recibe cartas de beber" },
-  { id: "pareja", label: "Con Pareja", desc: "No recibe cartas de ligar" },
+  { id: "abstemio", label: "Abstemio", desc: "Sin cartas de beber" },
+  { id: "pareja", label: "Con pareja", desc: "Sin cartas de ligar" },
   { id: "hardcore", label: "Hardcore", desc: "Recibe todo · doble puntos" },
 ];
 
-export default function PlayersScreen() {
+export default function LobbyScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { players, addPlayer, removePlayer, togglePlayerTag } = useGame();
-  const [name, setName] = useState("");
+  const router = useRouter();
   const isWeb = Platform.OS === "web";
+  const { session, room, isLoading, setSession } = useRoom();
+  const qc = useQueryClient();
 
-  function submit() {
-    if (!name.trim()) return;
-    addPlayer(name);
-    setName("");
+  const startMut = useStartGame();
+  const tagsMut = useSetMyTags();
+  const resetMut = useResetRoom();
+  const [error, setError] = useState<string | null>(null);
+
+  // If active, send to game
+  useEffect(() => {
+    if (room?.status === "active") router.replace("/game");
+  }, [room?.status, router]);
+
+  if (isLoading || !room || !session) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  const me = room.players.find((p) => p.id === session.playerId);
+  const isOwner = room.ownerId === session.playerId;
+
+  function invalidate() {
+    qc.invalidateQueries({
+      queryKey: getGetRoomQueryKey(session!.roomCode, {
+        playerId: session!.playerId,
+      }),
+    });
+  }
+
+  async function handleStart() {
+    setError(null);
+    try {
+      await startMut.mutateAsync({
+        code: room!.code,
+        data: { playerId: session!.playerId },
+      });
+      invalidate();
+      router.replace("/game");
+    } catch (e) {
+      setError(extractErr(e));
+    }
+  }
+
+  async function handleToggleTag(tag: CardTag) {
+    if (!me) return;
+    const has = me.tags.includes(tag);
+    let next = has ? me.tags.filter((t) => t !== tag) : [...me.tags, tag];
+    if (!has && tag === "hardcore") next = ["hardcore"];
+    else if (!has) next = next.filter((t) => t !== "hardcore");
+    try {
+      await tagsMut.mutateAsync({
+        code: room!.code,
+        data: { playerId: session!.playerId, tags: next },
+      });
+      invalidate();
+    } catch (e) {
+      setError(extractErr(e));
+    }
+  }
+
+  async function handleLeave() {
+    await setSession(null);
+    router.replace("/");
+  }
+
+  async function handleReset() {
+    try {
+      await resetMut.mutateAsync({
+        code: room!.code,
+        data: { playerId: session!.playerId },
+      });
+      invalidate();
+    } catch (e) {
+      setError(extractErr(e));
+    }
+  }
+
+  async function shareCode() {
+    if (Platform.OS === "web") {
+      try {
+        await navigator.clipboard?.writeText(room!.code);
+      } catch {}
+      return;
+    }
+    try {
+      await Share.share({
+        message: `Únete a mi sala de CAOS SOCIAL con el código: ${room!.code}`,
+      });
+    } catch {}
   }
 
   return (
@@ -43,166 +138,228 @@ export default function PlayersScreen() {
         { paddingBottom: (isWeb ? 34 : insets.bottom) + 40 },
       ]}
     >
-      <View style={styles.row}>
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          placeholder="Nombre del jugador"
-          placeholderTextColor={colors.mutedForeground}
-          onSubmitEditing={submit}
-          returnKeyType="done"
-          style={[
-            styles.input,
-            {
-              color: colors.foreground,
-              borderColor: colors.border,
-              backgroundColor: colors.card,
-            },
-          ]}
-        />
-        <NeonButton label="Añadir" onPress={submit} small />
+      <Pressable
+        onPress={shareCode}
+        style={[
+          styles.codeBox,
+          { borderColor: colors.primary, backgroundColor: colors.card },
+        ]}
+      >
+        <Text style={[styles.codeLabel, { color: colors.mutedForeground }]}>
+          CÓDIGO DE SALA · toca para compartir
+        </Text>
+        <Text style={[styles.code, { color: colors.primary }]}>{room.code}</Text>
+        <Feather name="share-2" size={18} color={colors.mutedForeground} />
+      </Pressable>
+
+      <View style={styles.sectionHead}>
+        <Feather name="users" size={18} color={colors.primary} />
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+          Jugadores conectados
+        </Text>
+        <Text style={[styles.count, { color: colors.mutedForeground }]}>
+          {room.players.length}
+        </Text>
       </View>
 
-      {players.length === 0 ? (
-        <View style={styles.emptyWrap}>
-          <Feather name="user-plus" size={40} color={colors.mutedForeground} />
-          <Text style={[styles.empty, { color: colors.mutedForeground }]}>
-            Añade jugadores para comenzar a jugar.
+      <View style={styles.playerList}>
+        {room.players.map((p) => {
+          const isMe = p.id === session.playerId;
+          return (
+            <View
+              key={p.id}
+              style={[
+                styles.playerRow,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: isMe ? colors.primary : colors.border,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.dot,
+                  { backgroundColor: p.connected ? colors.primary : colors.border },
+                ]}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.pName, { color: colors.foreground }]}>
+                  {p.name} {isMe && "(tú)"}
+                  {p.id === room.ownerId && (
+                    <Text style={{ color: colors.secondary, fontSize: 11 }}>
+                      {"  "}· anfitrión
+                    </Text>
+                  )}
+                </Text>
+                {p.tags.length > 0 && (
+                  <Text style={[styles.pTags, { color: colors.mutedForeground }]}>
+                    {p.tags.join(" · ")}
+                  </Text>
+                )}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+
+      <View style={styles.sectionHead}>
+        <Feather name="user" size={18} color={colors.secondary} />
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+          Tu rol
+        </Text>
+      </View>
+
+      <View style={styles.tagRow}>
+        {TAG_INFO.map((t) => {
+          const active = me?.tags.includes(t.id);
+          return (
+            <Pressable
+              key={t.id}
+              onPress={() => handleToggleTag(t.id)}
+              style={[
+                styles.tagChip,
+                {
+                  borderColor: active ? colors.primary : colors.border,
+                  backgroundColor: active ? colors.primary + "22" : "transparent",
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.tagChipText,
+                  { color: active ? colors.primary : colors.mutedForeground },
+                ]}
+              >
+                {t.label}
+              </Text>
+              <Text
+                style={[styles.tagChipDesc, { color: colors.mutedForeground }]}
+              >
+                {t.desc}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {error && (
+        <Text style={{ color: colors.destructive, textAlign: "center" }}>
+          {error}
+        </Text>
+      )}
+
+      {isOwner ? (
+        <NeonButton
+          label={
+            room.players.length < 2
+              ? "Necesitas 2+ jugadores"
+              : room.status === "active"
+                ? "Ya en juego"
+                : "EMPEZAR PARTIDA"
+          }
+          disabled={room.players.length < 2 || startMut.isPending}
+          onPress={handleStart}
+        />
+      ) : (
+        <View
+          style={[
+            styles.waiting,
+            { borderColor: colors.border, backgroundColor: colors.card },
+          ]}
+        >
+          <ActivityIndicator color={colors.secondary} />
+          <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
+            Esperando que el anfitrión empiece...
           </Text>
         </View>
-      ) : (
-        players.map((p) => (
-          <View
-            key={p.id}
-            style={[
-              styles.playerCard,
-              { backgroundColor: colors.card, borderColor: colors.border },
-            ]}
-          >
-            <View style={styles.playerHead}>
-              <Text style={[styles.name, { color: colors.foreground }]}>
-                {p.name}
-              </Text>
-              <Pressable
-                onPress={() => removePlayer(p.id)}
-                hitSlop={10}
-                style={styles.deleteBtn}
-              >
-                <Feather name="trash-2" size={18} color={colors.destructive} />
-              </Pressable>
-            </View>
-            <Text style={[styles.tagLabel, { color: colors.mutedForeground }]}>
-              ETIQUETAS DE ROL
-            </Text>
-            <View style={styles.tagsRow}>
-              {TAG_INFO.map((t) => {
-                const active = p.tags.includes(t.id);
-                return (
-                  <Pressable
-                    key={t.id}
-                    onPress={() => togglePlayerTag(p.id, t.id)}
-                    style={[
-                      styles.tag,
-                      {
-                        borderColor: active ? colors.primary : colors.border,
-                        backgroundColor: active
-                          ? colors.primary + "22"
-                          : "transparent",
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.tagText,
-                        {
-                          color: active ? colors.primary : colors.mutedForeground,
-                        },
-                      ]}
-                    >
-                      {t.label}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.tagDesc,
-                        {
-                          color: active
-                            ? colors.foreground
-                            : colors.mutedForeground,
-                        },
-                      ]}
-                    >
-                      {t.desc}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-        ))
       )}
+
+      <View style={styles.bottomActions}>
+        {isOwner && room.status === "active" && (
+          <NeonButton
+            label="Reiniciar partida"
+            variant="ghost"
+            small
+            onPress={handleReset}
+            style={{ flex: 1 }}
+          />
+        )}
+        <NeonButton
+          label="Salir de la sala"
+          variant="ghost"
+          small
+          onPress={handleLeave}
+          style={{ flex: 1 }}
+        />
+      </View>
     </ScrollView>
   );
 }
 
+function extractErr(e: unknown): string {
+  const err = e as { data?: { error?: string }; message?: string };
+  return err?.data?.error ?? err?.message ?? "Error";
+}
+
 const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    gap: 16,
-  },
-  row: {
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "center",
-  },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontFamily: "Inter_500Medium",
-    fontSize: 15,
-  },
-  emptyWrap: {
-    alignItems: "center",
-    paddingVertical: 60,
-    gap: 12,
-  },
-  empty: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    textAlign: "center",
-  },
-  playerCard: {
-    borderWidth: 1,
+  container: { padding: 20, gap: 18 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  codeBox: {
+    borderWidth: 2,
     borderRadius: 16,
-    padding: 16,
-    gap: 10,
-  },
-  playerHead: {
-    flexDirection: "row",
+    padding: 18,
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 6,
+    shadowColor: "#39FF14",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 18,
+    elevation: 8,
   },
-  name: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 18,
-  },
-  deleteBtn: {
-    padding: 4,
-  },
-  tagLabel: {
+  codeLabel: {
     fontFamily: "Inter_700Bold",
     fontSize: 10,
     letterSpacing: 1.5,
-    marginTop: 4,
   },
-  tagsRow: {
+  code: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 44,
+    letterSpacing: 12,
+  },
+  sectionHead: {
     flexDirection: "row",
+    alignItems: "center",
     gap: 8,
-    flexWrap: "wrap",
+    marginTop: 6,
   },
-  tag: {
+  sectionTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    flex: 1,
+  },
+  count: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+  },
+  playerList: { gap: 8 },
+  playerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  pName: { fontFamily: "Inter_700Bold", fontSize: 15 },
+  pTags: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    marginTop: 2,
+    letterSpacing: 0.5,
+  },
+  tagRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  tagChip: {
     flex: 1,
     minWidth: 100,
     paddingVertical: 10,
@@ -210,13 +367,24 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
   },
-  tagText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 12,
-  },
-  tagDesc: {
+  tagChipText: { fontFamily: "Inter_700Bold", fontSize: 12 },
+  tagChipDesc: {
     fontFamily: "Inter_400Regular",
     fontSize: 10,
     marginTop: 2,
+  },
+  waiting: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: "center",
+  },
+  bottomActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 8,
   },
 });

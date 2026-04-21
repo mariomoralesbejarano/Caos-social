@@ -1,9 +1,21 @@
 import { Feather } from "@expo/vector-icons";
+import {
+  GameCard,
+  PendingThrow,
+  RoomPlayer,
+  getGetRoomQueryKey,
+  useDrawCard,
+  usePanicVote,
+  useRespondToThrow,
+  useThrowCard,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Modal,
   Platform,
@@ -17,35 +29,28 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CardView } from "@/components/CardView";
 import { NeonButton } from "@/components/NeonButton";
-import { GameCard, getCard } from "@/constants/cards";
-import { useGame } from "@/contexts/GameContext";
+import { useRoom } from "@/contexts/RoomContext";
 import { useColors } from "@/hooks/useColors";
-
-type Phase = "select-player" | "view-hand" | "throw" | "draw-anim";
 
 export default function GameScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const isWeb = Platform.OS === "web";
-  const game = useGame();
-  const {
-    players,
-    pending,
-    drawCard,
-    throwCard,
-    acceptPending,
-    rejectPending,
-    resolvePower,
-    voteCancel,
-  } = game;
+  const { session, room, isLoading } = useRoom();
+  const qc = useQueryClient();
 
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const drawMut = useDrawCard();
+  const throwMut = useThrowCard();
+  const respondMut = useRespondToThrow();
+  const panicMut = usePanicVote();
+
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
-  const [throwTo, setThrowTo] = useState<string | null>(null);
+  const [throwTo, setThrowTo] = useState<boolean>(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
-  const [showPanic, setShowPanic] = useState(false);
   const [drawnPreview, setDrawnPreview] = useState<GameCard | null>(null);
+  const [activeInbox, setActiveInbox] = useState<PendingThrow | null>(null);
+  const [panicFor, setPanicFor] = useState<PendingThrow | null>(null);
 
   const shuffleAnim = useRef(new Animated.Value(0)).current;
 
@@ -56,17 +61,42 @@ export default function GameScreen() {
     }
   }, [errMsg]);
 
-  const active = players.find((p) => p.id === activeId);
+  useEffect(() => {
+    if (!session) router.replace("/");
+    else if (room && room.status !== "active") router.replace("/players");
+  }, [room, session, router]);
 
-  const phase: Phase = useMemo(() => {
-    if (!activeId) return "select-player";
-    if (selectedCard && throwTo === null) return "throw";
-    return "view-hand";
-  }, [activeId, selectedCard, throwTo]);
+  if (isLoading || !room || !session) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
 
-  function handleDraw() {
-    if (!active) return;
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const me = room.players.find((p) => p.id === session.playerId);
+  if (!me) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Text style={{ color: colors.foreground }}>No estás en esta sala</Text>
+      </View>
+    );
+  }
+
+  const others = room.players.filter((p) => p.id !== session.playerId);
+
+  function invalidate() {
+    qc.invalidateQueries({
+      queryKey: getGetRoomQueryKey(session!.roomCode, {
+        playerId: session!.playerId,
+      }),
+    });
+  }
+
+  async function handleDraw() {
+    if (!me || me.handCount >= 5) return;
+    if (Platform.OS !== "web")
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Animated.sequence([
       Animated.timing(shuffleAnim, {
         toValue: 1,
@@ -79,35 +109,74 @@ export default function GameScreen() {
         useNativeDriver: true,
       }),
     ]).start();
-    const c = drawCard(active.id);
-    if (!c) {
-      setErrMsg("Mazo vacío o mano completa.");
-      return;
+    try {
+      const res = await drawMut.mutateAsync({
+        code: room!.code,
+        data: { playerId: session!.playerId },
+      });
+      invalidate();
+      setDrawnPreview(res.drawnCard);
+      setTimeout(() => setDrawnPreview(null), 1800);
+    } catch (e) {
+      setErrMsg(extractErr(e));
     }
-    setDrawnPreview(c);
-    setTimeout(() => setDrawnPreview(null), 1800);
   }
 
-  function handleThrow(targetId: string) {
-    if (!active || !selectedCard) return;
-    const res = throwCard(active.id, targetId, selectedCard);
-    if (!res.ok) {
-      setErrMsg(res.reason ?? "No se puede lanzar.");
-      return;
+  async function handleThrow(targetId: string) {
+    if (!selectedCard) return;
+    try {
+      await throwMut.mutateAsync({
+        code: room!.code,
+        data: {
+          playerId: session!.playerId,
+          toPlayerId: targetId,
+          cardId: selectedCard,
+        },
+      });
+      invalidate();
+      setSelectedCard(null);
+      setThrowTo(false);
+      if (Platform.OS !== "web")
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {
+      setErrMsg(extractErr(e));
     }
-    setSelectedCard(null);
-    setThrowTo(null);
-    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
-  if (pending) {
-    return (
-      <PendingResolver
-        onClose={() => {}}
-        showPanic={showPanic}
-        setShowPanic={setShowPanic}
-      />
-    );
+  async function handleRespond(
+    pending: PendingThrow,
+    action: "accept" | "reject" | "reversa" | "espejo" | "bloqueo" | "robo-carta",
+  ) {
+    try {
+      await respondMut.mutateAsync({
+        code: room!.code,
+        data: {
+          playerId: session!.playerId,
+          throwId: pending.id,
+          action,
+        },
+      });
+      invalidate();
+      setActiveInbox(null);
+    } catch (e) {
+      setErrMsg(extractErr(e));
+    }
+  }
+
+  async function handlePanic(throwId: string, against: boolean) {
+    try {
+      await panicMut.mutateAsync({
+        code: room!.code,
+        data: {
+          playerId: session!.playerId,
+          throwId,
+          against,
+        },
+      });
+      invalidate();
+    } catch (e) {
+      setErrMsg(extractErr(e));
+    }
   }
 
   return (
@@ -121,11 +190,11 @@ export default function GameScreen() {
           },
         ]}
       >
-        <Pressable onPress={() => router.back()} hitSlop={10}>
-          <Feather name="x" size={24} color={colors.foreground} />
+        <Pressable onPress={() => router.push("/players")} hitSlop={10}>
+          <Feather name="users" size={22} color={colors.foreground} />
         </Pressable>
         <Text style={[styles.topTitle, { color: colors.foreground }]}>
-          {active ? `Turno de ${active.name}` : "Elige tu turno"}
+          {me.name}
         </Text>
         <Pressable onPress={() => router.push("/ranking")} hitSlop={10}>
           <Feather name="award" size={22} color={colors.primary} />
@@ -138,198 +207,186 @@ export default function GameScreen() {
         </View>
       )}
 
-      {phase === "select-player" && (
-        <ScrollView
-          contentContainerStyle={[
-            styles.selectorWrap,
-            { paddingBottom: (isWeb ? 34 : insets.bottom) + 40 },
-          ]}
-        >
-          <Text style={[styles.selectorTitle, { color: colors.foreground }]}>
-            ¿Quién juega ahora?
-          </Text>
-          <Text style={[styles.selectorSub, { color: colors.mutedForeground }]}>
-            Pasa el dispositivo y selecciona tu nombre para ver tu mano.
-          </Text>
-          <View style={styles.selectorGrid}>
-            {players.map((p) => {
-              const shielded = p.shieldUntil > Date.now();
-              return (
-                <Pressable
-                  key={p.id}
-                  onPress={() => setActiveId(p.id)}
-                  style={({ pressed }) => [
-                    styles.playerTile,
-                    {
-                      backgroundColor: colors.card,
-                      borderColor: shielded ? colors.secondary : colors.border,
-                      shadowColor: shielded ? colors.secondary : colors.primary,
-                    },
-                    pressed && { transform: [{ scale: 0.97 }] },
-                  ]}
-                >
-                  <Text style={[styles.tileName, { color: colors.foreground }]}>
-                    {p.name}
-                  </Text>
-                  <View style={styles.tileMeta}>
-                    <Text style={[styles.tileScore, { color: colors.primary }]}>
-                      {p.score} pts
-                    </Text>
-                    <Text style={[styles.tileHand, { color: colors.mutedForeground }]}>
-                      · {p.hand.length} cartas
-                    </Text>
-                  </View>
-                  {shielded && (
-                    <View style={styles.shieldBadge}>
-                      <Feather name="shield" size={12} color={colors.secondary} />
-                      <Text style={[styles.shieldText, { color: colors.secondary }]}>
-                        ESCUDO
-                      </Text>
-                    </View>
-                  )}
-                  {p.multiplier > 1 && (
-                    <Text style={[styles.multiplier, { color: colors.destructive }]}>
-                      x{p.multiplier} próximo reto
-                    </Text>
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
-        </ScrollView>
-      )}
-
-      {active && phase === "view-hand" && (
-        <ScrollView
-          contentContainerStyle={[
-            styles.handWrap,
-            { paddingBottom: (isWeb ? 34 : insets.bottom) + 40 },
-          ]}
-        >
-          <View style={styles.scoreRow}>
-            <View style={styles.scoreBox}>
-              <Text style={[styles.scoreLabel, { color: colors.mutedForeground }]}>
-                PUNTOS
-              </Text>
-              <Text style={[styles.scoreVal, { color: colors.primary }]}>
-                {active.score}
-              </Text>
-            </View>
-            <View style={styles.scoreBox}>
-              <Text style={[styles.scoreLabel, { color: colors.mutedForeground }]}>
-                MANO
-              </Text>
-              <Text style={[styles.scoreVal, { color: colors.secondary }]}>
-                {active.hand.length}/5
-              </Text>
-            </View>
-            <Pressable
-              onPress={() => {
-                setActiveId(null);
-                setSelectedCard(null);
-              }}
-              style={[
-                styles.exitTurn,
-                { borderColor: colors.border, backgroundColor: colors.card },
-              ]}
-            >
-              <Feather name="log-out" size={16} color={colors.mutedForeground} />
-            </Pressable>
-          </View>
-
-          {/* Central draw button */}
-          <View style={styles.drawSection}>
-            <Animated.View
-              style={{
-                transform: [
-                  {
-                    rotate: shuffleAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ["0deg", "360deg"],
-                    }),
-                  },
-                  {
-                    scale: shuffleAnim.interpolate({
-                      inputRange: [0, 0.5, 1],
-                      outputRange: [1, 1.15, 1],
-                    }),
-                  },
-                ],
-              }}
-            >
+      <ScrollView
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingBottom: (isWeb ? 34 : insets.bottom) + 40 },
+        ]}
+      >
+        {/* Inbox */}
+        {room.myInbox.length > 0 && (
+          <View
+            style={[
+              styles.inboxBox,
+              { borderColor: colors.destructive, backgroundColor: colors.card },
+            ]}
+          >
+            <Text style={[styles.inboxTitle, { color: colors.destructive }]}>
+              ⚡ {room.myInbox.length} CARTA{room.myInbox.length > 1 ? "S" : ""} PARA TI
+            </Text>
+            {room.myInbox.map((t) => (
               <Pressable
-                onPress={handleDraw}
-                disabled={active.hand.length >= 5}
-                style={({ pressed }) => [
-                  styles.drawBtn,
-                  {
-                    borderColor: colors.primary,
-                    shadowColor: colors.primary,
-                    opacity: active.hand.length >= 5 ? 0.4 : 1,
-                  },
-                  pressed && { transform: [{ scale: 0.95 }] },
+                key={t.id}
+                onPress={() => setActiveInbox(t)}
+                style={[
+                  styles.inboxRow,
+                  { borderColor: colors.border, backgroundColor: colors.background },
                 ]}
               >
-                <LinearGradient
-                  colors={["#1a4d0a", "#2a0a3d"]}
-                  style={StyleSheet.absoluteFill}
-                />
-                <Feather name="layers" size={36} color={colors.primary} />
-                <Text style={[styles.drawText, { color: colors.foreground }]}>
-                  ROBAR{"\n"}CARTA
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.inboxFrom, { color: colors.mutedForeground }]}>
+                    De {t.fromName}
+                  </Text>
+                  <Text style={[styles.inboxCard, { color: colors.foreground }]}>
+                    {t.card.title}
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={20} color={colors.primary} />
               </Pressable>
-            </Animated.View>
+            ))}
           </View>
+        )}
 
-          <Text style={[styles.handLabel, { color: colors.mutedForeground }]}>
-            TU MANO · toca para seleccionar
-          </Text>
-
-          {active.hand.length === 0 ? (
-            <Text style={[styles.empty, { color: colors.mutedForeground }]}>
-              Toca el botón central para robar tu primera carta.
+        {/* Score */}
+        <View style={styles.scoreRow}>
+          <View style={styles.scoreBox}>
+            <Text style={[styles.scoreLabel, { color: colors.mutedForeground }]}>
+              PUNTOS
             </Text>
-          ) : (
-            <View style={styles.handList}>
-              {active.hand.map((cid) => {
-                const card = getCard(cid);
-                if (!card) return null;
-                return (
-                  <CardView
-                    key={cid + Math.random()}
-                    card={card}
-                    selected={selectedCard === cid}
-                    onPress={() =>
-                      setSelectedCard(selectedCard === cid ? null : cid)
-                    }
-                  />
-                );
-              })}
-            </View>
-          )}
+            <Text style={[styles.scoreVal, { color: colors.primary }]}>
+              {me.score}
+            </Text>
+          </View>
+          <View style={styles.scoreBox}>
+            <Text style={[styles.scoreLabel, { color: colors.mutedForeground }]}>
+              MANO
+            </Text>
+            <Text style={[styles.scoreVal, { color: colors.secondary }]}>
+              {me.handCount}/5
+            </Text>
+          </View>
+          <View style={styles.scoreBox}>
+            <Text style={[styles.scoreLabel, { color: colors.mutedForeground }]}>
+              RETOS
+            </Text>
+            <Text style={[styles.scoreVal, { color: colors.foreground }]}>
+              {me.challengesCompleted}
+            </Text>
+          </View>
+        </View>
 
-          {selectedCard && (
-            <NeonButton
-              label="Lanzar a un jugador →"
-              onPress={() => setThrowTo("__pick__")}
-              style={{ marginTop: 16 }}
-            />
-          )}
-        </ScrollView>
-      )}
+        {me.shieldUntil > Date.now() && (
+          <View style={[styles.shieldBanner, { borderColor: colors.secondary }]}>
+            <Feather name="shield" size={16} color={colors.secondary} />
+            <Text style={{ color: colors.secondary, fontFamily: "Inter_700Bold" }}>
+              ESCUDO ACTIVO
+            </Text>
+          </View>
+        )}
+        {me.multiplier > 1 && (
+          <View style={[styles.shieldBanner, { borderColor: colors.destructive }]}>
+            <Feather name="alert-triangle" size={16} color={colors.destructive} />
+            <Text style={{ color: colors.destructive, fontFamily: "Inter_700Bold" }}>
+              x{me.multiplier} en tu próximo reto cumplido
+            </Text>
+          </View>
+        )}
 
-      {/* Throw target selector modal */}
+        {/* Draw button */}
+        <View style={styles.drawSection}>
+          <Animated.View
+            style={{
+              transform: [
+                {
+                  rotate: shuffleAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ["0deg", "360deg"],
+                  }),
+                },
+                {
+                  scale: shuffleAnim.interpolate({
+                    inputRange: [0, 0.5, 1],
+                    outputRange: [1, 1.15, 1],
+                  }),
+                },
+              ],
+            }}
+          >
+            <Pressable
+              onPress={handleDraw}
+              disabled={me.handCount >= 5 || drawMut.isPending}
+              style={({ pressed }) => [
+                styles.drawBtn,
+                {
+                  borderColor: colors.primary,
+                  shadowColor: colors.primary,
+                  opacity: me.handCount >= 5 ? 0.4 : 1,
+                },
+                pressed && { transform: [{ scale: 0.95 }] },
+              ]}
+            >
+              <LinearGradient
+                colors={["#1a4d0a", "#2a0a3d"]}
+                style={StyleSheet.absoluteFill}
+              />
+              <Feather name="layers" size={36} color={colors.primary} />
+              <Text style={[styles.drawText, { color: colors.foreground }]}>
+                ROBAR{"\n"}CARTA
+              </Text>
+            </Pressable>
+          </Animated.View>
+        </View>
+
+        <Text style={[styles.handLabel, { color: colors.mutedForeground }]}>
+          TU MANO · toca para seleccionar y lanzar
+        </Text>
+
+        {room.myHand.length === 0 ? (
+          <Text style={[styles.empty, { color: colors.mutedForeground }]}>
+            Toca el botón central para robar tu primera carta.
+          </Text>
+        ) : (
+          <View style={styles.handList}>
+            {room.myHand.map((card, i) => (
+              <CardView
+                key={card.id + i}
+                card={card}
+                selected={selectedCard === card.id}
+                onPress={() =>
+                  setSelectedCard(selectedCard === card.id ? null : card.id)
+                }
+              />
+            ))}
+          </View>
+        )}
+
+        {selectedCard && (
+          <NeonButton
+            label="Lanzar a un jugador →"
+            onPress={() => setThrowTo(true)}
+            style={{ marginTop: 16 }}
+          />
+        )}
+
+        {/* Other players preview */}
+        <Text style={[styles.handLabel, { color: colors.mutedForeground, marginTop: 18 }]}>
+          OTROS JUGADORES
+        </Text>
+        <View style={styles.othersList}>
+          {others.map((p) => (
+            <PlayerStrip key={p.id} player={p} />
+          ))}
+        </View>
+      </ScrollView>
+
+      {/* Throw target modal */}
       <Modal
-        visible={phase === "throw"}
+        visible={throwTo}
         transparent
         animationType="fade"
-        onRequestClose={() => setThrowTo(null)}
+        onRequestClose={() => setThrowTo(false)}
       >
-        <Pressable
-          style={styles.modalBg}
-          onPress={() => setThrowTo(null)}
-        >
+        <Pressable style={styles.modalBg} onPress={() => setThrowTo(false)}>
           <Pressable
             style={[
               styles.modalCard,
@@ -340,59 +397,53 @@ export default function GameScreen() {
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>
               ¿A quién?
             </Text>
-            {players
-              .filter((p) => p.id !== activeId)
-              .map((p) => {
-                const cd = game.cooldownLeft(activeId!, p.id);
-                const shielded = p.shieldUntil > Date.now();
-                const disabled = cd > 0 || shielded;
-                return (
-                  <Pressable
-                    key={p.id}
-                    onPress={() => !disabled && handleThrow(p.id)}
-                    style={[
-                      styles.targetRow,
-                      {
-                        borderColor: colors.border,
-                        opacity: disabled ? 0.4 : 1,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[styles.targetName, { color: colors.foreground }]}
-                    >
-                      {p.name}
+            {others.map((p) => {
+              const cdKey = `${session.playerId}->${p.id}`;
+              const last = room.cooldowns[cdKey] ?? 0;
+              const cd = Math.max(0, 10 * 60 * 1000 - (Date.now() - last));
+              const shielded = p.shieldUntil > Date.now();
+              const disabled = cd > 0 || shielded;
+              return (
+                <Pressable
+                  key={p.id}
+                  onPress={() => !disabled && handleThrow(p.id)}
+                  style={[
+                    styles.targetRow,
+                    {
+                      borderColor: colors.border,
+                      opacity: disabled ? 0.4 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.targetName, { color: colors.foreground }]}>
+                    {p.name}
+                  </Text>
+                  {shielded ? (
+                    <Text style={{ color: colors.secondary, fontSize: 11 }}>
+                      ESCUDO
                     </Text>
-                    {shielded ? (
-                      <Text style={{ color: colors.secondary, fontSize: 11 }}>
-                        ESCUDO
-                      </Text>
-                    ) : cd > 0 ? (
-                      <Text style={{ color: colors.destructive, fontSize: 11 }}>
-                        Cooldown {Math.ceil(cd / 60000)}m
-                      </Text>
-                    ) : (
-                      <Feather
-                        name="zap"
-                        size={16}
-                        color={colors.primary}
-                      />
-                    )}
-                  </Pressable>
-                );
-              })}
+                  ) : cd > 0 ? (
+                    <Text style={{ color: colors.destructive, fontSize: 11 }}>
+                      Cooldown {Math.ceil(cd / 60000)}m
+                    </Text>
+                  ) : (
+                    <Feather name="zap" size={16} color={colors.primary} />
+                  )}
+                </Pressable>
+              );
+            })}
             <NeonButton
               label="Cancelar"
               variant="ghost"
               small
-              onPress={() => setThrowTo(null)}
+              onPress={() => setThrowTo(false)}
               style={{ marginTop: 8 }}
             />
           </Pressable>
         </Pressable>
       </Modal>
 
-      {/* Drawn preview animation */}
+      {/* Drawn card preview */}
       <Modal visible={!!drawnPreview} transparent animationType="fade">
         <View style={styles.modalBg} pointerEvents="none">
           {drawnPreview && (
@@ -401,7 +452,7 @@ export default function GameScreen() {
               <Text
                 style={[
                   styles.drawnLabel,
-                  { color: colors.primary, textAlign: "center", marginTop: 8 },
+                  { color: colors.primary, marginTop: 8 },
                 ]}
               >
                 ¡NUEVA CARTA!
@@ -410,73 +461,142 @@ export default function GameScreen() {
           )}
         </View>
       </Modal>
+
+      {/* Inbox resolution modal */}
+      <Modal
+        visible={!!activeInbox}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setActiveInbox(null)}
+      >
+        {activeInbox && (
+          <ResolveInbox
+            pending={activeInbox}
+            myHand={room.myHand}
+            onClose={() => setActiveInbox(null)}
+            onAction={(act) => handleRespond(activeInbox, act)}
+            onPanic={() => {
+              setPanicFor(activeInbox);
+              setActiveInbox(null);
+            }}
+            busy={respondMut.isPending}
+          />
+        )}
+      </Modal>
+
+      {/* Panic vote modal */}
+      <Modal
+        visible={!!panicFor}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPanicFor(null)}
+      >
+        {panicFor && (
+          <PanicVote
+            pending={panicFor}
+            players={room.players}
+            myId={session.playerId}
+            onClose={() => setPanicFor(null)}
+            onVote={(against) => handlePanic(panicFor.id, against)}
+          />
+        )}
+      </Modal>
     </View>
   );
 }
 
-function PendingResolver({
-  showPanic,
-  setShowPanic,
+function PlayerStrip({ player }: { player: RoomPlayer }) {
+  const colors = useColors();
+  const shielded = player.shieldUntil > Date.now();
+  return (
+    <View
+      style={[
+        styles.otherRow,
+        {
+          backgroundColor: colors.card,
+          borderColor: shielded ? colors.secondary : colors.border,
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.dot,
+          { backgroundColor: player.connected ? colors.primary : colors.border },
+        ]}
+      />
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold" }}>
+          {player.name}
+        </Text>
+        <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>
+          {player.handCount} cartas · {player.score} pts
+          {shielded ? " · ESCUDO" : ""}
+          {player.multiplier > 1 ? ` · x${player.multiplier}` : ""}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function ResolveInbox({
+  pending,
+  myHand,
+  onClose,
+  onAction,
+  onPanic,
+  busy,
 }: {
+  pending: PendingThrow;
+  myHand: GameCard[];
   onClose: () => void;
-  showPanic: boolean;
-  setShowPanic: (v: boolean) => void;
+  onAction: (
+    action: "accept" | "reject" | "reversa" | "espejo" | "bloqueo" | "robo-carta",
+  ) => void;
+  onPanic: () => void;
+  busy: boolean;
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === "web";
-  const {
-    pending,
-    players,
-    acceptPending,
-    rejectPending,
-    resolvePower,
-    voteCancel,
-  } = useGame();
-  if (!pending) return null;
-  const card = getCard(pending.cardId);
-  const from = players.find((p) => p.id === pending.fromPlayerId);
-  const to = players.find((p) => p.id === pending.toPlayerId);
-  if (!card || !from || !to) return null;
-
-  const targetHand = to.hand.map((id) => getCard(id)).filter(Boolean) as GameCard[];
-  const counters = targetHand.filter((c) => c.isPower);
+  const counters = myHand.filter((c) => c.isPower);
 
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
       contentContainerStyle={[
-        styles.pendingWrap,
+        styles.resolveWrap,
         {
           paddingTop: (isWeb ? 67 : insets.top) + 16,
-          paddingBottom: (isWeb ? 34 : insets.bottom) + 30,
+          paddingBottom: (isWeb ? 34 : insets.bottom) + 40,
         },
       ]}
     >
-      <Text style={[styles.pendingFrom, { color: colors.mutedForeground }]}>
-        {from.name} →
-      </Text>
-      <Text style={[styles.pendingTo, { color: colors.foreground }]}>
-        {to.name}
-      </Text>
-      <Text style={[styles.pendingHint, { color: colors.secondary }]}>
-        {to.name}, has recibido un reto
-      </Text>
+      <View style={styles.resolveHeader}>
+        <Pressable onPress={onClose} hitSlop={10}>
+          <Feather name="x" size={24} color={colors.foreground} />
+        </Pressable>
+        <Text style={[styles.resolveTop, { color: colors.mutedForeground }]}>
+          De {pending.fromName}
+        </Text>
+        <View style={{ width: 24 }} />
+      </View>
 
-      <View style={{ marginVertical: 20 }}>
-        <CardView card={card} />
+      <View style={{ marginVertical: 16 }}>
+        <CardView card={pending.card} />
       </View>
 
       <View style={styles.actionsRow}>
         <NeonButton
-          label="Aceptar reto"
-          onPress={acceptPending}
+          label="Aceptar"
+          onPress={() => onAction("accept")}
+          disabled={busy}
           style={{ flex: 1 }}
         />
         <NeonButton
           label="Rechazar (x2)"
           variant="danger"
-          onPress={rejectPending}
+          onPress={() => onAction("reject")}
+          disabled={busy}
           style={{ flex: 1 }}
         />
       </View>
@@ -492,8 +612,11 @@ function PendingResolver({
               label={c.title.toUpperCase()}
               variant="secondary"
               onPress={() =>
-                resolvePower(c.id as "reversa" | "espejo" | "bloqueo" | "robo-carta")
+                onAction(
+                  c.id as "reversa" | "espejo" | "bloqueo" | "robo-carta",
+                )
               }
+              disabled={busy}
               style={{ marginTop: 8 }}
               small
             />
@@ -502,81 +625,101 @@ function PendingResolver({
       )}
 
       <Pressable
-        onPress={() => setShowPanic(true)}
+        onPress={onPanic}
         style={[
           styles.panic,
           { borderColor: colors.destructive, backgroundColor: colors.card },
         ]}
       >
         <Feather name="alert-octagon" size={20} color={colors.destructive} />
-        <Text style={[styles.panicText, { color: colors.destructive }]}>
-          BOTÓN DE PÁNICO · Votar anular
+        <Text style={{ color: colors.destructive, fontFamily: "Inter_700Bold" }}>
+          BOTÓN DE PÁNICO · pedir anulación
         </Text>
       </Pressable>
-
-      <Modal visible={showPanic} transparent animationType="slide">
-        <View style={styles.modalBg}>
-          <View
-            style={[
-              styles.modalCard,
-              { backgroundColor: colors.card, borderColor: colors.destructive },
-            ]}
-          >
-            <Text style={[styles.modalTitle, { color: colors.foreground }]}>
-              ¿Anular esta carta?
-            </Text>
-            <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>
-              Mayoría del grupo (excepto receptor) anula la carta.
-            </Text>
-            {players
-              .filter((p) => p.id !== to.id)
-              .map((p) => {
-                const voted = pending.panicAgainst.includes(p.id);
-                return (
-                  <Pressable
-                    key={p.id}
-                    onPress={() => voteCancel(p.id, !voted)}
-                    style={[
-                      styles.targetRow,
-                      {
-                        borderColor: voted ? colors.destructive : colors.border,
-                        backgroundColor: voted
-                          ? colors.destructive + "22"
-                          : "transparent",
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[styles.targetName, { color: colors.foreground }]}
-                    >
-                      {p.name}
-                    </Text>
-                    <Feather
-                      name={voted ? "check-square" : "square"}
-                      size={18}
-                      color={voted ? colors.destructive : colors.mutedForeground}
-                    />
-                  </Pressable>
-                );
-              })}
-            <Text style={[styles.voteCount, { color: colors.destructive }]}>
-              {pending.panicAgainst.length} / {Math.floor((players.length - 1) / 2) + 1} necesarios
-            </Text>
-            <NeonButton
-              label="Cerrar"
-              variant="ghost"
-              small
-              onPress={() => setShowPanic(false)}
-              style={{ marginTop: 8 }}
-            />
-          </View>
-        </View>
-      </Modal>
     </ScrollView>
   );
 }
 
+function PanicVote({
+  pending,
+  players,
+  myId,
+  onClose,
+  onVote,
+}: {
+  pending: PendingThrow;
+  players: RoomPlayer[];
+  myId: string;
+  onClose: () => void;
+  onVote: (against: boolean) => void;
+}) {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const isWeb = Platform.OS === "web";
+  const eligible = players.length - 1;
+  const needed = Math.floor(eligible / 2) + 1;
+  const myVote = pending.panicAgainst.includes(myId);
+
+  return (
+    <View
+      style={[styles.modalBg, { paddingTop: (isWeb ? 67 : insets.top) + 16 }]}
+    >
+      <View
+        style={[
+          styles.modalCard,
+          { backgroundColor: colors.card, borderColor: colors.destructive },
+        ]}
+      >
+        <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+          ¿Anular esta carta?
+        </Text>
+        <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
+          Mayoría del grupo (excepto el receptor) anula la carta.
+        </Text>
+        <Pressable
+          onPress={() => onVote(!myVote)}
+          style={[
+            styles.targetRow,
+            {
+              borderColor: myVote ? colors.destructive : colors.border,
+              backgroundColor: myVote
+                ? colors.destructive + "22"
+                : "transparent",
+              marginTop: 12,
+            },
+          ]}
+        >
+          <Text style={[styles.targetName, { color: colors.foreground }]}>
+            Mi voto: {myVote ? "ANULAR" : "Permitir"}
+          </Text>
+          <Feather
+            name={myVote ? "check-square" : "square"}
+            size={20}
+            color={myVote ? colors.destructive : colors.mutedForeground}
+          />
+        </Pressable>
+        <Text style={[styles.voteCount, { color: colors.destructive }]}>
+          {pending.panicAgainst.length} / {needed} votos para anular
+        </Text>
+        <NeonButton
+          label="Cerrar"
+          variant="ghost"
+          small
+          onPress={onClose}
+          style={{ marginTop: 8 }}
+        />
+      </View>
+    </View>
+  );
+}
+
+function extractErr(e: unknown): string {
+  const err = e as { data?: { error?: string }; message?: string };
+  return err?.data?.error ?? err?.message ?? "Error";
+}
+
 const styles = StyleSheet.create({
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
   topBar: {
     paddingHorizontal: 20,
     paddingBottom: 12,
@@ -604,79 +747,44 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: "center",
   },
-  selectorWrap: {
-    padding: 20,
-    gap: 16,
-  },
-  selectorTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 28,
-  },
-  selectorSub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  selectorGrid: {
-    gap: 12,
-  },
-  playerTile: {
-    padding: 18,
-    borderRadius: 14,
+  scroll: { padding: 20, gap: 14 },
+  inboxBox: {
     borderWidth: 2,
+    borderRadius: 16,
+    padding: 14,
+    gap: 8,
+    shadowColor: "#FF2D6F",
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowOpacity: 0.7,
+    shadowRadius: 14,
+    elevation: 8,
   },
-  tileName: {
+  inboxTitle: {
     fontFamily: "Inter_700Bold",
-    fontSize: 22,
+    fontSize: 13,
+    letterSpacing: 1.5,
   },
-  tileMeta: {
+  inboxRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 6,
-    gap: 6,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
   },
-  tileScore: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 14,
-  },
-  tileHand: {
+  inboxFrom: {
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
-  },
-  shieldBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 8,
-  },
-  shieldText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 10,
-    letterSpacing: 1,
-  },
-  multiplier: {
-    fontFamily: "Inter_700Bold",
     fontSize: 11,
-    marginTop: 6,
-    letterSpacing: 0.5,
   },
-  handWrap: {
-    padding: 20,
-    gap: 16,
+  inboxCard: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    marginTop: 2,
   },
-  scoreRow: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
-  },
+  scoreRow: { flexDirection: "row", gap: 10 },
   scoreBox: {
     flex: 1,
     paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     borderRadius: 12,
     backgroundColor: "#15042A",
     borderWidth: 1,
@@ -691,18 +799,16 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 22,
   },
-  exitTurn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+  shieldBanner: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 8,
+    padding: 10,
+    borderRadius: 10,
     borderWidth: 1,
+    justifyContent: "center",
   },
-  drawSection: {
-    alignItems: "center",
-    paddingVertical: 12,
-  },
+  drawSection: { alignItems: "center", paddingVertical: 12 },
   drawBtn: {
     width: 180,
     height: 180,
@@ -727,7 +833,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 11,
     letterSpacing: 1.5,
-    marginTop: 8,
+    marginTop: 6,
   },
   empty: {
     fontFamily: "Inter_400Regular",
@@ -736,9 +842,17 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     marginVertical: 30,
   },
-  handList: {
-    gap: 12,
+  handList: { gap: 12 },
+  othersList: { gap: 8 },
+  otherRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
   },
+  dot: { width: 8, height: 8, borderRadius: 4 },
   modalBg: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.85)",
@@ -748,74 +862,55 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: "100%",
-    maxWidth: 380,
+    maxWidth: 420,
+    padding: 20,
     borderRadius: 18,
     borderWidth: 2,
-    padding: 20,
     gap: 8,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 20,
   },
   modalTitle: {
     fontFamily: "Inter_700Bold",
     fontSize: 20,
-    marginBottom: 4,
-  },
-  modalSub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    marginBottom: 8,
   },
   targetRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: 14,
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
-    marginTop: 6,
+    marginVertical: 4,
   },
   targetName: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 16,
+    fontSize: 15,
   },
   drawnLabel: {
     fontFamily: "Inter_700Bold",
-    fontSize: 16,
+    fontSize: 18,
     letterSpacing: 2,
+    textAlign: "center",
   },
-  pendingWrap: {
-    padding: 20,
-    gap: 6,
-  },
-  pendingFrom: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
-  },
-  pendingTo: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 32,
-  },
-  pendingHint: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 13,
-    letterSpacing: 1.5,
-    marginTop: 6,
-  },
-  actionsRow: {
+  resolveWrap: { padding: 20, gap: 12 },
+  resolveHeader: {
     flexDirection: "row",
-    gap: 10,
+    alignItems: "center",
+    justifyContent: "space-between",
   },
-  counterSection: {
-    marginTop: 24,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#2A1450",
-    backgroundColor: "#15042A",
+  resolveTop: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    letterSpacing: 1.5,
   },
+  actionsRow: { flexDirection: "row", gap: 10 },
+  counterSection: { marginTop: 16 },
   counterLabel: {
     fontFamily: "Inter_700Bold",
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 1.5,
     marginBottom: 4,
   },
@@ -824,19 +919,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    marginTop: 24,
-    paddingVertical: 14,
+    padding: 14,
     borderRadius: 12,
     borderWidth: 2,
-  },
-  panicText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 13,
-    letterSpacing: 1.5,
+    marginTop: 20,
   },
   voteCount: {
     fontFamily: "Inter_700Bold",
-    fontSize: 12,
+    fontSize: 14,
     textAlign: "center",
     marginTop: 8,
   },

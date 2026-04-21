@@ -1,22 +1,37 @@
 import { Feather } from "@expo/vector-icons";
 import React, { useMemo } from "react";
-import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { NeonButton } from "@/components/NeonButton";
-import { useGame } from "@/contexts/GameContext";
+import { useRoom } from "@/contexts/RoomContext";
 import { useColors } from "@/hooks/useColors";
 
 export default function RankingScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === "web";
-  const { players, log, resetGame } = useGame();
+  const { room, isLoading } = useRoom();
 
   const sorted = useMemo(
-    () => [...players].sort((a, b) => b.score - a.score),
-    [players],
+    () =>
+      room ? [...room.players].sort((a, b) => b.score - a.score) : [],
+    [room],
   );
+
+  if (isLoading || !room) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -30,7 +45,7 @@ export default function RankingScreen() {
         <View style={styles.empty}>
           <Feather name="award" size={48} color={colors.mutedForeground} />
           <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-            Aún no hay puntuación. Juega una partida.
+            Aún no hay jugadores en la sala.
           </Text>
         </View>
       ) : (
@@ -63,6 +78,7 @@ export default function RankingScreen() {
                 </Text>
                 <Text style={[styles.meta, { color: colors.mutedForeground }]}>
                   {p.challengesCompleted} retos cumplidos
+                  {p.tags.length > 0 ? ` · ${p.tags.join("·")}` : ""}
                 </Text>
               </View>
               <Text style={[styles.score, { color: tint }]}>{p.score}</Text>
@@ -71,12 +87,12 @@ export default function RankingScreen() {
         })
       )}
 
-      {log.length > 0 && (
+      {room.log.length > 0 && (
         <View style={{ marginTop: 24 }}>
           <Text style={[styles.logTitle, { color: colors.mutedForeground }]}>
             HISTORIAL
           </Text>
-          {log.map((entry, i) => (
+          {room.log.map((entry, i) => (
             <Text
               key={i}
               style={[styles.logLine, { color: colors.foreground }]}
@@ -86,29 +102,14 @@ export default function RankingScreen() {
           ))}
         </View>
       )}
-
-      {players.length > 0 && (
-        <NeonButton
-          label="Reiniciar partida"
-          variant="danger"
-          onPress={resetGame}
-          style={{ marginTop: 24 }}
-        />
-      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    gap: 10,
-  },
-  empty: {
-    alignItems: "center",
-    paddingVertical: 80,
-    gap: 12,
-  },
+  container: { padding: 20, gap: 10 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  empty: { alignItems: "center", paddingVertical: 80, gap: 12 },
   emptyText: {
     fontFamily: "Inter_400Regular",
     fontSize: 14,
@@ -126,24 +127,14 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
   },
-  rank: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 22,
-    width: 48,
-  },
-  name: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 18,
-  },
+  rank: { fontFamily: "Inter_700Bold", fontSize: 22, width: 48 },
+  name: { fontFamily: "Inter_700Bold", fontSize: 18 },
   meta: {
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     marginTop: 2,
   },
-  score: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 28,
-  },
+  score: { fontFamily: "Inter_700Bold", fontSize: 28 },
   logTitle: {
     fontFamily: "Inter_700Bold",
     fontSize: 11,

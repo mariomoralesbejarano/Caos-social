@@ -5,7 +5,9 @@
  * API specification for CAOS SOCIAL multiplayer rooms
  * OpenAPI spec version: 0.1.0
  */
+import type { CardTag } from "./cardTag";
 
-export interface HealthStatus {
-  status: string;
+export interface SetTagsBody {
+  playerId: string;
+  tags: CardTag[];
 }

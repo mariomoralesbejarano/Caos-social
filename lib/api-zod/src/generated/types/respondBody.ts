@@ -5,7 +5,10 @@
  * API specification for CAOS SOCIAL multiplayer rooms
  * OpenAPI spec version: 0.1.0
  */
+import type { RespondBodyAction } from "./respondBodyAction";
 
-export interface HealthStatus {
-  status: string;
+export interface RespondBody {
+  playerId: string;
+  throwId: string;
+  action: RespondBodyAction;
 }
