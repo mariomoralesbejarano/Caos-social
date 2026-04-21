@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "61dBUvdp_sE5S89JEbUpn"
+uri = "file://artifacts/caos-social/assets/images/icon.png"
+type = "image"
+title = "caos social icon"
