@@ -50,3 +50,9 @@ externalPort = 80
 [[ports]]
 localPort = 20090
 externalPort = 3001
+
+[userenv]
+
+[userenv.shared]
+EXPO_PUBLIC_SUPABASE_URL = "https://wmmxnplssfwycnsdtqqm.supabase.co"
+EXPO_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_qaBCK0R9fozRStG_dTksDw_S7CkvrZd"

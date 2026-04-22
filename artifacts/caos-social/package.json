@@ -54,5 +54,10 @@
     "typescript": "~5.9.2",
     "zod": "catalog:",
     "zod-validation-error": "^3.4.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.104.0",
+    "expo-sharing": "^55.0.18",
+    "react-native-view-shot": "^4.0.3"
   }
 }
