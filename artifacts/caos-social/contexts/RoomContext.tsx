@@ -4,8 +4,9 @@ import {
   useGetRoom,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 
+import { buzzIncoming, playClink } from "@/lib/feedback";
 import { Session, clearSession, loadSession, saveSession } from "@/lib/session";
 
 interface RoomContextValue {
@@ -58,7 +59,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // If room not found (deleted on server), drop session
+  // Drop session if room no longer exists
   useEffect(() => {
     if (!session || !hydrated) return;
     const err = query.error as { status?: number } | null;
@@ -67,9 +68,27 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
     }
   }, [query.error, session, hydrated]);
 
+  // Feedback: clink on score increase, buzz on new inbox card
+  const room = (query.data as RoomState | undefined) ?? null;
+  const lastScoreRef = useRef<number | null>(null);
+  const lastInboxRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!room || !session) return;
+    const me = room.players.find((p) => p.id === session.playerId);
+    if (!me) return;
+    if (lastScoreRef.current !== null && me.score > lastScoreRef.current) {
+      playClink();
+    }
+    lastScoreRef.current = me.score;
+    const inboxLen = room.myInbox?.length ?? 0;
+    if (inboxLen > lastInboxRef.current) buzzIncoming();
+    lastInboxRef.current = inboxLen;
+  }, [room, session]);
+
   const value: RoomContextValue = {
     session,
-    room: (query.data as RoomState | undefined) ?? null,
+    room,
     isLoading: query.isLoading,
     setSession,
     refresh: () => query.refetch(),

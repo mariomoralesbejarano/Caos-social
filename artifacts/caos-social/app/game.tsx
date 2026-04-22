@@ -8,6 +8,7 @@ import {
   usePanicVote,
   useRespondToThrow,
   useThrowCard,
+  useUsePower,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
@@ -44,6 +45,7 @@ export default function GameScreen() {
   const throwMut = useThrowCard();
   const respondMut = useRespondToThrow();
   const panicMut = usePanicVote();
+  const powerMut = useUsePower();
 
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [throwTo, setThrowTo] = useState<boolean>(false);
@@ -143,9 +145,29 @@ export default function GameScreen() {
     }
   }
 
+  async function handleUsePower(cardId: string, targetPlayerId?: string) {
+    try {
+      await powerMut.mutateAsync({
+        code: room!.code,
+        data: { playerId: session!.playerId, cardId, targetPlayerId },
+      });
+      invalidate();
+      setSelectedCard(null);
+    } catch (e) {
+      setErrMsg(extractErr(e));
+    }
+  }
+
   async function handleRespond(
     pending: PendingThrow,
-    action: "accept" | "reject" | "reversa" | "espejo" | "bloqueo" | "robo-carta",
+    action:
+      | "accept"
+      | "reject"
+      | "reversa"
+      | "espejo"
+      | "bloqueo"
+      | "robo-carta"
+      | "comodin",
   ) {
     try {
       await respondMut.mutateAsync({
@@ -360,13 +382,69 @@ export default function GameScreen() {
           </View>
         )}
 
-        {selectedCard && (
-          <NeonButton
-            label="Lanzar a un jugador →"
-            onPress={() => setThrowTo(true)}
-            style={{ marginTop: 16 }}
-          />
-        )}
+        {selectedCard && (() => {
+          const card = room.myHand.find((c) => c.id === selectedCard);
+          const isProactivePower =
+            card?.isPower &&
+            !["reversa", "espejo", "bloqueo", "robo-carta"].includes(card.id);
+          const needsTarget = ["ladron", "escudo-grupal", "regalo"].includes(
+            selectedCard,
+          );
+          if (isProactivePower) {
+            return (
+              <View style={{ gap: 8, marginTop: 16 }}>
+                {needsTarget ? (
+                  <>
+                    <Text
+                      style={[
+                        styles.handLabel,
+                        { color: colors.mutedForeground },
+                      ]}
+                    >
+                      ELIGE OBJETIVO
+                    </Text>
+                    {others.map((p) => (
+                      <NeonButton
+                        key={p.id}
+                        label={`USAR EN ${p.name.toUpperCase()}`}
+                        variant="secondary"
+                        onPress={() => handleUsePower(selectedCard, p.id)}
+                        style={{ marginTop: 4 }}
+                      />
+                    ))}
+                  </>
+                ) : (
+                  <NeonButton
+                    label={`USAR ${(card?.title ?? "PODER").toUpperCase()} ✦`}
+                    variant="secondary"
+                    onPress={() => handleUsePower(selectedCard)}
+                  />
+                )}
+              </View>
+            );
+          }
+          if (card?.isPower) {
+            return (
+              <Text
+                style={{
+                  color: colors.mutedForeground,
+                  textAlign: "center",
+                  marginTop: 16,
+                  fontSize: 12,
+                }}
+              >
+                Este poder solo se activa al recibir un reto.
+              </Text>
+            );
+          }
+          return (
+            <NeonButton
+              label="Lanzar a un jugador →"
+              onPress={() => setThrowTo(true)}
+              style={{ marginTop: 16 }}
+            />
+          );
+        })()}
 
         {/* Other players preview */}
         <Text style={[styles.handLabel, { color: colors.mutedForeground, marginTop: 18 }]}>
@@ -550,7 +628,14 @@ function ResolveInbox({
   myHand: GameCard[];
   onClose: () => void;
   onAction: (
-    action: "accept" | "reject" | "reversa" | "espejo" | "bloqueo" | "robo-carta",
+    action:
+      | "accept"
+      | "reject"
+      | "reversa"
+      | "espejo"
+      | "bloqueo"
+      | "robo-carta"
+      | "comodin",
   ) => void;
   onPanic: () => void;
   busy: boolean;
@@ -558,7 +643,14 @@ function ResolveInbox({
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === "web";
-  const counters = myHand.filter((c) => c.isPower);
+  const COUNTER_IDS = new Set([
+    "reversa",
+    "espejo",
+    "bloqueo",
+    "robo-carta",
+    "comodin",
+  ]);
+  const counters = myHand.filter((c) => c.isPower && COUNTER_IDS.has(c.id));
 
   return (
     <ScrollView
@@ -613,7 +705,12 @@ function ResolveInbox({
               variant="secondary"
               onPress={() =>
                 onAction(
-                  c.id as "reversa" | "espejo" | "bloqueo" | "robo-carta",
+                  c.id as
+                    | "reversa"
+                    | "espejo"
+                    | "bloqueo"
+                    | "robo-carta"
+                    | "comodin",
                 )
               }
               disabled={busy}

@@ -266,6 +266,90 @@ paths:
               schema:
                 $ref: "#/components/schemas/RoomState"
 
+  /rooms/{code}/custom-cards:
+    post:
+      operationId: addCustomCard
+      tags: [rooms]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomCardBody"
+      responses:
+        "200":
+          description: Card added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomState"
+        "400":
+          description: Bad input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /rooms/{code}/use-power:
+    post:
+      operationId: usePower
+      tags: [rooms]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UsePowerBody"
+      responses:
+        "200":
+          description: Power used
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomState"
+        "400":
+          description: Bad input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /rooms/{code}/end-game:
+    post:
+      operationId: endGame
+      tags: [rooms]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlayerActionBody"
+      responses:
+        "200":
+          description: Game ended with trophies
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomState"
+
   /rooms/{code}/reset:
     post:
       operationId: resetRoom
@@ -316,7 +400,56 @@ components:
 
     PackId:
       type: string
-      enum: [clasico, discoteca, cena, gimnasio, allin]
+      enum:
+        - clasico
+        - discoteca
+        - cena
+        - gimnasio
+        - allin
+        - tardeo
+        - feria
+        - familiar
+        - noche
+        - estrategico
+
+    Trophy:
+      type: object
+      properties:
+        playerId:
+          type: string
+        playerName:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        emoji:
+          type: string
+      required: [playerId, playerName, title, description, emoji]
+
+    CustomCardBody:
+      type: object
+      properties:
+        playerId:
+          type: string
+        title:
+          type: string
+        effect:
+          type: string
+        points:
+          type: integer
+      required: [playerId, title, effect, points]
+
+    UsePowerBody:
+      type: object
+      properties:
+        playerId:
+          type: string
+        cardId:
+          type: string
+        targetPlayerId:
+          type: string
+      required: [playerId, cardId]
 
     GameCard:
       type: object
@@ -334,6 +467,8 @@ components:
         points:
           type: integer
         isPower:
+          type: boolean
+        custom:
           type: boolean
         blockedBy:
           type: array
@@ -417,7 +552,7 @@ components:
           $ref: "#/components/schemas/PackId"
         status:
           type: string
-          enum: [lobby, active]
+          enum: [lobby, active, ended]
         players:
           type: array
           items:
@@ -440,6 +575,18 @@ components:
             type: integer
         version:
           type: integer
+        silentUntil:
+          type: integer
+        customCards:
+          type: array
+          items:
+            $ref: "#/components/schemas/GameCard"
+        trophies:
+          type: array
+          items:
+            $ref: "#/components/schemas/Trophy"
+        endedAt:
+          type: integer
       required:
         - code
         - ownerId
@@ -451,6 +598,9 @@ components:
         - myInbox
         - cooldowns
         - version
+        - silentUntil
+        - customCards
+        - trophies
 
     JoinResult:
       type: object
@@ -532,7 +682,7 @@ components:
           type: string
         action:
           type: string
-          enum: [accept, reject, reversa, espejo, bloqueo, robo-carta]
+          enum: [accept, reject, reversa, espejo, bloqueo, robo-carta, comodin]
       required: [playerId, throwId, action]
 
     PanicVoteBody:

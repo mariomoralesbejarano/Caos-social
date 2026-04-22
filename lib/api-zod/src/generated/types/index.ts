@@ -9,6 +9,7 @@
 export * from "./cardCategory";
 export * from "./cardTag";
 export * from "./createRoomBody";
+export * from "./customCardBody";
 export * from "./drawResult";
 export * from "./errorResponse";
 export * from "./gameCard";
@@ -28,3 +29,5 @@ export * from "./roomStateCooldowns";
 export * from "./roomStateStatus";
 export * from "./setTagsBody";
 export * from "./throwCardBody";
+export * from "./trophy";
+export * from "./usePowerBody";

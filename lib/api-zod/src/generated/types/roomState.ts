@@ -11,6 +11,7 @@ import type { PendingThrow } from "./pendingThrow";
 import type { RoomPlayer } from "./roomPlayer";
 import type { RoomStateCooldowns } from "./roomStateCooldowns";
 import type { RoomStateStatus } from "./roomStateStatus";
+import type { Trophy } from "./trophy";
 
 export interface RoomState {
   code: string;
@@ -23,4 +24,8 @@ export interface RoomState {
   myInbox: PendingThrow[];
   cooldowns: RoomStateCooldowns;
   version: number;
+  silentUntil: number;
+  customCards: GameCard[];
+  trophies: Trophy[];
+  endedAt?: number;
 }

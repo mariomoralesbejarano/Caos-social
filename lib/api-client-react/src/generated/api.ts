@@ -18,6 +18,7 @@ import type {
 
 import type {
   CreateRoomBody,
+  CustomCardBody,
   DrawResult,
   ErrorResponse,
   GetRoomParams,
@@ -30,6 +31,7 @@ import type {
   RoomState,
   SetTagsBody,
   ThrowCardBody,
+  UsePowerBody,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -852,6 +854,249 @@ export const usePanicVote = <
   TContext
 > => {
   return useMutation(getPanicVoteMutationOptions(options));
+};
+
+export const getAddCustomCardUrl = (code: string) => {
+  return `/api/rooms/${code}/custom-cards`;
+};
+
+export const addCustomCard = async (
+  code: string,
+  customCardBody: CustomCardBody,
+  options?: RequestInit,
+): Promise<RoomState> => {
+  return customFetch<RoomState>(getAddCustomCardUrl(code), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(customCardBody),
+  });
+};
+
+export const getAddCustomCardMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addCustomCard>>,
+    TError,
+    { code: string; data: BodyType<CustomCardBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addCustomCard>>,
+  TError,
+  { code: string; data: BodyType<CustomCardBody> },
+  TContext
+> => {
+  const mutationKey = ["addCustomCard"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addCustomCard>>,
+    { code: string; data: BodyType<CustomCardBody> }
+  > = (props) => {
+    const { code, data } = props ?? {};
+
+    return addCustomCard(code, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddCustomCardMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addCustomCard>>
+>;
+export type AddCustomCardMutationBody = BodyType<CustomCardBody>;
+export type AddCustomCardMutationError = ErrorType<ErrorResponse>;
+
+export const useAddCustomCard = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addCustomCard>>,
+    TError,
+    { code: string; data: BodyType<CustomCardBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addCustomCard>>,
+  TError,
+  { code: string; data: BodyType<CustomCardBody> },
+  TContext
+> => {
+  return useMutation(getAddCustomCardMutationOptions(options));
+};
+
+export const getUsePowerUrl = (code: string) => {
+  return `/api/rooms/${code}/use-power`;
+};
+
+export const usePower = async (
+  code: string,
+  usePowerBody: UsePowerBody,
+  options?: RequestInit,
+): Promise<RoomState> => {
+  return customFetch<RoomState>(getUsePowerUrl(code), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(usePowerBody),
+  });
+};
+
+export const getUsePowerMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof usePower>>,
+    TError,
+    { code: string; data: BodyType<UsePowerBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof usePower>>,
+  TError,
+  { code: string; data: BodyType<UsePowerBody> },
+  TContext
+> => {
+  const mutationKey = ["usePower"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof usePower>>,
+    { code: string; data: BodyType<UsePowerBody> }
+  > = (props) => {
+    const { code, data } = props ?? {};
+
+    return usePower(code, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UsePowerMutationResult = NonNullable<
+  Awaited<ReturnType<typeof usePower>>
+>;
+export type UsePowerMutationBody = BodyType<UsePowerBody>;
+export type UsePowerMutationError = ErrorType<ErrorResponse>;
+
+export const useUsePower = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof usePower>>,
+    TError,
+    { code: string; data: BodyType<UsePowerBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof usePower>>,
+  TError,
+  { code: string; data: BodyType<UsePowerBody> },
+  TContext
+> => {
+  return useMutation(getUsePowerMutationOptions(options));
+};
+
+export const getEndGameUrl = (code: string) => {
+  return `/api/rooms/${code}/end-game`;
+};
+
+export const endGame = async (
+  code: string,
+  playerActionBody: PlayerActionBody,
+  options?: RequestInit,
+): Promise<RoomState> => {
+  return customFetch<RoomState>(getEndGameUrl(code), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(playerActionBody),
+  });
+};
+
+export const getEndGameMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof endGame>>,
+    TError,
+    { code: string; data: BodyType<PlayerActionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof endGame>>,
+  TError,
+  { code: string; data: BodyType<PlayerActionBody> },
+  TContext
+> => {
+  const mutationKey = ["endGame"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof endGame>>,
+    { code: string; data: BodyType<PlayerActionBody> }
+  > = (props) => {
+    const { code, data } = props ?? {};
+
+    return endGame(code, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EndGameMutationResult = NonNullable<
+  Awaited<ReturnType<typeof endGame>>
+>;
+export type EndGameMutationBody = BodyType<PlayerActionBody>;
+export type EndGameMutationError = ErrorType<unknown>;
+
+export const useEndGame = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof endGame>>,
+    TError,
+    { code: string; data: BodyType<PlayerActionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof endGame>>,
+  TError,
+  { code: string; data: BodyType<PlayerActionBody> },
+  TContext
+> => {
+  return useMutation(getEndGameMutationOptions(options));
 };
 
 export const getResetRoomUrl = (code: string) => {

@@ -14,4 +14,9 @@ export const PackId = {
   cena: "cena",
   gimnasio: "gimnasio",
   allin: "allin",
+  tardeo: "tardeo",
+  feria: "feria",
+  familiar: "familiar",
+  noche: "noche",
+  estrategico: "estrategico",
 } as const;

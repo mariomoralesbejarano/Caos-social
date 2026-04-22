@@ -1,5 +1,10 @@
 import { Feather } from "@expo/vector-icons";
-import React, { useMemo } from "react";
+import {
+  getGetRoomQueryKey,
+  useEndGame,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -10,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { NeonButton } from "@/components/NeonButton";
 import { useRoom } from "@/contexts/RoomContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -17,11 +23,13 @@ export default function RankingScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === "web";
-  const { room, isLoading } = useRoom();
+  const { room, session, isLoading } = useRoom();
+  const qc = useQueryClient();
+  const endMut = useEndGame();
+  const [err, setErr] = useState<string | null>(null);
 
   const sorted = useMemo(
-    () =>
-      room ? [...room.players].sort((a, b) => b.score - a.score) : [],
+    () => (room ? [...room.players].sort((a, b) => b.score - a.score) : []),
     [room],
   );
 
@@ -33,6 +41,27 @@ export default function RankingScreen() {
     );
   }
 
+  const isOwner = session?.playerId === room.ownerId;
+  const isEnded = room.status === "ended" || !!room.endedAt;
+
+  async function handleEndGame() {
+    setErr(null);
+    try {
+      await endMut.mutateAsync({
+        code: room!.code,
+        data: { playerId: session!.playerId },
+      });
+      qc.invalidateQueries({
+        queryKey: getGetRoomQueryKey(session!.roomCode, {
+          playerId: session!.playerId,
+        }),
+      });
+    } catch (e) {
+      const errObj = e as { data?: { error?: string }; message?: string };
+      setErr(errObj?.data?.error ?? errObj?.message ?? "Error");
+    }
+  }
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
@@ -41,6 +70,37 @@ export default function RankingScreen() {
         { paddingBottom: (isWeb ? 34 : insets.bottom) + 40 },
       ]}
     >
+      {isEnded && room.trophies && room.trophies.length > 0 && (
+        <View style={{ gap: 10 }}>
+          <Text style={[styles.trophyHead, { color: colors.primary }]}>
+            🏆 TROFEOS DE LA NOCHE
+          </Text>
+          {room.trophies.map((t, i) => (
+            <View
+              key={i}
+              style={[
+                styles.trophyRow,
+                {
+                  borderColor: colors.secondary,
+                  backgroundColor: colors.card,
+                  shadowColor: colors.secondary,
+                },
+              ]}
+            >
+              <Text style={styles.trophyEmoji}>{t.emoji}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.trophyTitle, { color: colors.foreground }]}>
+                  {t.title}
+                </Text>
+                <Text style={[styles.trophyDesc, { color: colors.mutedForeground }]}>
+                  {t.playerName} · {t.description}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
       {sorted.length === 0 ? (
         <View style={styles.empty}>
           <Feather name="award" size={48} color={colors.mutedForeground} />
@@ -85,6 +145,21 @@ export default function RankingScreen() {
             </View>
           );
         })
+      )}
+
+      {isOwner && room.status === "active" && !isEnded && (
+        <NeonButton
+          label="FINALIZAR PARTIDA Y ENTREGAR TROFEOS"
+          variant="secondary"
+          onPress={handleEndGame}
+          disabled={endMut.isPending}
+          style={{ marginTop: 12 }}
+        />
+      )}
+      {err && (
+        <Text style={{ color: colors.destructive, textAlign: "center" }}>
+          {err}
+        </Text>
       )}
 
       {room.log.length > 0 && (
@@ -135,6 +210,28 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   score: { fontFamily: "Inter_700Bold", fontSize: 28 },
+  trophyHead: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    letterSpacing: 1.8,
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  trophyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 14,
+    borderWidth: 2,
+    borderRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  trophyEmoji: { fontSize: 32 },
+  trophyTitle: { fontFamily: "Inter_700Bold", fontSize: 15 },
+  trophyDesc: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 },
   logTitle: {
     fontFamily: "Inter_700Bold",
     fontSize: 11,

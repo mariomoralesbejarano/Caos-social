@@ -7,38 +7,82 @@ export type {
   PendingThrow,
   RoomPlayer,
   RoomState,
+  Trophy,
 } from "@workspace/api-client-react";
 
+import type { PackId } from "@workspace/api-client-react";
+
 export interface PackInfo {
-  id: "clasico" | "discoteca" | "cena" | "gimnasio" | "allin";
+  id: PackId;
   name: string;
+  emoji: string;
   description: string;
 }
 
 export const PACKS: PackInfo[] = [
   {
-    id: "clasico",
-    name: "Clásico",
-    description: "Mezcla equilibrada para cualquier ocasión.",
+    id: "tardeo",
+    name: "Tardeo / Bar",
+    emoji: "🍺",
+    description:
+      "Retos rápidos, posavasos, camareros y caña. Ideal para tardeos sin pasarse.",
   },
   {
-    id: "discoteca",
-    name: "Discoteca",
-    description: "Ligar, bailar, beber, cantar. Modo fiesta total.",
+    id: "feria",
+    name: "Feria / Romería",
+    emoji: "💃",
+    description:
+      "Sevillanas, rebujito, faralaes y caballos. La caseta arde.",
   },
   {
-    id: "cena",
-    name: "Cena de Amigos",
-    description: "Más social, menos físico. Ideal para sobremesas.",
+    id: "familiar",
+    name: "Familiar",
+    emoji: "👨‍👩‍👧",
+    description:
+      "Retos blancos, mímica y anécdotas. Sin alcohol agresivo.",
   },
   {
-    id: "gimnasio",
-    name: "Gimnasio",
-    description: "Modo bestia: solo retos físicos y de superación.",
+    id: "noche",
+    name: "Noche / Hardcore",
+    emoji: "🔥",
+    description:
+      "Discoteca, desconocidos, valor. Solo para los más atrevidos.",
+  },
+  {
+    id: "estrategico",
+    name: "Estratégico",
+    emoji: "🧠",
+    description:
+      "Solo cartas de poder: comodines, robos, silencio y más.",
   },
   {
     id: "allin",
     name: "All In",
-    description: "Todas las cartas mezcladas. Caos absoluto.",
+    emoji: "🎲",
+    description: "Las 100+ cartas mezcladas. Caos absoluto.",
+  },
+  {
+    id: "clasico",
+    name: "Clásico",
+    emoji: "🎴",
+    description: "Mezcla equilibrada original.",
+  },
+  {
+    id: "discoteca",
+    name: "Discoteca",
+    emoji: "🪩",
+    description: "Pista de baile y modo galán.",
+  },
+  {
+    id: "cena",
+    name: "Cena de Amigos",
+    emoji: "🍷",
+    description: "Más social, menos físico.",
+  },
+  {
+    id: "gimnasio",
+    name: "Gimnasio",
+    emoji: "💪",
+    description: "Modo bestia: solo físicos.",
   },
 ];

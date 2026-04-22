@@ -2,6 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import {
   CardTag,
   getGetRoomQueryKey,
+  useAddCustomCard,
   useResetRoom,
   useSetMyTags,
   useStartGame,
@@ -17,6 +18,7 @@ import {
   Share,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -42,7 +44,11 @@ export default function LobbyScreen() {
   const startMut = useStartGame();
   const tagsMut = useSetMyTags();
   const resetMut = useResetRoom();
+  const customMut = useAddCustomCard();
   const [error, setError] = useState<string | null>(null);
+  const [ccTitle, setCcTitle] = useState("");
+  const [ccEffect, setCcEffect] = useState("");
+  const [ccPoints, setCcPoints] = useState("2");
 
   // If active, send to game
   useEffect(() => {
@@ -102,6 +108,32 @@ export default function LobbyScreen() {
   async function handleLeave() {
     await setSession(null);
     router.replace("/");
+  }
+
+  async function handleAddCustom() {
+    setError(null);
+    const points = Math.max(1, Math.min(10, parseInt(ccPoints, 10) || 2));
+    if (ccTitle.trim().length < 3 || ccEffect.trim().length < 3) {
+      setError("Título y efecto requeridos (mínimo 3 caracteres)");
+      return;
+    }
+    try {
+      await customMut.mutateAsync({
+        code: room!.code,
+        data: {
+          playerId: session!.playerId,
+          title: ccTitle.trim().slice(0, 60),
+          effect: ccEffect.trim().slice(0, 200),
+          points,
+        },
+      });
+      setCcTitle("");
+      setCcEffect("");
+      setCcPoints("2");
+      invalidate();
+    } catch (e) {
+      setError(extractErr(e));
+    }
   }
 
   async function handleReset() {
@@ -242,6 +274,81 @@ export default function LobbyScreen() {
         })}
       </View>
 
+      {isOwner && room.status === "lobby" && (
+        <View
+          style={[
+            styles.creatorBox,
+            { borderColor: colors.secondary, backgroundColor: colors.card },
+          ]}
+        >
+          <View style={styles.sectionHead}>
+            <Feather name="edit-3" size={18} color={colors.secondary} />
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+              Crea cartas personalizadas
+            </Text>
+          </View>
+          <Text style={[styles.pTags, { color: colors.mutedForeground }]}>
+            Se mezclarán con el mazo al empezar la partida.
+          </Text>
+          <TextInput
+            value={ccTitle}
+            onChangeText={setCcTitle}
+            placeholder="Título (ej: Brindis del jefe)"
+            placeholderTextColor={colors.mutedForeground}
+            maxLength={60}
+            style={[
+              styles.input,
+              {
+                color: colors.foreground,
+                borderColor: colors.border,
+                backgroundColor: colors.background,
+              },
+            ]}
+          />
+          <TextInput
+            value={ccEffect}
+            onChangeText={setCcEffect}
+            placeholder="Efecto (qué tiene que hacer)"
+            placeholderTextColor={colors.mutedForeground}
+            maxLength={200}
+            multiline
+            style={[
+              styles.input,
+              {
+                color: colors.foreground,
+                borderColor: colors.border,
+                backgroundColor: colors.background,
+                minHeight: 60,
+                textAlignVertical: "top",
+              },
+            ]}
+          />
+          <TextInput
+            value={ccPoints}
+            onChangeText={(t) => setCcPoints(t.replace(/[^0-9]/g, ""))}
+            placeholder="Puntos (1-10)"
+            placeholderTextColor={colors.mutedForeground}
+            keyboardType="number-pad"
+            maxLength={2}
+            style={[
+              styles.input,
+              {
+                color: colors.foreground,
+                borderColor: colors.border,
+                backgroundColor: colors.background,
+              },
+            ]}
+          />
+          <NeonButton
+            label={`AÑADIR CARTA${room.customCards?.length ? ` · ${room.customCards.length} creadas` : ""}`}
+            variant="secondary"
+            small
+            onPress={handleAddCustom}
+            disabled={customMut.isPending}
+          />
+        </View>
+      )}
+
       {error && (
         <Text style={{ color: colors.destructive, textAlign: "center" }}>
           {error}
@@ -381,6 +488,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     justifyContent: "center",
+  },
+  creatorBox: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    gap: 10,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
   },
   bottomActions: {
     flexDirection: "row",

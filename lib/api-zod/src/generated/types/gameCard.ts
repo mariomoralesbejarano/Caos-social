@@ -16,5 +16,6 @@ export interface GameCard {
   category: CardCategory;
   points: number;
   isPower?: boolean;
+  custom?: boolean;
   blockedBy?: CardTag[];
 }

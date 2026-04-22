@@ -40,7 +40,33 @@ export const PackId = {
   cena: "cena",
   gimnasio: "gimnasio",
   allin: "allin",
+  tardeo: "tardeo",
+  feria: "feria",
+  familiar: "familiar",
+  noche: "noche",
+  estrategico: "estrategico",
 } as const;
+
+export interface Trophy {
+  playerId: string;
+  playerName: string;
+  title: string;
+  description: string;
+  emoji: string;
+}
+
+export interface CustomCardBody {
+  playerId: string;
+  title: string;
+  effect: string;
+  points: number;
+}
+
+export interface UsePowerBody {
+  playerId: string;
+  cardId: string;
+  targetPlayerId?: string;
+}
 
 export interface GameCard {
   id: string;
@@ -50,6 +76,7 @@ export interface GameCard {
   category: CardCategory;
   points: number;
   isPower?: boolean;
+  custom?: boolean;
   blockedBy?: CardTag[];
 }
 
@@ -82,6 +109,7 @@ export type RoomStateStatus =
 export const RoomStateStatus = {
   lobby: "lobby",
   active: "active",
+  ended: "ended",
 } as const;
 
 export type RoomStateCooldowns = { [key: string]: number };
@@ -97,6 +125,10 @@ export interface RoomState {
   myInbox: PendingThrow[];
   cooldowns: RoomStateCooldowns;
   version: number;
+  silentUntil: number;
+  customCards: GameCard[];
+  trophies: Trophy[];
+  endedAt?: number;
 }
 
 export interface JoinResult {
@@ -145,6 +177,7 @@ export const RespondBodyAction = {
   espejo: "espejo",
   bloqueo: "bloqueo",
   "robo-carta": "robo-carta",
+  comodin: "comodin",
 } as const;
 
 export interface RespondBody {

@@ -12,4 +12,5 @@ export type RoomStateStatus =
 export const RoomStateStatus = {
   lobby: "lobby",
   active: "active",
+  ended: "ended",
 } as const;

@@ -16,4 +16,5 @@ export const RespondBodyAction = {
   espejo: "espejo",
   bloqueo: "bloqueo",
   "robo-carta": "robo-carta",
+  comodin: "comodin",
 } as const;

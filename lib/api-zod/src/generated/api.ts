@@ -19,7 +19,18 @@ export const HealthCheckResponse = zod.object({
  */
 export const CreateRoomBody = zod.object({
   name: zod.string(),
-  pack: zod.enum(["clasico", "discoteca", "cena", "gimnasio", "allin"]),
+  pack: zod.enum([
+    "clasico",
+    "discoteca",
+    "cena",
+    "gimnasio",
+    "allin",
+    "tardeo",
+    "feria",
+    "familiar",
+    "noche",
+    "estrategico",
+  ]),
   tags: zod.array(zod.enum(["abstemio", "pareja", "hardcore"])).optional(),
 });
 
@@ -37,8 +48,19 @@ export const JoinRoomResponse = zod.object({
   room: zod.object({
     code: zod.string(),
     ownerId: zod.string(),
-    pack: zod.enum(["clasico", "discoteca", "cena", "gimnasio", "allin"]),
-    status: zod.enum(["lobby", "active"]),
+    pack: zod.enum([
+      "clasico",
+      "discoteca",
+      "cena",
+      "gimnasio",
+      "allin",
+      "tardeo",
+      "feria",
+      "familiar",
+      "noche",
+      "estrategico",
+    ]),
+    status: zod.enum(["lobby", "active", "ended"]),
     players: zod.array(
       zod.object({
         id: zod.string(),
@@ -69,6 +91,7 @@ export const JoinRoomResponse = zod.object({
         ]),
         points: zod.number(),
         isPower: zod.boolean().optional(),
+        custom: zod.boolean().optional(),
         blockedBy: zod
           .array(zod.enum(["abstemio", "pareja", "hardcore"]))
           .optional(),
@@ -96,6 +119,7 @@ export const JoinRoomResponse = zod.object({
           ]),
           points: zod.number(),
           isPower: zod.boolean().optional(),
+          custom: zod.boolean().optional(),
           blockedBy: zod
             .array(zod.enum(["abstemio", "pareja", "hardcore"]))
             .optional(),
@@ -106,6 +130,39 @@ export const JoinRoomResponse = zod.object({
     ),
     cooldowns: zod.record(zod.string(), zod.number()),
     version: zod.number(),
+    silentUntil: zod.number(),
+    customCards: zod.array(
+      zod.object({
+        id: zod.string(),
+        title: zod.string(),
+        effect: zod.string(),
+        power: zod.string(),
+        category: zod.enum([
+          "reto",
+          "beber",
+          "ligar",
+          "fisico",
+          "poder",
+          "social",
+        ]),
+        points: zod.number(),
+        isPower: zod.boolean().optional(),
+        custom: zod.boolean().optional(),
+        blockedBy: zod
+          .array(zod.enum(["abstemio", "pareja", "hardcore"]))
+          .optional(),
+      }),
+    ),
+    trophies: zod.array(
+      zod.object({
+        playerId: zod.string(),
+        playerName: zod.string(),
+        title: zod.string(),
+        description: zod.string(),
+        emoji: zod.string(),
+      }),
+    ),
+    endedAt: zod.number().optional(),
   }),
 });
 
@@ -120,8 +177,19 @@ export const GetRoomQueryParams = zod.object({
 export const GetRoomResponse = zod.object({
   code: zod.string(),
   ownerId: zod.string(),
-  pack: zod.enum(["clasico", "discoteca", "cena", "gimnasio", "allin"]),
-  status: zod.enum(["lobby", "active"]),
+  pack: zod.enum([
+    "clasico",
+    "discoteca",
+    "cena",
+    "gimnasio",
+    "allin",
+    "tardeo",
+    "feria",
+    "familiar",
+    "noche",
+    "estrategico",
+  ]),
+  status: zod.enum(["lobby", "active", "ended"]),
   players: zod.array(
     zod.object({
       id: zod.string(),
@@ -152,6 +220,7 @@ export const GetRoomResponse = zod.object({
       ]),
       points: zod.number(),
       isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
       blockedBy: zod
         .array(zod.enum(["abstemio", "pareja", "hardcore"]))
         .optional(),
@@ -179,6 +248,7 @@ export const GetRoomResponse = zod.object({
         ]),
         points: zod.number(),
         isPower: zod.boolean().optional(),
+        custom: zod.boolean().optional(),
         blockedBy: zod
           .array(zod.enum(["abstemio", "pareja", "hardcore"]))
           .optional(),
@@ -189,6 +259,39 @@ export const GetRoomResponse = zod.object({
   ),
   cooldowns: zod.record(zod.string(), zod.number()),
   version: zod.number(),
+  silentUntil: zod.number(),
+  customCards: zod.array(
+    zod.object({
+      id: zod.string(),
+      title: zod.string(),
+      effect: zod.string(),
+      power: zod.string(),
+      category: zod.enum([
+        "reto",
+        "beber",
+        "ligar",
+        "fisico",
+        "poder",
+        "social",
+      ]),
+      points: zod.number(),
+      isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
+      blockedBy: zod
+        .array(zod.enum(["abstemio", "pareja", "hardcore"]))
+        .optional(),
+    }),
+  ),
+  trophies: zod.array(
+    zod.object({
+      playerId: zod.string(),
+      playerName: zod.string(),
+      title: zod.string(),
+      description: zod.string(),
+      emoji: zod.string(),
+    }),
+  ),
+  endedAt: zod.number().optional(),
 });
 
 export const SetMyTagsParams = zod.object({
@@ -203,8 +306,19 @@ export const SetMyTagsBody = zod.object({
 export const SetMyTagsResponse = zod.object({
   code: zod.string(),
   ownerId: zod.string(),
-  pack: zod.enum(["clasico", "discoteca", "cena", "gimnasio", "allin"]),
-  status: zod.enum(["lobby", "active"]),
+  pack: zod.enum([
+    "clasico",
+    "discoteca",
+    "cena",
+    "gimnasio",
+    "allin",
+    "tardeo",
+    "feria",
+    "familiar",
+    "noche",
+    "estrategico",
+  ]),
+  status: zod.enum(["lobby", "active", "ended"]),
   players: zod.array(
     zod.object({
       id: zod.string(),
@@ -235,6 +349,7 @@ export const SetMyTagsResponse = zod.object({
       ]),
       points: zod.number(),
       isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
       blockedBy: zod
         .array(zod.enum(["abstemio", "pareja", "hardcore"]))
         .optional(),
@@ -262,6 +377,7 @@ export const SetMyTagsResponse = zod.object({
         ]),
         points: zod.number(),
         isPower: zod.boolean().optional(),
+        custom: zod.boolean().optional(),
         blockedBy: zod
           .array(zod.enum(["abstemio", "pareja", "hardcore"]))
           .optional(),
@@ -272,6 +388,39 @@ export const SetMyTagsResponse = zod.object({
   ),
   cooldowns: zod.record(zod.string(), zod.number()),
   version: zod.number(),
+  silentUntil: zod.number(),
+  customCards: zod.array(
+    zod.object({
+      id: zod.string(),
+      title: zod.string(),
+      effect: zod.string(),
+      power: zod.string(),
+      category: zod.enum([
+        "reto",
+        "beber",
+        "ligar",
+        "fisico",
+        "poder",
+        "social",
+      ]),
+      points: zod.number(),
+      isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
+      blockedBy: zod
+        .array(zod.enum(["abstemio", "pareja", "hardcore"]))
+        .optional(),
+    }),
+  ),
+  trophies: zod.array(
+    zod.object({
+      playerId: zod.string(),
+      playerName: zod.string(),
+      title: zod.string(),
+      description: zod.string(),
+      emoji: zod.string(),
+    }),
+  ),
+  endedAt: zod.number().optional(),
 });
 
 export const StartGameParams = zod.object({
@@ -285,8 +434,19 @@ export const StartGameBody = zod.object({
 export const StartGameResponse = zod.object({
   code: zod.string(),
   ownerId: zod.string(),
-  pack: zod.enum(["clasico", "discoteca", "cena", "gimnasio", "allin"]),
-  status: zod.enum(["lobby", "active"]),
+  pack: zod.enum([
+    "clasico",
+    "discoteca",
+    "cena",
+    "gimnasio",
+    "allin",
+    "tardeo",
+    "feria",
+    "familiar",
+    "noche",
+    "estrategico",
+  ]),
+  status: zod.enum(["lobby", "active", "ended"]),
   players: zod.array(
     zod.object({
       id: zod.string(),
@@ -317,6 +477,7 @@ export const StartGameResponse = zod.object({
       ]),
       points: zod.number(),
       isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
       blockedBy: zod
         .array(zod.enum(["abstemio", "pareja", "hardcore"]))
         .optional(),
@@ -344,6 +505,7 @@ export const StartGameResponse = zod.object({
         ]),
         points: zod.number(),
         isPower: zod.boolean().optional(),
+        custom: zod.boolean().optional(),
         blockedBy: zod
           .array(zod.enum(["abstemio", "pareja", "hardcore"]))
           .optional(),
@@ -354,6 +516,39 @@ export const StartGameResponse = zod.object({
   ),
   cooldowns: zod.record(zod.string(), zod.number()),
   version: zod.number(),
+  silentUntil: zod.number(),
+  customCards: zod.array(
+    zod.object({
+      id: zod.string(),
+      title: zod.string(),
+      effect: zod.string(),
+      power: zod.string(),
+      category: zod.enum([
+        "reto",
+        "beber",
+        "ligar",
+        "fisico",
+        "poder",
+        "social",
+      ]),
+      points: zod.number(),
+      isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
+      blockedBy: zod
+        .array(zod.enum(["abstemio", "pareja", "hardcore"]))
+        .optional(),
+    }),
+  ),
+  trophies: zod.array(
+    zod.object({
+      playerId: zod.string(),
+      playerName: zod.string(),
+      title: zod.string(),
+      description: zod.string(),
+      emoji: zod.string(),
+    }),
+  ),
+  endedAt: zod.number().optional(),
 });
 
 export const DrawCardParams = zod.object({
@@ -368,8 +563,19 @@ export const DrawCardResponse = zod.object({
   room: zod.object({
     code: zod.string(),
     ownerId: zod.string(),
-    pack: zod.enum(["clasico", "discoteca", "cena", "gimnasio", "allin"]),
-    status: zod.enum(["lobby", "active"]),
+    pack: zod.enum([
+      "clasico",
+      "discoteca",
+      "cena",
+      "gimnasio",
+      "allin",
+      "tardeo",
+      "feria",
+      "familiar",
+      "noche",
+      "estrategico",
+    ]),
+    status: zod.enum(["lobby", "active", "ended"]),
     players: zod.array(
       zod.object({
         id: zod.string(),
@@ -400,6 +606,7 @@ export const DrawCardResponse = zod.object({
         ]),
         points: zod.number(),
         isPower: zod.boolean().optional(),
+        custom: zod.boolean().optional(),
         blockedBy: zod
           .array(zod.enum(["abstemio", "pareja", "hardcore"]))
           .optional(),
@@ -427,6 +634,7 @@ export const DrawCardResponse = zod.object({
           ]),
           points: zod.number(),
           isPower: zod.boolean().optional(),
+          custom: zod.boolean().optional(),
           blockedBy: zod
             .array(zod.enum(["abstemio", "pareja", "hardcore"]))
             .optional(),
@@ -437,6 +645,39 @@ export const DrawCardResponse = zod.object({
     ),
     cooldowns: zod.record(zod.string(), zod.number()),
     version: zod.number(),
+    silentUntil: zod.number(),
+    customCards: zod.array(
+      zod.object({
+        id: zod.string(),
+        title: zod.string(),
+        effect: zod.string(),
+        power: zod.string(),
+        category: zod.enum([
+          "reto",
+          "beber",
+          "ligar",
+          "fisico",
+          "poder",
+          "social",
+        ]),
+        points: zod.number(),
+        isPower: zod.boolean().optional(),
+        custom: zod.boolean().optional(),
+        blockedBy: zod
+          .array(zod.enum(["abstemio", "pareja", "hardcore"]))
+          .optional(),
+      }),
+    ),
+    trophies: zod.array(
+      zod.object({
+        playerId: zod.string(),
+        playerName: zod.string(),
+        title: zod.string(),
+        description: zod.string(),
+        emoji: zod.string(),
+      }),
+    ),
+    endedAt: zod.number().optional(),
   }),
   drawnCard: zod.object({
     id: zod.string(),
@@ -446,6 +687,7 @@ export const DrawCardResponse = zod.object({
     category: zod.enum(["reto", "beber", "ligar", "fisico", "poder", "social"]),
     points: zod.number(),
     isPower: zod.boolean().optional(),
+    custom: zod.boolean().optional(),
     blockedBy: zod
       .array(zod.enum(["abstemio", "pareja", "hardcore"]))
       .optional(),
@@ -465,8 +707,19 @@ export const ThrowCardBody = zod.object({
 export const ThrowCardResponse = zod.object({
   code: zod.string(),
   ownerId: zod.string(),
-  pack: zod.enum(["clasico", "discoteca", "cena", "gimnasio", "allin"]),
-  status: zod.enum(["lobby", "active"]),
+  pack: zod.enum([
+    "clasico",
+    "discoteca",
+    "cena",
+    "gimnasio",
+    "allin",
+    "tardeo",
+    "feria",
+    "familiar",
+    "noche",
+    "estrategico",
+  ]),
+  status: zod.enum(["lobby", "active", "ended"]),
   players: zod.array(
     zod.object({
       id: zod.string(),
@@ -497,6 +750,7 @@ export const ThrowCardResponse = zod.object({
       ]),
       points: zod.number(),
       isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
       blockedBy: zod
         .array(zod.enum(["abstemio", "pareja", "hardcore"]))
         .optional(),
@@ -524,6 +778,7 @@ export const ThrowCardResponse = zod.object({
         ]),
         points: zod.number(),
         isPower: zod.boolean().optional(),
+        custom: zod.boolean().optional(),
         blockedBy: zod
           .array(zod.enum(["abstemio", "pareja", "hardcore"]))
           .optional(),
@@ -534,6 +789,39 @@ export const ThrowCardResponse = zod.object({
   ),
   cooldowns: zod.record(zod.string(), zod.number()),
   version: zod.number(),
+  silentUntil: zod.number(),
+  customCards: zod.array(
+    zod.object({
+      id: zod.string(),
+      title: zod.string(),
+      effect: zod.string(),
+      power: zod.string(),
+      category: zod.enum([
+        "reto",
+        "beber",
+        "ligar",
+        "fisico",
+        "poder",
+        "social",
+      ]),
+      points: zod.number(),
+      isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
+      blockedBy: zod
+        .array(zod.enum(["abstemio", "pareja", "hardcore"]))
+        .optional(),
+    }),
+  ),
+  trophies: zod.array(
+    zod.object({
+      playerId: zod.string(),
+      playerName: zod.string(),
+      title: zod.string(),
+      description: zod.string(),
+      emoji: zod.string(),
+    }),
+  ),
+  endedAt: zod.number().optional(),
 });
 
 export const RespondToThrowParams = zod.object({
@@ -550,14 +838,26 @@ export const RespondToThrowBody = zod.object({
     "espejo",
     "bloqueo",
     "robo-carta",
+    "comodin",
   ]),
 });
 
 export const RespondToThrowResponse = zod.object({
   code: zod.string(),
   ownerId: zod.string(),
-  pack: zod.enum(["clasico", "discoteca", "cena", "gimnasio", "allin"]),
-  status: zod.enum(["lobby", "active"]),
+  pack: zod.enum([
+    "clasico",
+    "discoteca",
+    "cena",
+    "gimnasio",
+    "allin",
+    "tardeo",
+    "feria",
+    "familiar",
+    "noche",
+    "estrategico",
+  ]),
+  status: zod.enum(["lobby", "active", "ended"]),
   players: zod.array(
     zod.object({
       id: zod.string(),
@@ -588,6 +888,7 @@ export const RespondToThrowResponse = zod.object({
       ]),
       points: zod.number(),
       isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
       blockedBy: zod
         .array(zod.enum(["abstemio", "pareja", "hardcore"]))
         .optional(),
@@ -615,6 +916,7 @@ export const RespondToThrowResponse = zod.object({
         ]),
         points: zod.number(),
         isPower: zod.boolean().optional(),
+        custom: zod.boolean().optional(),
         blockedBy: zod
           .array(zod.enum(["abstemio", "pareja", "hardcore"]))
           .optional(),
@@ -625,6 +927,39 @@ export const RespondToThrowResponse = zod.object({
   ),
   cooldowns: zod.record(zod.string(), zod.number()),
   version: zod.number(),
+  silentUntil: zod.number(),
+  customCards: zod.array(
+    zod.object({
+      id: zod.string(),
+      title: zod.string(),
+      effect: zod.string(),
+      power: zod.string(),
+      category: zod.enum([
+        "reto",
+        "beber",
+        "ligar",
+        "fisico",
+        "poder",
+        "social",
+      ]),
+      points: zod.number(),
+      isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
+      blockedBy: zod
+        .array(zod.enum(["abstemio", "pareja", "hardcore"]))
+        .optional(),
+    }),
+  ),
+  trophies: zod.array(
+    zod.object({
+      playerId: zod.string(),
+      playerName: zod.string(),
+      title: zod.string(),
+      description: zod.string(),
+      emoji: zod.string(),
+    }),
+  ),
+  endedAt: zod.number().optional(),
 });
 
 export const PanicVoteParams = zod.object({
@@ -640,8 +975,19 @@ export const PanicVoteBody = zod.object({
 export const PanicVoteResponse = zod.object({
   code: zod.string(),
   ownerId: zod.string(),
-  pack: zod.enum(["clasico", "discoteca", "cena", "gimnasio", "allin"]),
-  status: zod.enum(["lobby", "active"]),
+  pack: zod.enum([
+    "clasico",
+    "discoteca",
+    "cena",
+    "gimnasio",
+    "allin",
+    "tardeo",
+    "feria",
+    "familiar",
+    "noche",
+    "estrategico",
+  ]),
+  status: zod.enum(["lobby", "active", "ended"]),
   players: zod.array(
     zod.object({
       id: zod.string(),
@@ -672,6 +1018,7 @@ export const PanicVoteResponse = zod.object({
       ]),
       points: zod.number(),
       isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
       blockedBy: zod
         .array(zod.enum(["abstemio", "pareja", "hardcore"]))
         .optional(),
@@ -699,6 +1046,7 @@ export const PanicVoteResponse = zod.object({
         ]),
         points: zod.number(),
         isPower: zod.boolean().optional(),
+        custom: zod.boolean().optional(),
         blockedBy: zod
           .array(zod.enum(["abstemio", "pareja", "hardcore"]))
           .optional(),
@@ -709,6 +1057,428 @@ export const PanicVoteResponse = zod.object({
   ),
   cooldowns: zod.record(zod.string(), zod.number()),
   version: zod.number(),
+  silentUntil: zod.number(),
+  customCards: zod.array(
+    zod.object({
+      id: zod.string(),
+      title: zod.string(),
+      effect: zod.string(),
+      power: zod.string(),
+      category: zod.enum([
+        "reto",
+        "beber",
+        "ligar",
+        "fisico",
+        "poder",
+        "social",
+      ]),
+      points: zod.number(),
+      isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
+      blockedBy: zod
+        .array(zod.enum(["abstemio", "pareja", "hardcore"]))
+        .optional(),
+    }),
+  ),
+  trophies: zod.array(
+    zod.object({
+      playerId: zod.string(),
+      playerName: zod.string(),
+      title: zod.string(),
+      description: zod.string(),
+      emoji: zod.string(),
+    }),
+  ),
+  endedAt: zod.number().optional(),
+});
+
+export const AddCustomCardParams = zod.object({
+  code: zod.coerce.string(),
+});
+
+export const AddCustomCardBody = zod.object({
+  playerId: zod.string(),
+  title: zod.string(),
+  effect: zod.string(),
+  points: zod.number(),
+});
+
+export const AddCustomCardResponse = zod.object({
+  code: zod.string(),
+  ownerId: zod.string(),
+  pack: zod.enum([
+    "clasico",
+    "discoteca",
+    "cena",
+    "gimnasio",
+    "allin",
+    "tardeo",
+    "feria",
+    "familiar",
+    "noche",
+    "estrategico",
+  ]),
+  status: zod.enum(["lobby", "active", "ended"]),
+  players: zod.array(
+    zod.object({
+      id: zod.string(),
+      name: zod.string(),
+      tags: zod.array(zod.enum(["abstemio", "pareja", "hardcore"])),
+      handCount: zod.number(),
+      score: zod.number(),
+      multiplier: zod.number(),
+      shieldUntil: zod.number(),
+      challengesCompleted: zod.number(),
+      connected: zod.boolean(),
+    }),
+  ),
+  log: zod.array(zod.string()),
+  myHand: zod.array(
+    zod.object({
+      id: zod.string(),
+      title: zod.string(),
+      effect: zod.string(),
+      power: zod.string(),
+      category: zod.enum([
+        "reto",
+        "beber",
+        "ligar",
+        "fisico",
+        "poder",
+        "social",
+      ]),
+      points: zod.number(),
+      isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
+      blockedBy: zod
+        .array(zod.enum(["abstemio", "pareja", "hardcore"]))
+        .optional(),
+    }),
+  ),
+  myInbox: zod.array(
+    zod.object({
+      id: zod.string(),
+      fromPlayerId: zod.string(),
+      fromName: zod.string(),
+      toPlayerId: zod.string(),
+      cardId: zod.string(),
+      card: zod.object({
+        id: zod.string(),
+        title: zod.string(),
+        effect: zod.string(),
+        power: zod.string(),
+        category: zod.enum([
+          "reto",
+          "beber",
+          "ligar",
+          "fisico",
+          "poder",
+          "social",
+        ]),
+        points: zod.number(),
+        isPower: zod.boolean().optional(),
+        custom: zod.boolean().optional(),
+        blockedBy: zod
+          .array(zod.enum(["abstemio", "pareja", "hardcore"]))
+          .optional(),
+      }),
+      createdAt: zod.number(),
+      panicAgainst: zod.array(zod.string()),
+    }),
+  ),
+  cooldowns: zod.record(zod.string(), zod.number()),
+  version: zod.number(),
+  silentUntil: zod.number(),
+  customCards: zod.array(
+    zod.object({
+      id: zod.string(),
+      title: zod.string(),
+      effect: zod.string(),
+      power: zod.string(),
+      category: zod.enum([
+        "reto",
+        "beber",
+        "ligar",
+        "fisico",
+        "poder",
+        "social",
+      ]),
+      points: zod.number(),
+      isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
+      blockedBy: zod
+        .array(zod.enum(["abstemio", "pareja", "hardcore"]))
+        .optional(),
+    }),
+  ),
+  trophies: zod.array(
+    zod.object({
+      playerId: zod.string(),
+      playerName: zod.string(),
+      title: zod.string(),
+      description: zod.string(),
+      emoji: zod.string(),
+    }),
+  ),
+  endedAt: zod.number().optional(),
+});
+
+export const UsePowerParams = zod.object({
+  code: zod.coerce.string(),
+});
+
+export const UsePowerBody = zod.object({
+  playerId: zod.string(),
+  cardId: zod.string(),
+  targetPlayerId: zod.string().optional(),
+});
+
+export const UsePowerResponse = zod.object({
+  code: zod.string(),
+  ownerId: zod.string(),
+  pack: zod.enum([
+    "clasico",
+    "discoteca",
+    "cena",
+    "gimnasio",
+    "allin",
+    "tardeo",
+    "feria",
+    "familiar",
+    "noche",
+    "estrategico",
+  ]),
+  status: zod.enum(["lobby", "active", "ended"]),
+  players: zod.array(
+    zod.object({
+      id: zod.string(),
+      name: zod.string(),
+      tags: zod.array(zod.enum(["abstemio", "pareja", "hardcore"])),
+      handCount: zod.number(),
+      score: zod.number(),
+      multiplier: zod.number(),
+      shieldUntil: zod.number(),
+      challengesCompleted: zod.number(),
+      connected: zod.boolean(),
+    }),
+  ),
+  log: zod.array(zod.string()),
+  myHand: zod.array(
+    zod.object({
+      id: zod.string(),
+      title: zod.string(),
+      effect: zod.string(),
+      power: zod.string(),
+      category: zod.enum([
+        "reto",
+        "beber",
+        "ligar",
+        "fisico",
+        "poder",
+        "social",
+      ]),
+      points: zod.number(),
+      isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
+      blockedBy: zod
+        .array(zod.enum(["abstemio", "pareja", "hardcore"]))
+        .optional(),
+    }),
+  ),
+  myInbox: zod.array(
+    zod.object({
+      id: zod.string(),
+      fromPlayerId: zod.string(),
+      fromName: zod.string(),
+      toPlayerId: zod.string(),
+      cardId: zod.string(),
+      card: zod.object({
+        id: zod.string(),
+        title: zod.string(),
+        effect: zod.string(),
+        power: zod.string(),
+        category: zod.enum([
+          "reto",
+          "beber",
+          "ligar",
+          "fisico",
+          "poder",
+          "social",
+        ]),
+        points: zod.number(),
+        isPower: zod.boolean().optional(),
+        custom: zod.boolean().optional(),
+        blockedBy: zod
+          .array(zod.enum(["abstemio", "pareja", "hardcore"]))
+          .optional(),
+      }),
+      createdAt: zod.number(),
+      panicAgainst: zod.array(zod.string()),
+    }),
+  ),
+  cooldowns: zod.record(zod.string(), zod.number()),
+  version: zod.number(),
+  silentUntil: zod.number(),
+  customCards: zod.array(
+    zod.object({
+      id: zod.string(),
+      title: zod.string(),
+      effect: zod.string(),
+      power: zod.string(),
+      category: zod.enum([
+        "reto",
+        "beber",
+        "ligar",
+        "fisico",
+        "poder",
+        "social",
+      ]),
+      points: zod.number(),
+      isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
+      blockedBy: zod
+        .array(zod.enum(["abstemio", "pareja", "hardcore"]))
+        .optional(),
+    }),
+  ),
+  trophies: zod.array(
+    zod.object({
+      playerId: zod.string(),
+      playerName: zod.string(),
+      title: zod.string(),
+      description: zod.string(),
+      emoji: zod.string(),
+    }),
+  ),
+  endedAt: zod.number().optional(),
+});
+
+export const EndGameParams = zod.object({
+  code: zod.coerce.string(),
+});
+
+export const EndGameBody = zod.object({
+  playerId: zod.string(),
+});
+
+export const EndGameResponse = zod.object({
+  code: zod.string(),
+  ownerId: zod.string(),
+  pack: zod.enum([
+    "clasico",
+    "discoteca",
+    "cena",
+    "gimnasio",
+    "allin",
+    "tardeo",
+    "feria",
+    "familiar",
+    "noche",
+    "estrategico",
+  ]),
+  status: zod.enum(["lobby", "active", "ended"]),
+  players: zod.array(
+    zod.object({
+      id: zod.string(),
+      name: zod.string(),
+      tags: zod.array(zod.enum(["abstemio", "pareja", "hardcore"])),
+      handCount: zod.number(),
+      score: zod.number(),
+      multiplier: zod.number(),
+      shieldUntil: zod.number(),
+      challengesCompleted: zod.number(),
+      connected: zod.boolean(),
+    }),
+  ),
+  log: zod.array(zod.string()),
+  myHand: zod.array(
+    zod.object({
+      id: zod.string(),
+      title: zod.string(),
+      effect: zod.string(),
+      power: zod.string(),
+      category: zod.enum([
+        "reto",
+        "beber",
+        "ligar",
+        "fisico",
+        "poder",
+        "social",
+      ]),
+      points: zod.number(),
+      isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
+      blockedBy: zod
+        .array(zod.enum(["abstemio", "pareja", "hardcore"]))
+        .optional(),
+    }),
+  ),
+  myInbox: zod.array(
+    zod.object({
+      id: zod.string(),
+      fromPlayerId: zod.string(),
+      fromName: zod.string(),
+      toPlayerId: zod.string(),
+      cardId: zod.string(),
+      card: zod.object({
+        id: zod.string(),
+        title: zod.string(),
+        effect: zod.string(),
+        power: zod.string(),
+        category: zod.enum([
+          "reto",
+          "beber",
+          "ligar",
+          "fisico",
+          "poder",
+          "social",
+        ]),
+        points: zod.number(),
+        isPower: zod.boolean().optional(),
+        custom: zod.boolean().optional(),
+        blockedBy: zod
+          .array(zod.enum(["abstemio", "pareja", "hardcore"]))
+          .optional(),
+      }),
+      createdAt: zod.number(),
+      panicAgainst: zod.array(zod.string()),
+    }),
+  ),
+  cooldowns: zod.record(zod.string(), zod.number()),
+  version: zod.number(),
+  silentUntil: zod.number(),
+  customCards: zod.array(
+    zod.object({
+      id: zod.string(),
+      title: zod.string(),
+      effect: zod.string(),
+      power: zod.string(),
+      category: zod.enum([
+        "reto",
+        "beber",
+        "ligar",
+        "fisico",
+        "poder",
+        "social",
+      ]),
+      points: zod.number(),
+      isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
+      blockedBy: zod
+        .array(zod.enum(["abstemio", "pareja", "hardcore"]))
+        .optional(),
+    }),
+  ),
+  trophies: zod.array(
+    zod.object({
+      playerId: zod.string(),
+      playerName: zod.string(),
+      title: zod.string(),
+      description: zod.string(),
+      emoji: zod.string(),
+    }),
+  ),
+  endedAt: zod.number().optional(),
 });
 
 export const ResetRoomParams = zod.object({
@@ -722,8 +1492,19 @@ export const ResetRoomBody = zod.object({
 export const ResetRoomResponse = zod.object({
   code: zod.string(),
   ownerId: zod.string(),
-  pack: zod.enum(["clasico", "discoteca", "cena", "gimnasio", "allin"]),
-  status: zod.enum(["lobby", "active"]),
+  pack: zod.enum([
+    "clasico",
+    "discoteca",
+    "cena",
+    "gimnasio",
+    "allin",
+    "tardeo",
+    "feria",
+    "familiar",
+    "noche",
+    "estrategico",
+  ]),
+  status: zod.enum(["lobby", "active", "ended"]),
   players: zod.array(
     zod.object({
       id: zod.string(),
@@ -754,6 +1535,7 @@ export const ResetRoomResponse = zod.object({
       ]),
       points: zod.number(),
       isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
       blockedBy: zod
         .array(zod.enum(["abstemio", "pareja", "hardcore"]))
         .optional(),
@@ -781,6 +1563,7 @@ export const ResetRoomResponse = zod.object({
         ]),
         points: zod.number(),
         isPower: zod.boolean().optional(),
+        custom: zod.boolean().optional(),
         blockedBy: zod
           .array(zod.enum(["abstemio", "pareja", "hardcore"]))
           .optional(),
@@ -791,4 +1574,37 @@ export const ResetRoomResponse = zod.object({
   ),
   cooldowns: zod.record(zod.string(), zod.number()),
   version: zod.number(),
+  silentUntil: zod.number(),
+  customCards: zod.array(
+    zod.object({
+      id: zod.string(),
+      title: zod.string(),
+      effect: zod.string(),
+      power: zod.string(),
+      category: zod.enum([
+        "reto",
+        "beber",
+        "ligar",
+        "fisico",
+        "poder",
+        "social",
+      ]),
+      points: zod.number(),
+      isPower: zod.boolean().optional(),
+      custom: zod.boolean().optional(),
+      blockedBy: zod
+        .array(zod.enum(["abstemio", "pareja", "hardcore"]))
+        .optional(),
+    }),
+  ),
+  trophies: zod.array(
+    zod.object({
+      playerId: zod.string(),
+      playerName: zod.string(),
+      title: zod.string(),
+      description: zod.string(),
+      emoji: zod.string(),
+    }),
+  ),
+  endedAt: zod.number().optional(),
 });
