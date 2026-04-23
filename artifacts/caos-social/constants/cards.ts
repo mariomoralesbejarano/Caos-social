@@ -56,6 +56,20 @@ export const PACKS: PackInfo[] = [
       "Discoteca, desconocidos, valor. Solo para los más atrevidos.",
   },
   {
+    id: "after",
+    name: "After",
+    emoji: "🌙",
+    description:
+      "Madrugada larga: churros, taxi compartido, confesiones de las 5am.",
+  },
+  {
+    id: "tercer-tiempo",
+    name: "Tercer Tiempo",
+    emoji: "🏆",
+    description:
+      "Post-partido: vestuario, MVP, himnos y trofeos improvisados.",
+  },
+  {
     id: "estrategico",
     name: "Estratégico",
     emoji: "🧠",

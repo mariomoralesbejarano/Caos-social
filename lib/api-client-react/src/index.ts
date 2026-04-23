@@ -6,6 +6,7 @@ import {
   applyDrawCard,
   applyEndGame,
   applyJoin,
+  applyMarkDone,
   applyPanicVote,
   applyResetRoom,
   applyRespondToThrow,
@@ -13,10 +14,15 @@ import {
   applyStartGame,
   applyThrowCard,
   applyUsePower,
+  applyVerifyVote,
   createInitialRoom,
   generateCode,
   serializeRoom,
+  PANIC_WINDOW_MS,
+  VERIFY_WINDOW_MS,
 } from "./game";
+
+export { PANIC_WINDOW_MS, VERIFY_WINDOW_MS };
 import {
   existsRoom,
   gcRooms,
@@ -205,7 +211,8 @@ export const useThrowCard = makeSimpleMutation<{
   playerId: string;
   toPlayerId: string;
   cardId: string;
-}>((room, b) => applyThrowCard(room, b.playerId, b.toPlayerId, b.cardId));
+  secret?: boolean;
+}>((room, b) => applyThrowCard(room, b.playerId, b.toPlayerId, b.cardId, { secret: b.secret }));
 
 export const useRespondToThrow = makeSimpleMutation<{
   playerId: string;
@@ -218,6 +225,18 @@ export const usePanicVote = makeSimpleMutation<{
   throwId: string;
   against: boolean;
 }>((room, b) => applyPanicVote(room, b.playerId, b.throwId, b.against));
+
+export const useMarkDone = makeSimpleMutation<{
+  playerId: string;
+  throwId: string;
+  evidenceUrl?: string;
+}>((room, b) => applyMarkDone(room, b.playerId, b.throwId, b.evidenceUrl));
+
+export const useVerifyVote = makeSimpleMutation<{
+  playerId: string;
+  throwId: string;
+  ok: boolean;
+}>((room, b) => applyVerifyVote(room, b.playerId, b.throwId, b.ok));
 
 export const useAddCustomCard = makeSimpleMutation<{
   playerId: string;

@@ -163,8 +163,40 @@ const BANCO: GameCard[] = [
   C("ba-silencio", "Silencio de 30s", "Todo el grupo en silencio absoluto 30 segundos.", "Quien hable o ría, -5.", "reto", 15, { pack: "banco" }),
 ];
 
+// PACK AFTER — madrugada larga, churros, taxi y resaca técnica (12 cartas)
+const AFTER: GameCard[] = [
+  C("af-churros", "Churros de Honor", "Convence al grupo para acabar en una churrería abierta.", "Si lo logras en 30 min, +30.", "social", 30, { pack: "after" }),
+  C("af-taxi-grupal", "Taxi Comunitario", "Compártete un taxi con un desconocido amable.", "Sin discutir el destino.", "social", 25, { pack: "after" }),
+  C("af-confesion-after", "Confesión de After", "Cuenta una verdad que solo dirías de madrugada.", "Sin daño colateral.", "social", 25, { pack: "after" }),
+  C("af-bocata", "Bocata Salvador", "Pide un bocata de calamares (o equivalente local) y compártelo.", "Si lo terminas, +15 extra.", "beber", 20, { blockedBy: ["abstemio"], pack: "after" }),
+  C("af-banco-filosofo", "El Filósofo del Banco", "Suelta una reflexión profunda en un banco de la calle.", "Mínimo 60 segundos.", "social", 15, { pack: "after" }),
+  C("af-cantar-calle", "Coro Callejero", "Canta a coro con el grupo una canción icónica andando por la calle.", "Sin molestar a vecinos.", "social", 20, { pack: "after" }),
+  C("af-llamada-amigo", "Llamada Sorpresa", "Llama a un amigo dormido y dile que le quieres.", "Sin chantajes.", "social", 25, { pack: "after" }),
+  C("af-foto-amanecer", "Foto del Amanecer", "Saca foto cuando empiece a clarear y mándala al chat.", "Solo si se queda hasta esa hora.", "social", 30, { pack: "after" }),
+  C("af-historia-noche", "Resumen de la Noche", "Cuenta el mejor momento de la noche en 60 segundos.", "Si haces reír a todos, +20.", "social", 20, { pack: "after" }),
+  C("af-camina-recto", "Línea Recta", "Camina 10 pasos en línea recta sobre la raya del bordillo.", "Sin tocar el suelo de fuera.", "fisico", 15, { pack: "after" }),
+  C("af-misterio-numero", "El Número Misterioso", "Mira tu móvil: el último mensaje recibido manda un reto al grupo.", "Lee en alto literal.", "social", 20, { pack: "after" }),
+  C("af-vaso-agua", "Misión Hidratación", "Convence al grupo de beber un vaso de agua antes de seguir.", "Si lo bebéis todos, +20.", "reto", 15, { pack: "after" }),
+];
+
+// PACK TERCER TIEMPO — post-partido, vestuario, sano (12 cartas)
+const TERCER: GameCard[] = [
+  C("tt-mvp", "MVP del Día", "Nombra al MVP del grupo con un argumento de 30 segundos.", "Si la mayoría está de acuerdo, +20.", "social", 20, { pack: "tercer-tiempo" }),
+  C("tt-cumple-rival", "Cumplido al Rival", "Hazle un cumplido sincero a alguien del grupo contrario imaginario.", "Sin sarcasmo.", "social", 15, { pack: "tercer-tiempo" }),
+  C("tt-anecdota", "La Jugada Mítica", "Cuenta tu mejor jugada (o la peor pifia) en 60 segundos.", "Bonus si emocionas.", "social", 20, { pack: "tercer-tiempo" }),
+  C("tt-grito", "Grito de Victoria", "Suelta un grito de campeón que se oiga en toda la sala.", "Sin reírte.", "social", 15, { pack: "tercer-tiempo" }),
+  C("tt-flexion", "10 Flexiones", "Hazlas aquí mismo, sin pausa.", "Hardcore = 20.", "fisico", 15, { pack: "tercer-tiempo" }),
+  C("tt-recovery", "Recovery Drink", "Pide y bébete un isotónico o una limonada.", "Hidratación es ley.", "beber", 10, { pack: "tercer-tiempo" }),
+  C("tt-foto-equipo", "Foto de Equipo", "Organiza una foto en pose de equipo.", "Si todos se prestan, +15.", "social", 15, { pack: "tercer-tiempo" }),
+  C("tt-himno", "Himno del Equipo", "Inventa un himno corto del grupo. Tres versos.", "Si lo cantáis a coro, +25.", "social", 25, { pack: "tercer-tiempo" }),
+  C("tt-charla-tecnica", "Charla Técnica", "Imita a un entrenador analizando la jugada del último vídeo del chat.", "Pizarra invisible incluida.", "social", 20, { pack: "tercer-tiempo" }),
+  C("tt-vendaje", "Vendaje Falso", "Hazte un vendaje falso con servilleta y palillo durante 5 min.", "Sin quitártelo.", "reto", 15, { pack: "tercer-tiempo" }),
+  C("tt-grita-arbitro", "Grita al Árbitro", "Grita 'Árbitro!' con tono de queja, una sola vez, sin contexto.", "Sin reírte.", "social", 10, { pack: "tercer-tiempo" }),
+  C("tt-mvp-foto", "Trofeo Improvisado", "Crea un trofeo con cosas de la mesa y entrégaselo al MVP.", "Si lo acepta serio, +20.", "social", 20, { pack: "tercer-tiempo" }),
+];
+
 export const ALL_CARDS: GameCard[] = [
-  ...TARDEO, ...FERIA, ...FAMILIAR, ...NOCHE, ...BANCO, ...ESTRATEGICO, ...LEGACY,
+  ...TARDEO, ...FERIA, ...FAMILIAR, ...NOCHE, ...BANCO, ...AFTER, ...TERCER, ...ESTRATEGICO, ...LEGACY,
 ];
 
 const idsOf = (arr: GameCard[]) => arr.map((c) => c.id);
@@ -175,6 +207,8 @@ export const PACKS: { id: PackId; cardIds: string[] }[] = [
   { id: "familiar", cardIds: [...idsOf(FAMILIAR), ...idsOf(ESTRATEGICO).slice(5, 9)] },
   { id: "noche", cardIds: [...idsOf(NOCHE), ...idsOf(ESTRATEGICO)] },
   { id: "banco", cardIds: [...idsOf(BANCO), ...idsOf(ESTRATEGICO).slice(0, 4)] },
+  { id: "after", cardIds: [...idsOf(AFTER), ...idsOf(ESTRATEGICO).slice(0, 5)] },
+  { id: "tercer-tiempo", cardIds: [...idsOf(TERCER), ...idsOf(ESTRATEGICO).slice(0, 4)] },
   { id: "estrategico", cardIds: idsOf(ESTRATEGICO) },
   { id: "clasico", cardIds: [...idsOf(LEGACY), "reversa", "bloqueo", "espejo", "robo-carta", "comodin"] },
   { id: "discoteca", cardIds: [...idsOf(NOCHE).slice(0, 12), "reversa", "bloqueo", "espejo"] },

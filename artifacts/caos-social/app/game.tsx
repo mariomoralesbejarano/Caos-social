@@ -5,10 +5,14 @@ import {
   RoomPlayer,
   getGetRoomQueryKey,
   useDrawCard,
+  useMarkDone,
   usePanicVote,
   useRespondToThrow,
   useThrowCard,
   useUsePower,
+  useVerifyVote,
+  PANIC_WINDOW_MS,
+  VERIFY_WINDOW_MS,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
@@ -46,6 +50,8 @@ export default function GameScreen() {
   const respondMut = useRespondToThrow();
   const panicMut = usePanicVote();
   const powerMut = useUsePower();
+  const markDoneMut = useMarkDone();
+  const verifyMut = useVerifyVote();
 
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [throwTo, setThrowTo] = useState<boolean>(false);
@@ -62,6 +68,53 @@ export default function GameScreen() {
       return () => clearTimeout(t);
     }
   }, [errMsg]);
+
+  // Tick para refrescar cuentas atrás (Tribunal y pánico) cada segundo.
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => forceTick((x) => (x + 1) % 1000000), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Notificaciones push básicas (web): pedir permiso y avisar de cambios.
+  const lastInboxIds = useRef<Set<string>>(new Set());
+  const lastTribunalIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    if (!("serviceWorker" in navigator) || !("Notification" in window)) return;
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    if (Notification.permission === "default") Notification.requestPermission().catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    if (!room) return;
+    const inboxIds = new Set(room.myInbox.map((t) => t.id));
+    for (const t of room.myInbox) {
+      if (!lastInboxIds.current.has(t.id)) {
+        try {
+          new Notification("⚡ Nueva carta para ti", {
+            body: `${t.fromName}: ${t.card.title}`,
+            tag: "inbox-" + t.id,
+          });
+        } catch {}
+      }
+    }
+    lastInboxIds.current = inboxIds;
+
+    const tribIds = new Set((room.tribunal ?? []).map((t) => t.id));
+    for (const t of room.tribunal ?? []) {
+      if (!lastTribunalIds.current.has(t.id)) {
+        try {
+          new Notification("🧑‍⚖️ Tribunal del Caos", {
+            body: `Vota: ¿"${t.card.title}" cumplido?`,
+            tag: "trib-" + t.id,
+          });
+        } catch {}
+      }
+    }
+    lastTribunalIds.current = tribIds;
+  }, [room?.myInbox, room?.tribunal]);
 
   useEffect(() => {
     if (!session) router.replace("/");
@@ -207,6 +260,18 @@ export default function GameScreen() {
     }
   }
 
+  async function handleVerify(throwId: string, ok: boolean) {
+    try {
+      await verifyMut.mutateAsync({
+        code: room!.code,
+        data: { playerId: session!.playerId, throwId, ok },
+      });
+      invalidate();
+    } catch (e) {
+      setErrMsg(extractErr(e));
+    }
+  }
+
   async function handlePanic(throwId: string, against: boolean) {
     try {
       await panicMut.mutateAsync({
@@ -288,6 +353,60 @@ export default function GameScreen() {
                 <Feather name="chevron-right" size={20} color={colors.primary} />
               </Pressable>
             ))}
+          </View>
+        )}
+
+        {/* Tribunal del Caos: votar verificaciones de otros */}
+        {(room.tribunal ?? []).length > 0 && (
+          <View
+            style={[
+              styles.inboxBox,
+              { borderColor: colors.secondary, backgroundColor: colors.card, shadowColor: colors.secondary },
+            ]}
+          >
+            <Text style={[styles.inboxTitle, { color: colors.secondary }]}>
+              🧑‍⚖️ TRIBUNAL DEL CAOS · {(room.tribunal ?? []).length} en juicio
+            </Text>
+            {(room.tribunal ?? []).map((t) => {
+              const owner = room.players.find((p) => p.id === t.toPlayerId);
+              const left = Math.max(0, t.verifyEndsAt - Date.now());
+              const mins = Math.floor(left / 60000);
+              const secs = Math.floor((left % 60000) / 1000);
+              const myVote = t.verifyVotes.find((v) => v.voterId === session.playerId);
+              const yes = t.verifyVotes.filter((v) => v.ok).length;
+              const no = t.verifyVotes.filter((v) => !v.ok).length;
+              return (
+                <View
+                  key={t.id}
+                  style={[
+                    styles.inboxRow,
+                    { borderColor: colors.border, backgroundColor: colors.background, flexDirection: "column", alignItems: "stretch", gap: 8 },
+                  ]}
+                >
+                  <Text style={[styles.inboxFrom, { color: colors.mutedForeground }]}>
+                    {owner?.name ?? "?"} dice haber cumplido · {mins}:{secs.toString().padStart(2, "0")} restantes
+                  </Text>
+                  <Text style={[styles.inboxCard, { color: colors.foreground }]}>
+                    {t.secret ? "🕶️ Reto secreto" : t.card.title}
+                  </Text>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <NeonButton
+                      label={`✅ Superado${myVote?.ok ? " ✓" : ""} (${yes})`}
+                      onPress={() => handleVerify(t.id, true)}
+                      small
+                      style={{ flex: 1 }}
+                    />
+                    <NeonButton
+                      label={`❌ Falso${myVote && !myVote.ok ? " ✓" : ""} (${no})`}
+                      variant="danger"
+                      onPress={() => handleVerify(t.id, false)}
+                      small
+                      style={{ flex: 1 }}
+                    />
+                  </View>
+                </View>
+              );
+            })}
           </View>
         )}
 
@@ -701,7 +820,7 @@ function ResolveInbox({
 
       <View style={styles.actionsRow}>
         <NeonButton
-          label="Aceptar"
+          label="✅ Hecho"
           onPress={() => onAction("accept")}
           disabled={busy}
           style={{ flex: 1 }}
@@ -778,6 +897,10 @@ function PanicVote({
   const eligible = players.length - 1;
   const needed = Math.floor(eligible / 2) + 1;
   const myVote = pending.panicAgainst.includes(myId);
+  const left = Math.max(0, (pending.panicEndsAt ?? 0) - Date.now());
+  const mins = Math.floor(left / 60000);
+  const secs = Math.floor((left % 60000) / 1000);
+  const expired = left <= 0;
 
   return (
     <View
@@ -794,6 +917,9 @@ function PanicVote({
         </Text>
         <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
           Mayoría del grupo (excepto el receptor) anula la carta.
+        </Text>
+        <Text style={{ color: expired ? colors.destructive : colors.primary, fontFamily: "Inter_700Bold", fontSize: 13, marginTop: 4 }}>
+          {expired ? "⏱️ Ventana de pánico cerrada" : `⏱️ ${mins}:${secs.toString().padStart(2, "0")} para votar`}
         </Text>
         <Pressable
           onPress={() => onVote(!myVote)}

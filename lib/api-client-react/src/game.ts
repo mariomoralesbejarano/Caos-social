@@ -8,11 +8,14 @@ import type {
   RespondAction,
   Room,
   Trophy,
+  VerificationVote,
 } from "./types";
 
 export const COOLDOWN_MS = 10 * 60 * 1000;
 export const SHIELD_MS = 5 * 60 * 1000;
 export const SILENCE_MS = 5 * 60 * 1000;
+export const PANIC_WINDOW_MS = 2 * 60 * 1000;       // Pánico: 2 min de votación
+export const VERIFY_WINDOW_MS = 10 * 60 * 1000;     // Verificación: 10 min asíncrono
 export const HAND_SIZE = 5;
 export const MAX_LOG = 30;
 
@@ -37,13 +40,11 @@ export function generateCode(): string {
 }
 
 function buildPile(packs: PackId[], customCards: GameCard[]): string[] {
-  // Union de packs (sin duplicados) — el shuffle final garantiza intercalado real
   const set = new Set<string>();
   for (const p of packs) for (const id of getPackCardIds(p)) set.add(id);
   for (const c of customCards) set.add(c.id);
   const ids = [...set];
   const deck: string[] = [];
-  // 4 copias de cada carta, luego Fisher-Yates dos veces para mezcla profesional
   for (let i = 0; i < 4; i++) deck.push(...ids);
   return shuffle(shuffle(deck));
 }
@@ -74,11 +75,23 @@ function bump(room: Room) {
   room.version += 1;
 }
 
+/** Peso de voto: el Juez vale x2 en pánico y verificación. */
+function voteWeight(p: PlayerInternal | undefined): number {
+  return p?.role === "juez" ? 2 : 1;
+}
+
+/** Multiplicador de puntuación por rol (víctima +20 %). */
+function roleScoreMultiplier(p: PlayerInternal): number {
+  return p.role === "victima" ? 1.2 : 1;
+}
+
 function newPlayer(
   name: string,
   tags: CardTag[] = [],
   extra: { avatar?: string; role?: string } = {},
 ): PlayerInternal {
+  // El Abstemio fuerza la tag para filtrar cartas de alcohol.
+  if (extra.role === "abstemio" && !tags.includes("abstemio")) tags = [...tags, "abstemio"];
   return {
     id: newId("p_"),
     name: name.trim() || "Jugador",
@@ -136,6 +149,7 @@ export function applyJoin(
   room: Room,
   opts: { name: string; tags?: CardTag[]; avatar?: string; role?: string },
 ): GameResult<{ room: Room; playerId: string }> {
+  resolveTimeouts(room);
   const trimmed = opts.name.trim();
   if (!trimmed) return { error: "Nombre vacío" };
   const existing = room.players.find((p) => p.name.toLowerCase() === trimmed.toLowerCase());
@@ -145,7 +159,8 @@ export function applyJoin(
     bump(room);
     return { room, playerId: existing.id };
   }
-  const player = newPlayer(trimmed, opts.tags ?? [], { avatar: opts.avatar, role: opts.role });
+  const tags = opts.tags ?? [];
+  const player = newPlayer(trimmed, tags, { avatar: opts.avatar, role: opts.role });
   if (room.status === "active") {
     for (let i = 0; i < HAND_SIZE; i++) {
       const c = nextValidCard(room.drawPile, player.tags, room.customCards);
@@ -201,6 +216,7 @@ export function applyStartGame(room: Room, playerId: string): GameResult {
 
 export function applyDrawCard(room: Room, playerId: string): GameResult<{ room: Room; drawnCard: GameCard }> {
   if (room.status !== "active") return { error: "La partida no ha empezado" };
+  resolveTimeouts(room);
   const me = room.players.find((p) => p.id === playerId);
   if (!me) return { error: "Jugador no encontrado" };
   if (me.hand.length >= HAND_SIZE) return { error: "Mano llena" };
@@ -214,7 +230,14 @@ export function applyDrawCard(room: Room, playerId: string): GameResult<{ room: 
   return { room, drawnCard: card };
 }
 
-export function applyThrowCard(room: Room, fromId: string, toId: string, cardId: string): GameResult {
+export function applyThrowCard(
+  room: Room,
+  fromId: string,
+  toId: string,
+  cardId: string,
+  opts: { secret?: boolean } = {},
+): GameResult {
+  resolveTimeouts(room);
   if (fromId === toId) return { error: "No puedes lanzarte a ti mismo" };
   if (room.silentUntil > Date.now()) return { error: "Modo silencio activo. Nada de lanzar cartas." };
   const from = room.players.find((p) => p.id === fromId);
@@ -245,43 +268,202 @@ export function applyThrowCard(room: Room, fromId: string, toId: string, cardId:
     return room;
   }
 
+  // Solo el Infiltrado puede marcar como secreto. Si llega cualquier otro, ignora.
+  const isSecret = !!opts.secret && from.role === "infiltrado";
+  const now = Date.now();
   const pending: PendingThrow = {
     id: newId("t_"),
     fromPlayerId: fromId,
     fromName: from.name,
     toPlayerId: toId,
     cardId,
-    card,
-    createdAt: Date.now(),
+    card: { ...card, secret: isSecret },
+    createdAt: now,
+    status: "pending",
     panicAgainst: [],
+    panicEndsAt: now + PANIC_WINDOW_MS,
+    verifyVotes: [],
+    verifyEndsAt: 0,
+    secret: isSecret,
   };
   to.inbox.push(pending);
-  pushLog(room, `${from.name} lanzó "${card.title}" a ${to.name}`);
+  pushLog(
+    room,
+    isSecret
+      ? `🕶️ El Infiltrado lanzó un reto SECRETO a ${to.name}`
+      : `${from.name} lanzó "${card.title}" a ${to.name}`,
+  );
   bump(room);
   return room;
 }
 
-function applyAccept(p: PlayerInternal, card: GameCard) {
+/** Aplica los puntos de un reto cumplido al jugador. */
+function awardChallenge(p: PlayerInternal, card: GameCard, opts: { secret?: boolean; undetected?: boolean } = {}) {
   const isHardcore = p.tags.includes("hardcore");
-  const gained = card.points * p.multiplier * (isHardcore ? 2 : 1);
+  const roleMul = roleScoreMultiplier(p);
+  const secretMul = opts.secret && opts.undetected ? 3 : 1; // Infiltrado x3 si nadie lo descubrió
+  const gained = Math.round(card.points * p.multiplier * (isHardcore ? 2 : 1) * roleMul * secretMul);
   p.score += gained;
   p.multiplier = 1;
   p.challengesCompleted += 1;
+  return gained;
+}
+
+/** El receptor marca el reto como hecho. Pasa a fase de verificación 10 min. */
+export function applyMarkDone(
+  room: Room,
+  playerId: string,
+  throwId: string,
+  evidenceUrl?: string,
+): GameResult {
+  resolveTimeouts(room);
+  const me = room.players.find((p) => p.id === playerId);
+  if (!me) return { error: "Jugador no encontrado" };
+  const t = me.inbox.find((x) => x.id === throwId);
+  if (!t) return { error: "Carta no encontrada en tu bandeja" };
+  if (t.status !== "pending") return { error: "Este reto ya está en otra fase" };
+  // Solo el Fotógrafo puede subir prueba; al resto se la ignoramos.
+  const allowEvidence = me.role === "fotografo";
+  t.status = "verifying";
+  t.verifyEndsAt = Date.now() + VERIFY_WINDOW_MS;
+  if (evidenceUrl && allowEvidence) t.evidenceUrl = evidenceUrl;
+  pushLog(
+    room,
+    t.secret
+      ? `🕶️ ${me.name} dice haber cumplido un reto SECRETO. ¡Adivinad cuál!`
+      : `🧑‍⚖️ ${me.name} marcó "${t.card.title}" como HECHO. Tribunal en marcha (10 min).`,
+  );
+  me.lastSeen = Date.now();
+  bump(room);
+  return room;
+}
+
+/** Cualquier jugador (excepto el receptor) vota si el reto se hizo o no. */
+export function applyVerifyVote(
+  room: Room,
+  voterId: string,
+  throwId: string,
+  ok: boolean,
+): GameResult {
+  resolveTimeouts(room);
+  const voter = room.players.find((p) => p.id === voterId);
+  if (!voter) return { error: "Votante no encontrado" };
+  let owner: PlayerInternal | undefined;
+  let t: PendingThrow | undefined;
+  for (const p of room.players) {
+    const found = p.inbox.find((x) => x.id === throwId && x.status === "verifying");
+    if (found) { owner = p; t = found; break; }
+  }
+  if (!owner || !t) return { error: "Reto no está en verificación" };
+  if (voter.id === owner.id) return { error: "No puedes votar tu propio reto" };
+  // Reemplazar voto previo del mismo votante
+  t.verifyVotes = t.verifyVotes.filter((v) => v.voterId !== voterId);
+  t.verifyVotes.push({ voterId, ok } as VerificationVote);
+  voter.lastSeen = Date.now();
+  // Resolver si la mayoría ponderada ya está clara
+  tryResolveVerification(room, owner, t);
+  bump(room);
+  return room;
+}
+
+/** Suma pesos de votos (juez x2). Devuelve {yes, no, eligible}. */
+function tallyVerification(room: Room, t: PendingThrow) {
+  let yes = 0, no = 0;
+  for (const v of t.verifyVotes) {
+    const p = room.players.find((x) => x.id === v.voterId);
+    const w = voteWeight(p);
+    if (v.ok) yes += w; else no += w;
+  }
+  // Eligibles: todos excepto el receptor
+  const eligibleWeight = room.players
+    .filter((p) => p.id !== t.toPlayerId)
+    .reduce((s, p) => s + voteWeight(p), 0);
+  return { yes, no, eligibleWeight };
+}
+
+/** Si la votación tiene mayoría absoluta o ya pasó deadline, cierra el reto. */
+function tryResolveVerification(room: Room, owner: PlayerInternal, t: PendingThrow, force = false) {
+  const { yes, no, eligibleWeight } = tallyVerification(room, t);
+  const majority = Math.floor(eligibleWeight / 2) + 1;
+  const past = Date.now() >= t.verifyEndsAt;
+  if (!force && yes < majority && no < majority && !past) return;
+
+  // Si pasó el tiempo y nadie votó, time-out = válido (regla pedida).
+  let valid: boolean;
+  if (yes === 0 && no === 0) valid = true;
+  else if (yes === no) valid = true; // empate → beneficio de la duda
+  else valid = yes > no;
+
+  // Detectado: alguien votó "no". Para infiltrado eso elimina el x3.
+  const undetected = no === 0;
+
+  if (valid) {
+    const gained = awardChallenge(owner, t.card, { secret: t.secret, undetected });
+    pushLog(
+      room,
+      t.secret
+        ? `🕶️✅ ${owner.name} cumplió el reto secreto. +${gained} pts${undetected ? " (x3 sin ser detectado)" : ""}`
+        : `✅ Tribunal valida "${t.card.title}" de ${owner.name}. +${gained} pts`,
+    );
+  } else {
+    // Falso → se restan el doble de los puntos asignados a la carta
+    const penalty = t.card.points * 2;
+    owner.score -= penalty;
+    pushLog(room, `❌ Tribunal: ${owner.name} mintió en "${t.card.title}". -${penalty} pts`);
+  }
+  t.status = "resolved";
+  // Eliminar del inbox
+  owner.inbox = owner.inbox.filter((x) => x.id !== t.id);
+}
+
+/** Resuelve verificaciones y pánicos vencidos (idempotente, llamado en cada lectura). */
+export function resolveTimeouts(room: Room): boolean {
+  const now = Date.now();
+  let changed = false;
+  for (const p of room.players) {
+    // Iterar copia porque mutamos inbox
+    for (const t of [...p.inbox]) {
+      if (t.status === "verifying" && now >= t.verifyEndsAt) {
+        tryResolveVerification(room, p, t, true);
+        changed = true;
+      }
+      if (t.status === "pending" && now >= t.panicEndsAt && t.panicAgainst.length > 0) {
+        // Resolver pánico al expirar la ventana
+        const yes = t.panicAgainst.reduce((s, voterId) => {
+          const v = room.players.find((x) => x.id === voterId);
+          return s + voteWeight(v);
+        }, 0);
+        const eligibleWeight = room.players
+          .filter((x) => x.id !== p.id)
+          .reduce((s, x) => s + voteWeight(x), 0);
+        const needed = Math.floor(eligibleWeight / 2) + 1;
+        if (yes >= needed) {
+          p.inbox = p.inbox.filter((x) => x.id !== t.id);
+          pushLog(room, `🚨 Pánico cerrado: "${t.card.title}" anulado por el grupo.`);
+          changed = true;
+        }
+      }
+    }
+  }
+  if (changed) bump(room);
+  return changed;
 }
 
 export function applyRespondToThrow(room: Room, playerId: string, throwId: string, action: RespondAction): GameResult {
+  resolveTimeouts(room);
   const me = room.players.find((p) => p.id === playerId);
   if (!me) return { error: "Jugador no encontrado" };
   const idx = me.inbox.findIndex((t) => t.id === throwId);
   if (idx < 0) return { error: "Carta no encontrada en tu bandeja" };
   const pending = me.inbox[idx];
+  if (pending.status !== "pending") return { error: "Este reto ya está en otra fase" };
   const card = getCard(pending.cardId, room.customCards);
   if (!card) return { error: "Carta inválida" };
   const from = room.players.find((p) => p.id === pending.fromPlayerId);
 
   if (action === "accept") {
-    applyAccept(me, card);
-    pushLog(room, `${me.name} aceptó "${card.title}". +${card.points * (me.tags.includes("hardcore") ? 2 : 1)} pts`);
+    // En modo Fantasy "aceptar" = "lo voy a hacer / lo he hecho" → al Tribunal.
+    return applyMarkDone(room, playerId, throwId);
   } else if (action === "reject") {
     me.multiplier = me.multiplier * 2;
     me.challengesRejected += 1;
@@ -293,15 +475,29 @@ export function applyRespondToThrow(room: Room, playerId: string, throwId: strin
     me.powersUsed += 1;
     if (action === "reversa") {
       if (!from) return { error: "Emisor no encontrado" };
-      applyAccept(from, card);
-      pushLog(room, `${me.name} usó REVERSA. ${from.name} cumple "${card.title}"`);
+      // Reversa: el emisor cumple → directo a verificación contra él
+      const now = Date.now();
+      from.inbox.push({
+        ...pending,
+        id: newId("t_"),
+        toPlayerId: from.id,
+        fromPlayerId: me.id,
+        fromName: me.name,
+        status: "verifying",
+        verifyEndsAt: now + VERIFY_WINDOW_MS,
+        panicEndsAt: now + PANIC_WINDOW_MS,
+        verifyVotes: [],
+        panicAgainst: [],
+        createdAt: now,
+      });
+      pushLog(room, `🔁 ${me.name} usó REVERSA. ${from.name} debe cumplir "${card.title}"`);
     } else if (action === "espejo") {
       const points = card.points;
       me.score += points;
-      pushLog(room, `${me.name} usó ESPEJO. ${from?.name ?? "El emisor"} debe cumplir; ${me.name} +${points}`);
+      pushLog(room, `🪞 ${me.name} usó ESPEJO. ${from?.name ?? "Emisor"} cumple; ${me.name} +${points}`);
     } else if (action === "bloqueo") {
       me.shieldUntil = Date.now() + SHIELD_MS;
-      pushLog(room, `${me.name} activó BLOQUEO. Escudo 5m`);
+      pushLog(room, `🛡️ ${me.name} activó BLOQUEO. Escudo 5 min`);
     } else if (action === "robo-carta") {
       if (from && from.hand.length > 0) {
         const stolenIdx = Math.floor(Math.random() * from.hand.length);
@@ -314,14 +510,15 @@ export function applyRespondToThrow(room: Room, playerId: string, throwId: strin
     } else if (action === "comodin") {
       pushLog(room, `🃏 ${me.name} usó COMODÍN: anula "${card.title}" sin consecuencias`);
     }
+    me.inbox.splice(idx, 1);
   }
-  me.inbox.splice(idx, 1);
   me.lastSeen = Date.now();
   bump(room);
   return room;
 }
 
 export function applyPanicVote(room: Room, voterId: string, throwId: string, against: boolean): GameResult {
+  resolveTimeouts(room);
   let owner: PlayerInternal | undefined;
   let pending: PendingThrow | undefined;
   for (const p of room.players) {
@@ -330,14 +527,22 @@ export function applyPanicVote(room: Room, voterId: string, throwId: string, aga
   }
   if (!owner || !pending) return { error: "Carta no encontrada" };
   if (voterId === owner.id) return { error: "No puedes votar tu propia carta" };
+  if (Date.now() > pending.panicEndsAt) return { error: "La ventana de pánico ya cerró" };
   if (against) {
     if (!pending.panicAgainst.includes(voterId)) pending.panicAgainst.push(voterId);
   } else {
     pending.panicAgainst = pending.panicAgainst.filter((v) => v !== voterId);
   }
-  const eligible = room.players.length - 1;
-  const needed = Math.max(2, Math.floor(eligible / 2) + 1);
-  if (pending.panicAgainst.length >= needed) {
+  // Mayoría ponderada inmediata
+  const yes = pending.panicAgainst.reduce((s, vId) => {
+    const v = room.players.find((x) => x.id === vId);
+    return s + voteWeight(v);
+  }, 0);
+  const eligibleWeight = room.players
+    .filter((p) => p.id !== owner!.id)
+    .reduce((s, p) => s + voteWeight(p), 0);
+  const needed = Math.max(2, Math.floor(eligibleWeight / 2) + 1);
+  if (yes >= needed) {
     owner.inbox = owner.inbox.filter((t) => t.id !== throwId);
     pushLog(room, `🚨 Carta anulada por votación del grupo`);
   }
@@ -369,6 +574,7 @@ export function applyAddCustomCard(room: Room, playerId: string, body: { title: 
 
 export function applyUsePower(room: Room, playerId: string, cardId: string, targetPlayerId?: string): GameResult {
   if (room.status !== "active") return { error: "La partida no ha empezado" };
+  resolveTimeouts(room);
   const me = room.players.find((p) => p.id === playerId);
   if (!me) return { error: "Jugador no encontrado" };
   const handIdx = me.hand.indexOf(cardId);
@@ -521,8 +727,31 @@ export function applyResetRoom(room: Room, playerId: string): GameResult {
   return room;
 }
 
+function migratePending(t: PendingThrow): PendingThrow {
+  // Compatibilidad con salas creadas antes del Tribunal: rellenar campos nuevos.
+  const now = Date.now();
+  return {
+    ...t,
+    status: t.status ?? "pending",
+    panicEndsAt: t.panicEndsAt ?? (t.createdAt ?? now) + PANIC_WINDOW_MS,
+    verifyVotes: t.verifyVotes ?? [],
+    verifyEndsAt: t.verifyEndsAt ?? 0,
+    panicAgainst: t.panicAgainst ?? [],
+  };
+}
+
 export function serializeRoom(room: Room, viewerId: string) {
+  // Calcular en lectura cualquier timeout vencido (no muta DB; el próximo write lo persiste).
+  resolveTimeouts(room);
   const me = room.players.find((p) => p.id === viewerId);
+  // Tribunal global = todas las cartas en verificación de OTROS jugadores
+  const tribunal: PendingThrow[] = [];
+  for (const p of room.players) {
+    if (p.id === viewerId) continue;
+    for (const t of p.inbox) {
+      if (t.status === "verifying") tribunal.push(migratePending(t));
+    }
+  }
   return {
     code: room.code,
     ownerId: room.ownerId,
@@ -544,16 +773,11 @@ export function serializeRoom(room: Room, viewerId: string) {
     })),
     log: room.log,
     myHand: me ? (me.hand.map((id) => getCard(id, room.customCards)).filter(Boolean) as GameCard[]) : [],
-    myInbox: me ? me.inbox.map((t) => ({
-      id: t.id,
-      fromPlayerId: t.fromPlayerId,
-      fromName: t.fromName,
-      toPlayerId: t.toPlayerId,
-      cardId: t.cardId,
+    myInbox: me ? me.inbox.map((t) => migratePending({
+      ...t,
       card: getCard(t.cardId, room.customCards)!,
-      createdAt: t.createdAt,
-      panicAgainst: t.panicAgainst,
     })) : [],
+    tribunal,
     cooldowns: room.cooldowns,
     version: room.version,
     silentUntil: room.silentUntil,
