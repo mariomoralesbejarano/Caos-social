@@ -29,6 +29,16 @@ Multiplayer party-game. Single Supabase table `caos_rooms (code pk, state jsonb,
 
 `artifacts/caos-social/lib/nativePush.ts` is a no-op on web and an adapter for OneSignal / `@capacitor/push-notifications` on native. Fill the marked TODOs and add the SDK to enable real background pushes when wrapping the Expo web build with Capacitor.
 
+### Capacitor (Android/iOS)
+
+- App ID: `com.mario.caossocial`, App name: `Caos Social`. Config in `artifacts/caos-social/capacitor.config.ts` (webDir = `dist`).
+- Scripts (in `artifacts/caos-social/`):
+  - `pnpm run cap:init-android` / `cap:init-ios` — scaffold native projects (run once).
+  - `pnpm run cap:sync` — `expo export` + `cap sync`.
+  - `pnpm run cap:open:android` / `cap:open:ios` — open IDE.
+  - `pnpm run cap:build:apk` — build debug APK (needs Android SDK + JDK).
+- Full instructions to generate the installable APK on Replit or locally: `artifacts/caos-social/CAPACITOR.md`.
+
 ### Layout
 
 - `lib/api-client-react/` — game logic + Supabase client + React Query hooks (drop-in replacement that keeps the old orval-style `{code,data}` signatures so screens compile unchanged).
