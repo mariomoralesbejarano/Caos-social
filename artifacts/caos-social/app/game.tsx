@@ -43,6 +43,8 @@ import {
   notifPermission,
   showCaosNotification,
 } from "@/lib/notifications";
+import { sendPushNotification, subscribeToPush } from "@/lib/push";
+import { initNativePush } from "@/lib/nativePush";
 
 export default function GameScreen() {
   const colors = useColors();
@@ -107,9 +109,19 @@ export default function GameScreen() {
   const lastInboxIds = useRef<Set<string>>(new Set());
   const lastTribunalIds = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (!isWebNotifSupported()) return;
-    ensureServiceWorker();
+    if (isWebNotifSupported()) ensureServiceWorker();
+    // Inicializa SDK de push nativo (no-op en web).
+    void initNativePush();
   }, []);
+
+  // Suscripción a PUSH entrantes para mí (broadcast instantáneo).
+  useEffect(() => {
+    if (!session) return;
+    const off = subscribeToPush(session.roomCode, session.playerId, (p) => {
+      setNotifMsg(`📨 ${p.body}`);
+    });
+    return off;
+  }, [session?.roomCode, session?.playerId]);
   useEffect(() => {
     if (!room) return;
     const inboxIds = new Set(room.myInbox.map((t) => t.id));
@@ -244,6 +256,14 @@ export default function GameScreen() {
         },
       });
       invalidate();
+      // Push instantáneo al receptor: dispara notificación nativa/PWA en su móvil.
+      const card = room!.myHand.find((c) => c.id === selectedCard);
+      void sendPushNotification(room!.code, targetId, {
+        fromPlayerId: session!.playerId,
+        title: "⚠️ ¡CAOS!",
+        body: `${me!.name} te ha lanzado: ${card?.title ?? "una carta"}`,
+        tag: `throw-${targetId}-${Date.now()}`,
+      });
       setSelectedCard(null);
       setThrowTo(false);
       if (Platform.OS !== "web")

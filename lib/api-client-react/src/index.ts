@@ -31,7 +31,7 @@ import {
   loadRoom,
   mutateRoom,
 } from "./store";
-import { getSupabase, ROOMS_TABLE } from "./supabase";
+import { broadcastRoomEvent, getRoomChannel, getSupabase, ROOMS_TABLE } from "./supabase";
 import type {
   CardTag,
   GameCard,
@@ -43,7 +43,14 @@ import type {
 
 export * from "./types";
 export { ALL_CARDS, PACKS as ALL_PACKS, getCard, getPackCardIds } from "./cards";
-export { getSupabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "./supabase";
+export {
+  getSupabase,
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
+  broadcastRoomEvent,
+  getRoomChannel,
+} from "./supabase";
+export type { RoomBroadcastEvent } from "./supabase";
 export { existsRoom };
 
 export function useSpectatorJoin() {
@@ -121,6 +128,18 @@ export function useGetRoom(
         },
       )
       .subscribe();
+
+    // BROADCAST: canal independiente. Cualquier mutación dispara
+    // ROOM_UPDATED y todos los clientes refrescan al instante (<100ms),
+    // sin esperar a postgres_changes.
+    const { channel: bcast } = getRoomChannel(upper);
+    const onBroadcast = () => {
+      qc.invalidateQueries({ queryKey });
+    };
+    bcast.on("broadcast", { event: "ROOM_UPDATED" }, onBroadcast);
+    bcast.on("broadcast", { event: "PANICO" }, onBroadcast);
+    bcast.on("broadcast", { event: "VOTO" }, onBroadcast);
+    bcast.on("broadcast", { event: "VERIFICACION" }, onBroadcast);
 
     // Refrescar al recuperar foco / online — clave para "modo fantasma"
     // (la app vuelve del background y debe pintar el modal de votación).
@@ -238,12 +257,38 @@ export const useEndGame = makeSimpleMutation<{ playerId: string }>((room, b) =>
   applyEndGame(room, b.playerId),
 );
 
-export const useThrowCard = makeSimpleMutation<{
-  playerId: string;
-  toPlayerId: string;
-  cardId: string;
-  secret?: boolean;
-}>((room, b) => applyThrowCard(room, b.playerId, b.toPlayerId, b.cardId, { secret: b.secret }));
+export function useThrowCard() {
+  return useMutation({
+    mutationFn: async ({
+      code,
+      data,
+    }: {
+      code: string;
+      data: {
+        playerId: string;
+        toPlayerId: string;
+        cardId: string;
+        secret?: boolean;
+      };
+    }) => {
+      const result = await mutateRoom(code, (room) =>
+        applyThrowCard(room, data.playerId, data.toPlayerId, data.cardId, {
+          secret: data.secret,
+        }),
+      );
+      if ("error" in (result as any))
+        throw { status: 400, data: result, message: (result as any).error };
+      // Broadcast PANICO: el receptor abre el modal de votación AL INSTANTE.
+      void broadcastRoomEvent(code, "PANICO", {
+        fromPlayerId: data.playerId,
+        toPlayerId: data.toPlayerId,
+        cardId: data.cardId,
+        ts: Date.now(),
+      });
+      return serializeRoom(result as Room, data.playerId);
+    },
+  });
+}
 
 export const useRespondToThrow = makeSimpleMutation<{
   playerId: string;
@@ -251,11 +296,32 @@ export const useRespondToThrow = makeSimpleMutation<{
   action: RespondAction;
 }>((room, b) => applyRespondToThrow(room, b.playerId, b.throwId, b.action));
 
-export const usePanicVote = makeSimpleMutation<{
-  playerId: string;
-  throwId: string;
-  against: boolean;
-}>((room, b) => applyPanicVote(room, b.playerId, b.throwId, b.against));
+export function usePanicVote() {
+  return useMutation({
+    mutationFn: async ({
+      code,
+      data,
+    }: {
+      code: string;
+      data: { playerId: string; throwId: string; against: boolean };
+    }) => {
+      // Broadcast OPTIMISTA: dispara el modal de votación en TODOS los móviles
+      // al mismo milisegundo, antes incluso de escribir en BBDD.
+      void broadcastRoomEvent(code, "VOTO", {
+        throwId: data.throwId,
+        voterId: data.playerId,
+        against: data.against,
+        ts: Date.now(),
+      });
+      const result = await mutateRoom(code, (room) =>
+        applyPanicVote(room, data.playerId, data.throwId, data.against),
+      );
+      if ("error" in (result as any))
+        throw { status: 400, data: result, message: (result as any).error };
+      return serializeRoom(result as Room, data.playerId);
+    },
+  });
+}
 
 export const useMarkDone = makeSimpleMutation<{
   playerId: string;
@@ -263,11 +329,30 @@ export const useMarkDone = makeSimpleMutation<{
   evidenceUrl?: string;
 }>((room, b) => applyMarkDone(room, b.playerId, b.throwId, b.evidenceUrl));
 
-export const useVerifyVote = makeSimpleMutation<{
-  playerId: string;
-  throwId: string;
-  ok: boolean;
-}>((room, b) => applyVerifyVote(room, b.playerId, b.throwId, b.ok));
+export function useVerifyVote() {
+  return useMutation({
+    mutationFn: async ({
+      code,
+      data,
+    }: {
+      code: string;
+      data: { playerId: string; throwId: string; ok: boolean };
+    }) => {
+      void broadcastRoomEvent(code, "VERIFICACION", {
+        throwId: data.throwId,
+        voterId: data.playerId,
+        ok: data.ok,
+        ts: Date.now(),
+      });
+      const result = await mutateRoom(code, (room) =>
+        applyVerifyVote(room, data.playerId, data.throwId, data.ok),
+      );
+      if ("error" in (result as any))
+        throw { status: 400, data: result, message: (result as any).error };
+      return serializeRoom(result as Room, data.playerId);
+    },
+  });
+}
 
 export const useAddCustomCard = makeSimpleMutation<{
   playerId: string;

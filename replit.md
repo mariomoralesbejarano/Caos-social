@@ -15,7 +15,19 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 
 ## Project: CAOS SOCIAL — 100% serverless
 
-Multiplayer party-game. Single Supabase table `caos_rooms (code pk, state jsonb, version int, updated_at)` with optimistic concurrency (load → mutate → CAS by version, 5 retries). Live updates via Supabase Realtime `postgres_changes` on `caos_rooms`. 48h inactivity GC runs client-side. 100+ cards across 5 packs (TARDEO/FERIA/FAMILIAR/NOCHE/ESTRATEGICO), reactive + proactive powers, custom cards, podium with 5 trophies, panic-vote system.
+Multiplayer party-game. Single Supabase table `caos_rooms (code pk, state jsonb, version int, updated_at)` with optimistic concurrency (load → mutate → CAS by version, 5 retries). Live updates via **two transports**: Supabase Realtime `postgres_changes` on `caos_rooms` (canonical state) + **Realtime Broadcast** on a per-room channel `room-bcast:<CODE>` for instant (<100ms) panic/vote/push events that don't wait for DB latency. 48h inactivity GC runs client-side. 100+ cards across 5 packs (TARDEO/FERIA/FAMILIAR/NOCHE/ESTRATEGICO), reactive + proactive powers, custom cards, podium with 5 trophies, panic-vote system.
+
+### Realtime Broadcast events (`RoomBroadcastEvent`)
+
+- `ROOM_UPDATED` — emitted by `mutateRoom` after every successful CAS write.
+- `PANICO` — emitted by `useThrowCard`; opens panic modal across all phones.
+- `VOTO` — emitted by `usePanicVote` (optimistic, before DB write).
+- `VERIFICACION` — emitted by `useVerifyVote`.
+- `PUSH` — emitted by `sendPushNotification(roomCode, playerId, msg)`; targets a single player.
+
+### Native push (Capacitor)
+
+`artifacts/caos-social/lib/nativePush.ts` is a no-op on web and an adapter for OneSignal / `@capacitor/push-notifications` on native. Fill the marked TODOs and add the SDK to enable real background pushes when wrapping the Expo web build with Capacitor.
 
 ### Layout
 

@@ -1,4 +1,4 @@
-import { getSupabase, ROOMS_TABLE } from "./supabase";
+import { broadcastRoomEvent, getSupabase, ROOMS_TABLE } from "./supabase";
 import type { Room } from "./types";
 import type { GameResult } from "./game";
 
@@ -91,6 +91,11 @@ export async function mutateRoom<T>(
       .select("code");
     if (updErr) throw updErr;
     if (upd && upd.length > 0) {
+      // Broadcast inmediato: dispara refrescos en TODOS los móviles al instante
+      // (sin esperar a postgres_changes, que puede tardar 200-800ms).
+      void broadcastRoomEvent(upper, "ROOM_UPDATED", {
+        version: newRoom.version,
+      });
       return result as T;
     }
     // version conflict, retry
