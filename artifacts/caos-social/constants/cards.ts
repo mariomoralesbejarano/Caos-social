@@ -21,6 +21,13 @@ export interface PackInfo {
 
 export const PACKS: PackInfo[] = [
   {
+    id: "banco",
+    name: "Banco / Parque",
+    emoji: "🌳",
+    description:
+      "Modo chill para cuando estáis sentados sin nada que hacer. Observación, palabras y confesiones suaves.",
+  },
+  {
     id: "tardeo",
     name: "Tardeo / Bar",
     emoji: "🍺",

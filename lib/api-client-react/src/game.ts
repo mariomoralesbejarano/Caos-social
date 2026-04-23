@@ -36,11 +36,21 @@ export function generateCode(): string {
   return code;
 }
 
-function buildPile(pack: PackId, customCards: GameCard[]): string[] {
-  const ids = [...getPackCardIds(pack), ...customCards.map((c) => c.id)];
+function buildPile(packs: PackId[], customCards: GameCard[]): string[] {
+  // Union de packs (sin duplicados) — el shuffle final garantiza intercalado real
+  const set = new Set<string>();
+  for (const p of packs) for (const id of getPackCardIds(p)) set.add(id);
+  for (const c of customCards) set.add(c.id);
+  const ids = [...set];
   const deck: string[] = [];
+  // 4 copias de cada carta, luego Fisher-Yates dos veces para mezcla profesional
   for (let i = 0; i < 4; i++) deck.push(...ids);
-  return shuffle(deck);
+  return shuffle(shuffle(deck));
+}
+
+function effectivePacks(room: Room): PackId[] {
+  const ps = room.packs && room.packs.length > 0 ? room.packs : [room.pack];
+  return ps;
 }
 
 function nextValidCard(pile: string[], tags: CardTag[], customs: GameCard[]): string | null {
@@ -86,14 +96,17 @@ function newPlayer(name: string, tags: CardTag[] = []): PlayerInternal {
 export function createInitialRoom(opts: {
   code: string;
   name: string;
-  pack: PackId;
+  pack?: PackId;
+  packs?: PackId[];
   tags?: CardTag[];
 }): { room: Room; playerId: string } {
   const player = newPlayer(opts.name, opts.tags ?? []);
+  const packs = opts.packs && opts.packs.length > 0 ? opts.packs : [opts.pack ?? "allin"];
   const room: Room = {
     code: opts.code,
     ownerId: player.id,
-    pack: opts.pack,
+    pack: packs[0],
+    packs,
     status: "lobby",
     players: [player],
     drawPile: [],
@@ -148,7 +161,7 @@ export function applySetMyTags(room: Room, playerId: string, tags: CardTag[]): G
 export function applyStartGame(room: Room, playerId: string): GameResult {
   if (room.ownerId !== playerId) return { error: "Solo el creador puede empezar" };
   if (room.players.length < 2) return { error: "Necesitas 2+ jugadores" };
-  room.drawPile = buildPile(room.pack, room.customCards);
+  room.drawPile = buildPile(effectivePacks(room), room.customCards);
   room.cooldowns = {};
   room.silentUntil = 0;
   room.trophies = [];
@@ -503,6 +516,7 @@ export function serializeRoom(room: Room, viewerId: string) {
     code: room.code,
     ownerId: room.ownerId,
     pack: room.pack,
+    packs: effectivePacks(room),
     status: room.status,
     players: room.players.map((p) => ({
       id: p.id,

@@ -41,7 +41,7 @@ export default function HomeScreen() {
   const [mode, setMode] = useState<"create" | "join">("create");
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
-  const [pack, setPack] = useState<PackId>("allin");
+  const [packs, setPacks] = useState<PackId[]>(["banco"]);
   const [tags, setTags] = useState<CardTag[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,8 +72,12 @@ export default function HomeScreen() {
       return;
     }
     try {
+      if (packs.length === 0) {
+        setError("Elige al menos un pack");
+        return;
+      }
       const res = await createMut.mutateAsync({
-        data: { name: name.trim(), pack, tags },
+        data: { name: name.trim(), packs, tags },
       });
       await setSession({
         roomCode: res.room.code,
@@ -276,14 +280,23 @@ export default function HomeScreen() {
       {mode === "create" && (
         <View style={styles.section}>
           <Text style={[styles.label, { color: colors.mutedForeground }]}>
-            PACK DE CARTAS
+            MEZCLA DE PACKS · marca varios para combinar
           </Text>
           {PACKS.map((p) => {
-            const active = pack === p.id;
+            const active = packs.includes(p.id);
             return (
               <Pressable
                 key={p.id}
-                onPress={() => setPack(p.id)}
+                onPress={() =>
+                  setPacks((prev) => {
+                    // 'allin' es exclusivo: si lo activas, descarta el resto
+                    if (p.id === "allin") return active ? [] : ["allin"];
+                    const next = active
+                      ? prev.filter((x) => x !== p.id)
+                      : [...prev.filter((x) => x !== "allin"), p.id];
+                    return next;
+                  })
+                }
                 style={[
                   styles.packCard,
                   {
@@ -326,8 +339,13 @@ export default function HomeScreen() {
                     {p.description}
                   </Text>
                 </View>
-                {active && (
-                  <Feather name="check-circle" size={22} color={colors.primary} />
+                <Feather
+                  name={active ? "check-square" : "square"}
+                  size={22}
+                  color={active ? colors.primary : colors.mutedForeground}
+                />
+                {active && p.id === "allin" && (
+                  <Feather name="zap" size={16} color={colors.destructive} style={{ marginLeft: 4 }} />
                 )}
               </Pressable>
             );

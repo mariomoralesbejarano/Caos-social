@@ -106,7 +106,7 @@ export function useGetRoom(
 // =====================================================
 
 interface MutateOpts {
-  data: { name: string; pack: PackId; tags?: CardTag[] };
+  data: { name: string; pack?: PackId; packs?: PackId[]; tags?: CardTag[] };
 }
 
 export function useCreateRoom() {
@@ -124,6 +124,7 @@ export function useCreateRoom() {
         code,
         name: data.name,
         pack: data.pack,
+        packs: data.packs,
         tags: data.tags,
       });
       await insertRoom(room);

@@ -141,8 +141,30 @@ const LEGACY: GameCard[] = [
   C("shot-mezcla", "Shot Misterioso", "El grupo mezcla 3 ingredientes seguros y lo bebes.", "Si no haces mueca, +25.", "beber", 25, { blockedBy: ["abstemio"], pack: "clasico" }),
 ];
 
+// PACK BANCO / PARQUE — modo chill, baja energía (18 cartas)
+const BANCO: GameCard[] = [
+  C("ba-hora", "¿Qué Hora Es?", "Ve a preguntarle la hora a un desconocido y vuelve bailando.", "Si te responde con simpatía, +20.", "social", 25, { pack: "banco" }),
+  C("ba-perro", "Caza-Perros", "El primero del grupo en señalar un perro real gana esta carta.", "Tú ya la tienes: 10 puntos directos si declaras 'perro' antes que nadie en los próximos 3 minutos.", "reto", 10, { pack: "banco" }),
+  C("ba-mas-probable", "Más Probable Que…", "Lanza un '¿quién es más probable que…?' al grupo y voten a la vez.", "El más votado, +5; tú, +15.", "social", 15, { pack: "banco" }),
+  C("ba-confesion", "Confesión de Banco", "Cuenta algo que nunca habías contado del grupo (sano).", "Sin drama, sin secretos peligrosos.", "social", 20, { pack: "banco" }),
+  C("ba-observacion", "Detective de Calle", "Inventa la historia de la próxima persona que pase delante.", "Mínimo 3 frases.", "social", 15, { pack: "banco" }),
+  C("ba-palabras", "Palabra Encadenada", "Encadenad palabras (la última sílaba inicia la siguiente). Quien falle pierde.", "Tú ganas si aguantas 5 turnos.", "reto", 15, { pack: "banco" }),
+  C("ba-color", "Caza del Color", "Elige un color. El primero que vea 3 cosas de ese color en la calle gana 10.", "Tú lo eliges, juegas también.", "reto", 10, { pack: "banco" }),
+  C("ba-imitar", "Imita al Vecino", "Imita a alguien que pase por delante hasta que el grupo lo identifique.", "Sin que la persona se entere.", "social", 20, { pack: "banco" }),
+  C("ba-saludo", "Saludo Inesperado", "Salúdale efusivamente al próximo desconocido como si fuera un amigo.", "Si te sigue la corriente, +25.", "social", 20, { pack: "banco" }),
+  C("ba-recuerdo", "Mejor Verano", "Cuenta el mejor verano de tu vida en 60 segundos.", "Si emocionas a alguien, +10.", "social", 15, { pack: "banco" }),
+  C("ba-piedra-papel", "Piedra-Papel-Tijera", "Reta al jugador a tu derecha al mejor de 3.", "El ganador se lleva 10.", "reto", 10, { pack: "banco" }),
+  C("ba-canta", "Banda Sonora", "Canta el estribillo de una canción que defina al grupo.", "Si alguien se une, +15.", "social", 15, { pack: "banco" }),
+  C("ba-foto", "Foto Random", "Haz una foto a algo absurdo que veas y mándala al chat del grupo.", "Mínimo 1 risa.", "social", 10, { pack: "banco" }),
+  C("ba-mimica", "Mímica Pasajera", "Mímica del último plan que hicisteis juntos.", "60 segundos para adivinar.", "social", 20, { pack: "banco" }),
+  C("ba-prediccion", "Predicción Boba", "Predice qué hará la próxima persona que pase. Si aciertas, +20.", "Sin trampas.", "reto", 20, { pack: "banco" }),
+  C("ba-trivia", "Trivia del Grupo", "Haz una pregunta que solo el grupo pueda saber. El primero en acertar, +10.", "Tú, +5 por preguntar.", "social", 15, { pack: "banco" }),
+  C("ba-confianza", "Test de Confianza", "Cuenta una manía tuya rara. Si nadie la sabía, +20.", "Sano y bonito.", "social", 20, { pack: "banco" }),
+  C("ba-silencio", "Silencio de 30s", "Todo el grupo en silencio absoluto 30 segundos.", "Quien hable o ría, -5.", "reto", 15, { pack: "banco" }),
+];
+
 export const ALL_CARDS: GameCard[] = [
-  ...TARDEO, ...FERIA, ...FAMILIAR, ...NOCHE, ...ESTRATEGICO, ...LEGACY,
+  ...TARDEO, ...FERIA, ...FAMILIAR, ...NOCHE, ...BANCO, ...ESTRATEGICO, ...LEGACY,
 ];
 
 const idsOf = (arr: GameCard[]) => arr.map((c) => c.id);
@@ -152,6 +174,7 @@ export const PACKS: { id: PackId; cardIds: string[] }[] = [
   { id: "feria", cardIds: [...idsOf(FERIA), ...idsOf(ESTRATEGICO).slice(0, 5)] },
   { id: "familiar", cardIds: [...idsOf(FAMILIAR), ...idsOf(ESTRATEGICO).slice(5, 9)] },
   { id: "noche", cardIds: [...idsOf(NOCHE), ...idsOf(ESTRATEGICO)] },
+  { id: "banco", cardIds: [...idsOf(BANCO), ...idsOf(ESTRATEGICO).slice(0, 4)] },
   { id: "estrategico", cardIds: idsOf(ESTRATEGICO) },
   { id: "clasico", cardIds: [...idsOf(LEGACY), "reversa", "bloqueo", "espejo", "robo-carta", "comodin"] },
   { id: "discoteca", cardIds: [...idsOf(NOCHE).slice(0, 12), "reversa", "bloqueo", "espejo"] },

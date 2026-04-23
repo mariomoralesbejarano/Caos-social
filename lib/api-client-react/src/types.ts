@@ -9,6 +9,8 @@ export type CardCategory =
 export type CardTag = "abstemio" | "pareja" | "hardcore";
 
 export type PackId =
+  | "banco"
+
   | "clasico"
   | "discoteca"
   | "cena"
@@ -68,6 +70,7 @@ export interface RoomState {
   code: string;
   ownerId: string;
   pack: PackId;
+  packs?: PackId[];
   status: "lobby" | "active" | "ended";
   players: RoomPlayer[];
   log: string[];
@@ -104,6 +107,7 @@ export interface Room {
   code: string;
   ownerId: string;
   pack: PackId;
+  packs?: PackId[];
   status: "lobby" | "active" | "ended";
   players: PlayerInternal[];
   drawPile: string[];
