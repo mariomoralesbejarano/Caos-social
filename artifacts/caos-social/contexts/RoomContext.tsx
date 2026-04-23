@@ -42,7 +42,8 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           playerId: session?.playerId ?? "",
         }),
         enabled: !!session,
-        refetchInterval: 3000,
+        // Realtime subscription pushes updates; we still poll lightly as a safety net.
+        refetchInterval: 8000,
         retry: false,
       },
     },

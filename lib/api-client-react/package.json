@@ -7,9 +7,14 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.104.0",
     "@tanstack/react-query": "catalog:"
   },
   "peerDependencies": {
     "react": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "@types/react": "catalog:"
   }
 }

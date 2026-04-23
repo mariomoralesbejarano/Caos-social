@@ -1,37 +1,4 @@
-export type CardCategory =
-  | "reto"
-  | "beber"
-  | "ligar"
-  | "fisico"
-  | "poder"
-  | "social";
-
-export type CardTag = "abstemio" | "pareja" | "hardcore";
-
-export type PackId =
-  | "clasico"
-  | "discoteca"
-  | "cena"
-  | "gimnasio"
-  | "allin"
-  | "tardeo"
-  | "feria"
-  | "familiar"
-  | "noche"
-  | "estrategico";
-
-export interface GameCard {
-  id: string;
-  title: string;
-  effect: string;
-  power: string;
-  category: CardCategory;
-  points: number;
-  blockedBy?: CardTag[];
-  isPower?: boolean;
-  pack?: PackId;
-  custom?: boolean;
-}
+import type { CardCategory, CardTag, GameCard, PackId } from "./types";
 
 const C = (
   id: string,
@@ -43,9 +10,7 @@ const C = (
   opts: { blockedBy?: CardTag[]; isPower?: boolean; pack?: PackId } = {},
 ): GameCard => ({ id, title, effect, power, category, points, ...opts });
 
-// =====================================================
 // PACK TARDEO / BAR (20)
-// =====================================================
 const TARDEO: GameCard[] = [
   C("td-posavasos", "Torre de Posavasos", "Construye una torre de 5 posavasos en 30s.", "Si la mantienes 10s, doble puntos.", "fisico", 15, { pack: "tardeo" }),
   C("td-camarero", "Saluda al Camarero", "Llama al camarero por su nombre (pregúntalo si no lo sabes).", "Si te responde con simpatía, +10 extra.", "social", 15, { pack: "tardeo" }),
@@ -69,9 +34,7 @@ const TARDEO: GameCard[] = [
   C("td-foto-grupal", "Foto Histórica", "Organiza una foto grupal en 60s.", "Pídesela a un desconocido.", "social", 10, { pack: "tardeo" }),
 ];
 
-// =====================================================
 // PACK FERIA / ROMERÍA (20)
-// =====================================================
 const FERIA: GameCard[] = [
   C("fr-sevillanas", "4 por Sevillanas", "Baila las 4 sevillanas con cualquier persona disponible.", "Sin parar entre coplas.", "social", 30, { pack: "feria" }),
   C("fr-rebujito", "Invita a Rebujito", "Invita a un rebujito a alguien fuera del grupo.", "Si bebe contigo, +20.", "beber", 25, { blockedBy: ["abstemio"], pack: "feria" }),
@@ -95,9 +58,7 @@ const FERIA: GameCard[] = [
   C("fr-mantilla", "Mantilla Improvisada", "Improvisa una mantilla con una servilleta y desfila 10 segundos.", "Con porte.", "social", 15, { pack: "feria" }),
 ];
 
-// =====================================================
-// PACK FAMILIAR (20) - blanco, sin alcohol agresivo
-// =====================================================
+// PACK FAMILIAR (20)
 const FAMILIAR: GameCard[] = [
   C("fa-quien-conoce", "¿Quién Conoce a Quién?", "Responde quién conoce mejor al grupo: tú o tu vecino. Comprobad.", "Si aciertas más, +20.", "social", 20, { pack: "familiar" }),
   C("fa-mimica-pelicula", "Mímica de Película", "Mímica de una peli familiar. 60 segundos para que adivinen.", "Sin sonidos.", "social", 20, { pack: "familiar" }),
@@ -121,9 +82,7 @@ const FAMILIAR: GameCard[] = [
   C("fa-canta-himno", "Himno Familiar", "Canta una canción típica de tu familia.", "Si te acompañan, +15.", "social", 15, { pack: "familiar" }),
 ];
 
-// =====================================================
 // PACK NOCHE / HARDCORE (20)
-// =====================================================
 const NOCHE: GameCard[] = [
   C("no-bailar-desconocido", "Bailar con Desconocido", "Baila 30 segundos con alguien fuera del grupo.", "Si aceptan, +30.", "social", 30, { blockedBy: ["pareja"], pack: "noche" }),
   C("no-numero", "El Número", "Pide el número a alguien en menos de 2 minutos.", "Si lo consigues, +50.", "ligar", 50, { blockedBy: ["pareja"], pack: "noche" }),
@@ -147,9 +106,7 @@ const NOCHE: GameCard[] = [
   C("no-baño-libre", "Misión al Baño", "Pregunta a 3 desconocidos dónde está el baño aunque ya lo sepas.", "Hazlo con cara seria.", "social", 15, { pack: "noche" }),
 ];
 
-// =====================================================
 // PACK ESTRATÉGICO / PODERES (15)
-// =====================================================
 const ESTRATEGICO: GameCard[] = [
   C("reversa", "Reversa", "Devuelve el reto al jugador que te lo lanzó.", "El emisor original cumple sin opción a rechazar.", "poder", 5, { isPower: true, pack: "estrategico" }),
   C("bloqueo", "Bloqueo", "Inmunidad temporal: nadie te puede lanzar cartas por 5 minutos.", "Activa un escudo neón sobre tu perfil.", "poder", 5, { isPower: true, pack: "estrategico" }),
@@ -168,9 +125,7 @@ const ESTRATEGICO: GameCard[] = [
   C("revelacion", "Revelación", "Mira la mano completa de un jugador.", "Sin que él lo sepa.", "poder", 5, { isPower: true, pack: "estrategico" }),
 ];
 
-// =====================================================
-// CARTAS LEGACY (compatibilidad con packs viejos)
-// =====================================================
+// LEGACY
 const LEGACY: GameCard[] = [
   C("hidalgo", "Hidalgo", "El receptor debe beber un trago largo de su bebida.", "Si lo cumple, gana inmunidad por 1 turno.", "beber", 10, { blockedBy: ["abstemio"], pack: "clasico" }),
   C("pregunta-incomoda", "Pregunta Incómoda", "Hazle una pregunta personal. Debe responder con la verdad.", "Si miente y le pillan, x2 castigo.", "social", 15, { pack: "clasico" }),
@@ -187,93 +142,28 @@ const LEGACY: GameCard[] = [
 ];
 
 export const ALL_CARDS: GameCard[] = [
-  ...TARDEO,
-  ...FERIA,
-  ...FAMILIAR,
-  ...NOCHE,
-  ...ESTRATEGICO,
-  ...LEGACY,
+  ...TARDEO, ...FERIA, ...FAMILIAR, ...NOCHE, ...ESTRATEGICO, ...LEGACY,
 ];
-
-interface PackDef {
-  id: PackId;
-  cardIds: string[];
-}
 
 const idsOf = (arr: GameCard[]) => arr.map((c) => c.id);
 
-export const PACKS: PackDef[] = [
-  // Nuevos packs temáticos
-  {
-    id: "tardeo",
-    cardIds: [...idsOf(TARDEO), ...idsOf(ESTRATEGICO).slice(0, 5)],
-  },
-  {
-    id: "feria",
-    cardIds: [...idsOf(FERIA), ...idsOf(ESTRATEGICO).slice(0, 5)],
-  },
-  {
-    id: "familiar",
-    cardIds: [...idsOf(FAMILIAR), ...idsOf(ESTRATEGICO).slice(5, 9)],
-  },
-  {
-    id: "noche",
-    cardIds: [...idsOf(NOCHE), ...idsOf(ESTRATEGICO)],
-  },
-  {
-    id: "estrategico",
-    cardIds: idsOf(ESTRATEGICO),
-  },
-  // Packs legacy (compatibilidad)
-  {
-    id: "clasico",
-    cardIds: [
-      ...idsOf(LEGACY),
-      "reversa",
-      "bloqueo",
-      "espejo",
-      "robo-carta",
-      "comodin",
-    ],
-  },
-  {
-    id: "discoteca",
-    cardIds: [...idsOf(NOCHE).slice(0, 12), "reversa", "bloqueo", "espejo"],
-  },
-  {
-    id: "cena",
-    cardIds: [...idsOf(FAMILIAR).slice(0, 12), "reversa", "bloqueo", "espejo"],
-  },
-  {
-    id: "gimnasio",
-    cardIds: [
-      "burpees",
-      "plancha",
-      "sentadillas",
-      "imitacion",
-      "reversa",
-      "bloqueo",
-      "espejo",
-      "robo-carta",
-    ],
-  },
-  {
-    id: "allin",
-    cardIds: ALL_CARDS.map((c) => c.id),
-  },
+export const PACKS: { id: PackId; cardIds: string[] }[] = [
+  { id: "tardeo", cardIds: [...idsOf(TARDEO), ...idsOf(ESTRATEGICO).slice(0, 5)] },
+  { id: "feria", cardIds: [...idsOf(FERIA), ...idsOf(ESTRATEGICO).slice(0, 5)] },
+  { id: "familiar", cardIds: [...idsOf(FAMILIAR), ...idsOf(ESTRATEGICO).slice(5, 9)] },
+  { id: "noche", cardIds: [...idsOf(NOCHE), ...idsOf(ESTRATEGICO)] },
+  { id: "estrategico", cardIds: idsOf(ESTRATEGICO) },
+  { id: "clasico", cardIds: [...idsOf(LEGACY), "reversa", "bloqueo", "espejo", "robo-carta", "comodin"] },
+  { id: "discoteca", cardIds: [...idsOf(NOCHE).slice(0, 12), "reversa", "bloqueo", "espejo"] },
+  { id: "cena", cardIds: [...idsOf(FAMILIAR).slice(0, 12), "reversa", "bloqueo", "espejo"] },
+  { id: "gimnasio", cardIds: ["burpees", "plancha", "sentadillas", "imitacion", "reversa", "bloqueo", "espejo", "robo-carta"] },
+  { id: "allin", cardIds: ALL_CARDS.map((c) => c.id) },
 ];
 
-export function getCard(
-  id: string,
-  customCards: GameCard[] = [],
-): GameCard | undefined {
+export function getCard(id: string, customCards: GameCard[] = []): GameCard | undefined {
   return ALL_CARDS.find((c) => c.id === id) ?? customCards.find((c) => c.id === id);
 }
 
 export function getPackCardIds(pack: PackId): string[] {
   return PACKS.find((p) => p.id === pack)?.cardIds ?? [];
-}
-
-export function totalCardCount(): number {
-  return ALL_CARDS.length;
 }
