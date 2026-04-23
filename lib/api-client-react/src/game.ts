@@ -74,10 +74,16 @@ function bump(room: Room) {
   room.version += 1;
 }
 
-function newPlayer(name: string, tags: CardTag[] = []): PlayerInternal {
+function newPlayer(
+  name: string,
+  tags: CardTag[] = [],
+  extra: { avatar?: string; role?: string } = {},
+): PlayerInternal {
   return {
     id: newId("p_"),
     name: name.trim() || "Jugador",
+    avatar: extra.avatar,
+    role: extra.role,
     tags,
     hand: [],
     inbox: [],
@@ -99,8 +105,10 @@ export function createInitialRoom(opts: {
   pack?: PackId;
   packs?: PackId[];
   tags?: CardTag[];
+  avatar?: string;
+  role?: string;
 }): { room: Room; playerId: string } {
-  const player = newPlayer(opts.name, opts.tags ?? []);
+  const player = newPlayer(opts.name, opts.tags ?? [], { avatar: opts.avatar, role: opts.role });
   const packs = opts.packs && opts.packs.length > 0 ? opts.packs : [opts.pack ?? "allin"];
   const room: Room = {
     code: opts.code,
@@ -124,7 +132,10 @@ export function createInitialRoom(opts: {
 
 export type GameResult<T = Room> = T | { error: string };
 
-export function applyJoin(room: Room, opts: { name: string; tags?: CardTag[] }): GameResult<{ room: Room; playerId: string }> {
+export function applyJoin(
+  room: Room,
+  opts: { name: string; tags?: CardTag[]; avatar?: string; role?: string },
+): GameResult<{ room: Room; playerId: string }> {
   const trimmed = opts.name.trim();
   if (!trimmed) return { error: "Nombre vacío" };
   const existing = room.players.find((p) => p.name.toLowerCase() === trimmed.toLowerCase());
@@ -134,7 +145,7 @@ export function applyJoin(room: Room, opts: { name: string; tags?: CardTag[] }):
     bump(room);
     return { room, playerId: existing.id };
   }
-  const player = newPlayer(trimmed, opts.tags ?? []);
+  const player = newPlayer(trimmed, opts.tags ?? [], { avatar: opts.avatar, role: opts.role });
   if (room.status === "active") {
     for (let i = 0; i < HAND_SIZE; i++) {
       const c = nextValidCard(room.drawPile, player.tags, room.customCards);
@@ -521,6 +532,8 @@ export function serializeRoom(room: Room, viewerId: string) {
     players: room.players.map((p) => ({
       id: p.id,
       name: p.name,
+      avatar: p.avatar,
+      role: p.role,
       tags: p.tags,
       handCount: p.hand.length,
       score: p.score,

@@ -15,6 +15,8 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { FloatingMusicToggle } from "@/components/MusicToggle";
+import { CaosSplash } from "@/components/SplashScreen";
 import { RoomProvider } from "@/contexts/RoomContext";
 
 SplashScreen.preventAutoHideAsync();
@@ -50,6 +52,7 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
+  const [splashDone, setSplashDone] = React.useState(false);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
@@ -70,6 +73,8 @@ export default function RootLayout() {
               <KeyboardProvider>
                 <StatusBar style="light" />
                 <RootLayoutNav />
+                <FloatingMusicToggle />
+                {!splashDone && <CaosSplash onDone={() => setSplashDone(true)} />}
               </KeyboardProvider>
             </GestureHandlerRootView>
           </RoomProvider>

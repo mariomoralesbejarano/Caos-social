@@ -49,6 +49,8 @@ export interface PendingThrow {
 export interface RoomPlayer {
   id: string;
   name: string;
+  avatar?: string;
+  role?: string;
   tags: CardTag[];
   handCount: number;
   score: number;
@@ -87,6 +89,8 @@ export interface RoomState {
 // ----- Internal (what is stored in supabase JSONB) -----
 
 export interface PlayerInternal {
+  avatar?: string;
+  role?: string;
   id: string;
   name: string;
   tags: CardTag[];

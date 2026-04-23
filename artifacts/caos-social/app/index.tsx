@@ -4,6 +4,7 @@ import {
   PackId,
   useCreateRoom,
   useJoinRoom,
+  useSpectatorJoin,
 } from "@workspace/api-client-react";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -31,6 +32,16 @@ const TAGS: { id: CardTag; label: string }[] = [
   { id: "hardcore", label: "Hardcore" },
 ];
 
+const AVATARS = ["🦄", "🐙", "🦊", "🐲", "🦋", "🐸", "🦝", "🐼", "🦖", "🐺", "👻", "🤖"];
+
+const ROLES: { id: string; label: string; emoji: string; tag?: CardTag }[] = [
+  { id: "infiltrado", label: "Infiltrado", emoji: "🕶️" },
+  { id: "juez", label: "Juez", emoji: "⚖️" },
+  { id: "victima", label: "Víctima", emoji: "🎯" },
+  { id: "fotografo", label: "Fotógrafo", emoji: "📸" },
+  { id: "abstemio", label: "Abstemio", emoji: "🚫", tag: "abstemio" },
+];
+
 export default function HomeScreen() {
   const router = useRouter();
   const colors = useColors();
@@ -43,15 +54,25 @@ export default function HomeScreen() {
   const [code, setCode] = useState("");
   const [packs, setPacks] = useState<PackId[]>(["banco"]);
   const [tags, setTags] = useState<CardTag[]>([]);
+  const [avatar, setAvatar] = useState<string>(AVATARS[0]);
+  const [role, setRole] = useState<string>("infiltrado");
   const [error, setError] = useState<string | null>(null);
 
   const createMut = useCreateRoom();
   const joinMut = useJoinRoom();
+  const spectateMut = useSpectatorJoin();
+
+  function effectiveTags(): CardTag[] {
+    const r = ROLES.find((x) => x.id === role);
+    if (r?.tag && !tags.includes(r.tag)) return [...tags, r.tag];
+    return tags;
+  }
 
   // If session already loaded, jump to right screen
   useEffect(() => {
     if (!hydrated || !session || !room) return;
-    if (room.status === "active") router.replace("/game");
+    if (session.spectator) router.replace("/ranking");
+    else if (room.status === "active") router.replace("/game");
     else router.replace("/players");
   }, [hydrated, session, room, router]);
 
@@ -77,12 +98,14 @@ export default function HomeScreen() {
         return;
       }
       const res = await createMut.mutateAsync({
-        data: { name: name.trim(), packs, tags },
+        data: { name: name.trim(), packs, tags: effectiveTags(), avatar, role },
       });
       await setSession({
         roomCode: res.room.code,
         playerId: res.playerId,
         name: name.trim(),
+        avatar,
+        role,
       });
       router.replace("/players");
     } catch (e) {
@@ -99,14 +122,36 @@ export default function HomeScreen() {
     try {
       const res = await joinMut.mutateAsync({
         code: code.trim().toUpperCase(),
-        data: { name: name.trim(), tags },
+        data: { name: name.trim(), tags: effectiveTags(), avatar, role },
       });
       await setSession({
         roomCode: res.room.code,
         playerId: res.playerId,
         name: name.trim(),
+        avatar,
+        role,
       });
       router.replace(res.room.status === "active" ? "/game" : "/players");
+    } catch (e) {
+      setError(extractErr(e));
+    }
+  }
+
+  async function handleSpectate() {
+    setError(null);
+    if (!code.trim()) {
+      setError("Necesitas el código de la sala");
+      return;
+    }
+    try {
+      const res = await spectateMut.mutateAsync({ code: code.trim() });
+      await setSession({
+        roomCode: res.roomCode,
+        playerId: "",
+        name: name.trim() || "Espectador",
+        spectator: true,
+      });
+      router.replace("/ranking");
     } catch (e) {
       setError(extractErr(e));
     }
@@ -120,7 +165,7 @@ export default function HomeScreen() {
     );
   }
 
-  const busy = createMut.isPending || joinMut.isPending;
+  const busy = createMut.isPending || joinMut.isPending || spectateMut.isPending;
 
   return (
     <ScrollView
@@ -246,7 +291,67 @@ export default function HomeScreen() {
 
       <View style={styles.section}>
         <Text style={[styles.label, { color: colors.mutedForeground }]}>
-          ROL (puedes cambiarlo después)
+          AVATAR
+        </Text>
+        <View style={styles.avatarRow}>
+          {AVATARS.map((a) => {
+            const active = a === avatar;
+            return (
+              <Pressable
+                key={a}
+                onPress={() => setAvatar(a)}
+                style={[
+                  styles.avatarChip,
+                  {
+                    borderColor: active ? colors.primary : colors.border,
+                    backgroundColor: active ? colors.primary + "22" : colors.card,
+                  },
+                ]}
+              >
+                <Text style={styles.avatarEmoji}>{a}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={[styles.label, { color: colors.mutedForeground }]}>
+          ROL EN LA PARTIDA
+        </Text>
+        <View style={styles.tagRow}>
+          {ROLES.map((r) => {
+            const active = r.id === role;
+            return (
+              <Pressable
+                key={r.id}
+                onPress={() => setRole(r.id)}
+                style={[
+                  styles.roleChip,
+                  {
+                    borderColor: active ? colors.secondary : colors.border,
+                    backgroundColor: active ? colors.secondary + "22" : "transparent",
+                  },
+                ]}
+              >
+                <Text style={styles.roleEmoji}>{r.emoji}</Text>
+                <Text
+                  style={[
+                    styles.tagChipText,
+                    { color: active ? colors.secondary : colors.mutedForeground },
+                  ]}
+                >
+                  {r.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={[styles.label, { color: colors.mutedForeground }]}>
+          EXTRAS (opcional)
         </Text>
         <View style={styles.tagRow}>
           {TAGS.map((t) => {
@@ -375,6 +480,19 @@ export default function HomeScreen() {
         style={{ marginTop: 4 }}
       />
 
+      {mode === "join" && (
+        <Pressable
+          onPress={handleSpectate}
+          disabled={busy}
+          style={[styles.spectateBtn, { borderColor: colors.border, opacity: busy ? 0.5 : 1 }]}
+        >
+          <Feather name="eye" size={16} color={colors.mutedForeground} />
+          <Text style={[styles.spectateText, { color: colors.mutedForeground }]}>
+            ENTRAR COMO ESPECTADOR
+          </Text>
+        </Pressable>
+      )}
+
       <Text style={[styles.footer, { color: colors.mutedForeground }]}>
         Sin alcohol, sin riesgos, sin gastos. Solo caos del bueno.
       </Text>
@@ -448,6 +566,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   tagChipText: { fontFamily: "Inter_700Bold", fontSize: 12 },
+  avatarRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  avatarChip: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    borderWidth: 2,
+  },
+  avatarEmoji: { fontSize: 24 },
+  roleChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  roleEmoji: { fontSize: 16 },
+  spectateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    marginTop: 4,
+  },
+  spectateText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    letterSpacing: 1.5,
+  },
   packCard: {
     flexDirection: "row",
     alignItems: "center",

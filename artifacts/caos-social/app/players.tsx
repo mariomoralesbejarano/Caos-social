@@ -214,6 +214,9 @@ export default function LobbyScreen() {
                   { backgroundColor: p.connected ? colors.primary : colors.border },
                 ]}
               />
+              {p.avatar && (
+                <Text style={{ fontSize: 22, marginRight: 4 }}>{p.avatar}</Text>
+              )}
               <View style={{ flex: 1 }}>
                 <Text style={[styles.pName, { color: colors.foreground }]}>
                   {p.name} {isMe && "(tú)"}
@@ -223,9 +226,9 @@ export default function LobbyScreen() {
                     </Text>
                   )}
                 </Text>
-                {p.tags.length > 0 && (
+                {(p.role || p.tags.length > 0) && (
                   <Text style={[styles.pTags, { color: colors.mutedForeground }]}>
-                    {p.tags.join(" · ")}
+                    {[p.role, ...p.tags].filter(Boolean).join(" · ")}
                   </Text>
                 )}
               </View>

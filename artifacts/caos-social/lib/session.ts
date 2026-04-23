@@ -6,6 +6,9 @@ export interface Session {
   roomCode: string;
   playerId: string;
   name: string;
+  avatar?: string;
+  role?: string;
+  spectator?: boolean;
 }
 
 export async function loadSession(): Promise<Session | null> {

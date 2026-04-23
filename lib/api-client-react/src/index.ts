@@ -36,7 +36,18 @@ import type {
 
 export * from "./types";
 export { ALL_CARDS, PACKS as ALL_PACKS, getCard, getPackCardIds } from "./cards";
-export { getSupabase };
+export { getSupabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "./supabase";
+export { existsRoom };
+
+export function useSpectatorJoin() {
+  return useMutation({
+    mutationFn: async ({ code }: { code: string }) => {
+      const ok = await existsRoom(code.toUpperCase());
+      if (!ok) throw { status: 404, data: { error: "Sala no encontrada" }, message: "Sala no encontrada" };
+      return { roomCode: code.toUpperCase() };
+    },
+  });
+}
 
 // Backwards-compat no-ops
 export function setBaseUrl(_url: string): void {}
@@ -106,7 +117,14 @@ export function useGetRoom(
 // =====================================================
 
 interface MutateOpts {
-  data: { name: string; pack?: PackId; packs?: PackId[]; tags?: CardTag[] };
+  data: {
+    name: string;
+    pack?: PackId;
+    packs?: PackId[];
+    tags?: CardTag[];
+    avatar?: string;
+    role?: string;
+  };
 }
 
 export function useCreateRoom() {
@@ -126,6 +144,8 @@ export function useCreateRoom() {
         pack: data.pack,
         packs: data.packs,
         tags: data.tags,
+        avatar: data.avatar,
+        role: data.role,
       });
       await insertRoom(room);
       return { playerId, room: serializeRoom(room, playerId) };
@@ -140,7 +160,7 @@ export function useJoinRoom() {
       data,
     }: {
       code: string;
-      data: { name: string; tags?: CardTag[] };
+      data: { name: string; tags?: CardTag[]; avatar?: string; role?: string };
     }) => {
       const result = await mutateRoom(code, (room) => applyJoin(room, data));
       if ("error" in (result as any))

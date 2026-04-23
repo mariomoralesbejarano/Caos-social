@@ -79,8 +79,30 @@ export default function GameScreen() {
   const me = room.players.find((p) => p.id === session.playerId);
   if (!me) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <Text style={{ color: colors.foreground }}>No estás en esta sala</Text>
+      <View style={[styles.center, { backgroundColor: colors.background, gap: 16, padding: 24 }]}>
+        <Feather name="eye" size={32} color={colors.primary} />
+        <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 18, textAlign: "center" }}>
+          {session.spectator ? "Modo espectador" : "No estás en esta sala"}
+        </Text>
+        <Text style={{ color: colors.mutedForeground, textAlign: "center" }}>
+          {session.spectator
+            ? "La partida está en marcha. Mira el ranking en vivo."
+            : "Vuelve al inicio para entrar de nuevo."}
+        </Text>
+        <Pressable
+          onPress={() => router.replace(session.spectator ? "/ranking" : "/")}
+          style={{
+            paddingVertical: 12,
+            paddingHorizontal: 20,
+            borderRadius: 10,
+            borderWidth: 2,
+            borderColor: colors.primary,
+          }}
+        >
+          <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold" }}>
+            {session.spectator ? "VER RANKING" : "VOLVER"}
+          </Text>
+        </Pressable>
       </View>
     );
   }
