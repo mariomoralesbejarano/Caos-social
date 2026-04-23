@@ -73,6 +73,19 @@ export function CaosSplash({ onDone }: { onDone: () => void }) {
           SOCIAL
         </Animated.Text>
         <Text style={styles.subtitle}>v3.5 · multi-pack mix</Text>
+        <Animated.Text
+          style={[
+            styles.loading,
+            {
+              opacity: glow,
+              textShadowColor: "#39FF14",
+              textShadowOffset: { width: 0, height: 0 },
+              textShadowRadius: 12,
+            },
+          ]}
+        >
+          🃏 Cargando el Caos...
+        </Animated.Text>
       </Animated.View>
     </Animated.View>
   );
@@ -117,6 +130,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 3,
     marginTop: 18,
+    textTransform: "uppercase",
+  },
+  loading: {
+    color: "#FF00E5",
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    letterSpacing: 2,
+    marginTop: 24,
     textTransform: "uppercase",
   },
 });

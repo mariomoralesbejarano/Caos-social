@@ -1,5 +1,8 @@
 # CAOS SOCIAL
 
+<!-- 👇 sustituye OWNER y REPO por tu usuario/repo de GitHub la primera vez -->
+[![Build Android APK](https://github.com/OWNER/REPO/actions/workflows/android-apk.yml/badge.svg?branch=main)](https://github.com/OWNER/REPO/actions/workflows/android-apk.yml)
+
 Juego multijugador de cartas tipo "fiesta-Uno" para Android, iOS y web.
 Construido con Expo (React Native), Express + Drizzle ORM, PostgreSQL y un cliente generado por OpenAPI.
 

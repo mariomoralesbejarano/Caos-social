@@ -6,3 +6,15 @@ id = "61dBUvdp_sE5S89JEbUpn"
 uri = "file://artifacts/caos-social/assets/images/icon.png"
 type = "image"
 title = "caos social icon"
+
+[[generated]]
+id = "PhKP7eD7qjFWD4FThqr--"
+uri = "file://artifacts/caos-social/resources/icon.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "EtvFPJUDUW-d3-XRDlWHG"
+uri = "file://artifacts/caos-social/resources/splash.png"
+type = "image"
+title = "generated_image"

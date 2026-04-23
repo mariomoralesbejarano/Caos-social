@@ -74,6 +74,9 @@ jobs:
             pnpm exec cap add android
           fi
 
+      - name: Generate app icon and splash from resources/
+        run: pnpm exec capacitor-assets generate --android
+
       - name: Capacitor sync
         run: pnpm exec cap sync android
 
