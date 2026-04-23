@@ -2,7 +2,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useRef } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 
+import { ensureServiceWorker } from "@/lib/notifications";
+
 export function CaosSplash({ onDone }: { onDone: () => void }) {
+  // Pre-registrar el SW lo antes posible para tener notificaciones listas.
+  useEffect(() => {
+    ensureServiceWorker();
+  }, []);
+
   const fade = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.85)).current;
   const glow = useRef(new Animated.Value(0)).current;

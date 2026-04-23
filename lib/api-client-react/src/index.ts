@@ -1,4 +1,4 @@
-import { useMutation, useQuery, type UseQueryOptions } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import {
@@ -70,6 +70,7 @@ export function getGetRoomQueryKey(code: string, params: { playerId: string }) {
 
 // =====================================================
 // useGetRoom — subscribes to Supabase Realtime for live updates
+// (postgres_changes + broadcast fallback). Cero polling.
 // =====================================================
 export function useGetRoom(
   code: string,
@@ -77,44 +78,69 @@ export function useGetRoom(
   options?: { query?: Partial<UseQueryOptions<RoomState, { status?: number; message?: string }>> },
 ) {
   const enabled = !!code && !!params.playerId && (options?.query?.enabled ?? true);
+  const qc = useQueryClient();
+  const queryKey = getGetRoomQueryKey(code, params);
+
   const query = useQuery<RoomState, { status?: number; message?: string }>({
-    queryKey: getGetRoomQueryKey(code, params),
+    queryKey,
     enabled,
     queryFn: async () => {
       const room = await loadRoom(code);
       if (!room) throw { status: 404, message: "Sala no encontrada" };
       return serializeRoom(room, params.playerId);
     },
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
     refetchOnReconnect: true,
-    staleTime: 1000,
+    staleTime: 500,
     retry: false,
     ...(options?.query ?? {}),
   });
 
-  // Realtime subscription
+  // Realtime: postgres_changes empuja la fila completa al instante.
   useEffect(() => {
     if (!enabled) return;
     const sb = getSupabase();
+    const upper = code.toUpperCase();
     const channel = sb
-      .channel(`room:${code}`)
+      .channel(`room:${upper}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: ROOMS_TABLE, filter: `code=eq.${code.toUpperCase()}` },
+        { event: "*", schema: "public", table: ROOMS_TABLE, filter: `code=eq.${upper}` },
         (payload) => {
-          const newRow = (payload.new as any)?.state as Room | undefined;
+          const newRow = (payload.new as { state?: Room } | null)?.state;
           if (newRow) {
-            // Hot-swap query data
-            (query as any).refetch?.();
+            // Actualiza la caché al instante con el estado recibido.
+            try {
+              qc.setQueryData(queryKey, serializeRoom(newRow, params.playerId));
+            } catch {
+              qc.invalidateQueries({ queryKey });
+            }
+          } else {
+            qc.invalidateQueries({ queryKey });
           }
         },
       )
       .subscribe();
+
+    // Refrescar al recuperar foco / online — clave para "modo fantasma"
+    // (la app vuelve del background y debe pintar el modal de votación).
+    const onFocus = () => qc.invalidateQueries({ queryKey });
+    if (typeof window !== "undefined") {
+      window.addEventListener("focus", onFocus);
+      window.addEventListener("online", onFocus);
+      document.addEventListener("visibilitychange", onFocus);
+    }
+
     return () => {
       sb.removeChannel(channel);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("focus", onFocus);
+        window.removeEventListener("online", onFocus);
+        document.removeEventListener("visibilitychange", onFocus);
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, code]);
+  }, [enabled, code, params.playerId]);
 
   return query;
 }

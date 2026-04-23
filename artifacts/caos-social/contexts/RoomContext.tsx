@@ -42,8 +42,7 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
           playerId: session?.playerId ?? "",
         }),
         enabled: !!session,
-        // Realtime subscription pushes updates; we still poll lightly as a safety net.
-        refetchInterval: 8000,
+        // Sin polling: Supabase Realtime empuja los cambios en milisegundos.
         retry: false,
       },
     },

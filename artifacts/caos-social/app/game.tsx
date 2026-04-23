@@ -37,6 +37,12 @@ import { CardView } from "@/components/CardView";
 import { NeonButton } from "@/components/NeonButton";
 import { useRoom } from "@/contexts/RoomContext";
 import { useColors } from "@/hooks/useColors";
+import {
+  ensureServiceWorker,
+  isWebNotifSupported,
+  notifPermission,
+  showCaosNotification,
+} from "@/lib/notifications";
 
 export default function GameScreen() {
   const colors = useColors();
@@ -97,28 +103,29 @@ export default function GameScreen() {
     return () => clearInterval(t);
   }, []);
 
-  // Notificaciones push básicas (web): pedir permiso y avisar de cambios.
+  // Notificaciones push (web): registrar SW al entrar al juego.
   const lastInboxIds = useRef<Set<string>>(new Set());
   const lastTribunalIds = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (Platform.OS !== "web" || typeof window === "undefined") return;
-    if (!("serviceWorker" in navigator) || !("Notification" in window)) return;
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
-    if (Notification.permission === "default") Notification.requestPermission().catch(() => {});
+    if (!isWebNotifSupported()) return;
+    ensureServiceWorker();
   }, []);
   useEffect(() => {
     if (!room) return;
     const inboxIds = new Set(room.myInbox.map((t) => t.id));
     const isFirst = lastInboxIds.current.size === 0 && lastTribunalIds.current.size === 0;
-    const granted = Platform.OS === "web" && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted";
+    const granted = notifPermission() === "granted";
     for (const t of room.myInbox) {
       if (!lastInboxIds.current.has(t.id) && !isFirst) {
-        const body = `${t.fromName}: ${t.card.title}`;
-        setNotifMsg(`⚡ ${body}`);
+        const body = `${t.fromName} te ha lanzado: ${t.card.title}`;
+        setNotifMsg(`⚠️ ${body}`);
         if (granted) {
-          try {
-            new Notification("⚡ Nueva carta para ti", { body, tag: "inbox-" + t.id });
-          } catch {}
+          showCaosNotification({
+            title: "⚠️ ¡CAOS!",
+            body,
+            tag: "inbox-" + t.id,
+            requireInteraction: true,
+          });
         }
       }
     }
@@ -130,9 +137,12 @@ export default function GameScreen() {
         const body = `Vota: ¿"${t.card.title}" cumplido?`;
         setNotifMsg(`🧑‍⚖️ ${body}`);
         if (granted) {
-          try {
-            new Notification("🧑‍⚖️ Tribunal del Caos", { body, tag: "trib-" + t.id });
-          } catch {}
+          showCaosNotification({
+            title: "🧑‍⚖️ Tribunal del Caos",
+            body,
+            tag: "trib-" + t.id,
+            requireInteraction: true,
+          });
         }
       }
     }
@@ -330,12 +340,28 @@ export default function GameScreen() {
             {(me.avatar ? me.avatar + "  " : "") + me.name}
           </Text>
         </View>
-        <View style={{ flexDirection: "row", gap: 14, alignItems: "center" }}>
+        <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
           <Pressable onPress={() => router.push("/ranking")} hitSlop={10}>
-            <Feather name="award" size={22} color={colors.primary} />
+            <Text style={{ fontSize: 22 }}>🏆</Text>
           </Pressable>
-          <Pressable onPress={handleLeave} hitSlop={10}>
-            <Feather name="log-out" size={22} color={colors.destructive} />
+          <Pressable
+            onPress={handleLeave}
+            hitSlop={10}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.destructive,
+            }}
+          >
+            <Text style={{ fontSize: 14 }}>🚪</Text>
+            <Text style={{ color: colors.destructive, fontFamily: "Inter_700Bold", fontSize: 11 }}>
+              SALIR
+            </Text>
           </Pressable>
         </View>
       </View>

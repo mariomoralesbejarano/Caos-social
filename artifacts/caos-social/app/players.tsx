@@ -107,11 +107,6 @@ export default function LobbyScreen() {
     }
   }
 
-  async function handleLeave() {
-    await setSession(null);
-    router.replace("/");
-  }
-
   async function handleAddCustom() {
     setError(null);
     const points = Math.max(1, Math.min(10, parseInt(ccPoints, 10) || 2));
