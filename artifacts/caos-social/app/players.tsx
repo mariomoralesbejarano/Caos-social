@@ -3,6 +3,7 @@ import {
   CardTag,
   getGetRoomQueryKey,
   useAddCustomCard,
+  useLeaveRoom,
   useResetRoom,
   useSetMyTags,
   useStartGame,
@@ -45,6 +46,7 @@ export default function LobbyScreen() {
   const tagsMut = useSetMyTags();
   const resetMut = useResetRoom();
   const customMut = useAddCustomCard();
+  const leaveMut = useLeaveRoom();
   const [error, setError] = useState<string | null>(null);
   const [ccTitle, setCcTitle] = useState("");
   const [ccEffect, setCcEffect] = useState("");
@@ -136,6 +138,17 @@ export default function LobbyScreen() {
     }
   }
 
+  async function handleLeave() {
+    try {
+      await leaveMut.mutateAsync({
+        code: room!.code,
+        data: { playerId: session!.playerId },
+      });
+    } catch {}
+    setSession(null);
+    router.replace("/");
+  }
+
   async function handleReset() {
     try {
       await resetMut.mutateAsync({
@@ -170,6 +183,26 @@ export default function LobbyScreen() {
         { paddingBottom: (isWeb ? 34 : insets.bottom) + 40 },
       ]}
     >
+      <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 6 }}>
+        <Pressable
+          onPress={handleLeave}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: colors.destructive,
+          }}
+        >
+          <Feather name="log-out" size={14} color={colors.destructive} />
+          <Text style={{ color: colors.destructive, fontFamily: "Inter_700Bold", fontSize: 12 }}>
+            SALIR
+          </Text>
+        </Pressable>
+      </View>
       <Pressable
         onPress={shareCode}
         style={[
@@ -214,9 +247,23 @@ export default function LobbyScreen() {
                   { backgroundColor: p.connected ? colors.primary : colors.border },
                 ]}
               />
-              {p.avatar && (
-                <Text style={{ fontSize: 22, marginRight: 4 }}>{p.avatar}</Text>
-              )}
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: colors.background,
+                  borderWidth: 2,
+                  borderColor: isMe ? colors.primary : colors.border,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginRight: 6,
+                }}
+              >
+                <Text style={{ fontSize: 24, lineHeight: 28, textAlign: "center" }}>
+                  {p.avatar || "👤"}
+                </Text>
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.pName, { color: colors.foreground }]}>
                   {p.name} {isMe && "(tú)"}

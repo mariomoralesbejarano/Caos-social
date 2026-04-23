@@ -5,6 +5,7 @@ import {
   RoomPlayer,
   getGetRoomQueryKey,
   useDrawCard,
+  useLeaveRoom,
   useMarkDone,
   usePanicVote,
   useRespondToThrow,
@@ -42,7 +43,7 @@ export default function GameScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const isWeb = Platform.OS === "web";
-  const { session, room, isLoading } = useRoom();
+  const { session, room, isLoading, setSession } = useRoom();
   const qc = useQueryClient();
 
   const drawMut = useDrawCard();
@@ -52,6 +53,7 @@ export default function GameScreen() {
   const powerMut = useUsePower();
   const markDoneMut = useMarkDone();
   const verifyMut = useVerifyVote();
+  const leaveMut = useLeaveRoom();
 
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [throwTo, setThrowTo] = useState<boolean>(false);
@@ -59,6 +61,25 @@ export default function GameScreen() {
   const [drawnPreview, setDrawnPreview] = useState<GameCard | null>(null);
   const [activeInbox, setActiveInbox] = useState<PendingThrow | null>(null);
   const [panicFor, setPanicFor] = useState<PendingThrow | null>(null);
+  const [notifMsg, setNotifMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (notifMsg) {
+      const t = setTimeout(() => setNotifMsg(null), 4500);
+      return () => clearTimeout(t);
+    }
+  }, [notifMsg]);
+
+  async function handleLeave() {
+    try {
+      await leaveMut.mutateAsync({
+        code: room!.code,
+        data: { playerId: session!.playerId },
+      });
+    } catch {}
+    setSession(null);
+    router.replace("/");
+  }
 
   const shuffleAnim = useRef(new Animated.Value(0)).current;
 
@@ -86,31 +107,33 @@ export default function GameScreen() {
     if (Notification.permission === "default") Notification.requestPermission().catch(() => {});
   }, []);
   useEffect(() => {
-    if (Platform.OS !== "web" || typeof window === "undefined") return;
-    if (!("Notification" in window) || Notification.permission !== "granted") return;
     if (!room) return;
     const inboxIds = new Set(room.myInbox.map((t) => t.id));
+    const isFirst = lastInboxIds.current.size === 0 && lastTribunalIds.current.size === 0;
+    const granted = Platform.OS === "web" && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted";
     for (const t of room.myInbox) {
-      if (!lastInboxIds.current.has(t.id)) {
-        try {
-          new Notification("⚡ Nueva carta para ti", {
-            body: `${t.fromName}: ${t.card.title}`,
-            tag: "inbox-" + t.id,
-          });
-        } catch {}
+      if (!lastInboxIds.current.has(t.id) && !isFirst) {
+        const body = `${t.fromName}: ${t.card.title}`;
+        setNotifMsg(`⚡ ${body}`);
+        if (granted) {
+          try {
+            new Notification("⚡ Nueva carta para ti", { body, tag: "inbox-" + t.id });
+          } catch {}
+        }
       }
     }
     lastInboxIds.current = inboxIds;
 
     const tribIds = new Set((room.tribunal ?? []).map((t) => t.id));
     for (const t of room.tribunal ?? []) {
-      if (!lastTribunalIds.current.has(t.id)) {
-        try {
-          new Notification("🧑‍⚖️ Tribunal del Caos", {
-            body: `Vota: ¿"${t.card.title}" cumplido?`,
-            tag: "trib-" + t.id,
-          });
-        } catch {}
+      if (!lastTribunalIds.current.has(t.id) && !isFirst) {
+        const body = `Vota: ¿"${t.card.title}" cumplido?`;
+        setNotifMsg(`🧑‍⚖️ ${body}`);
+        if (granted) {
+          try {
+            new Notification("🧑‍⚖️ Tribunal del Caos", { body, tag: "trib-" + t.id });
+          } catch {}
+        }
       }
     }
     lastTribunalIds.current = tribIds;
@@ -302,17 +325,29 @@ export default function GameScreen() {
         <Pressable onPress={() => router.push("/players")} hitSlop={10}>
           <Feather name="users" size={22} color={colors.foreground} />
         </Pressable>
-        <Text style={[styles.topTitle, { color: colors.foreground }]}>
-          {me.name}
-        </Text>
-        <Pressable onPress={() => router.push("/ranking")} hitSlop={10}>
-          <Feather name="award" size={22} color={colors.primary} />
-        </Pressable>
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Text style={[styles.topTitle, { color: colors.foreground }]}>
+            {(me.avatar ? me.avatar + "  " : "") + me.name}
+          </Text>
+        </View>
+        <View style={{ flexDirection: "row", gap: 14, alignItems: "center" }}>
+          <Pressable onPress={() => router.push("/ranking")} hitSlop={10}>
+            <Feather name="award" size={22} color={colors.primary} />
+          </Pressable>
+          <Pressable onPress={handleLeave} hitSlop={10}>
+            <Feather name="log-out" size={22} color={colors.destructive} />
+          </Pressable>
+        </View>
       </View>
 
       {errMsg && (
         <View style={[styles.toast, { backgroundColor: colors.destructive }]}>
           <Text style={styles.toastText}>{errMsg}</Text>
+        </View>
+      )}
+      {notifMsg && (
+        <View style={[styles.toast, { backgroundColor: colors.primary }]}>
+          <Text style={styles.toastText}>{notifMsg}</Text>
         </View>
       )}
 

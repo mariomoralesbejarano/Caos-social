@@ -190,6 +190,7 @@ export default function HomeScreen() {
           Crea una sala, comparte el código y mandad cartas a vuestros amigos
           desde cada móvil cuando queráis.
         </Text>
+        <NotificationsButton />
       </View>
 
       <View style={styles.tabs}>
@@ -566,7 +567,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   tagChipText: { fontFamily: "Inter_700Bold", fontSize: 12 },
-  avatarRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  avatarRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   avatarChip: {
     width: 48,
     height: 48,
@@ -575,7 +576,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 2,
   },
-  avatarEmoji: { fontSize: 24 },
+  avatarEmoji: { fontSize: 28, lineHeight: 32, textAlign: "center" },
   roleChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -645,3 +646,66 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
 });
+
+function NotificationsButton() {
+  const colors = useColors();
+  const [perm, setPerm] = useState<string>(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return "unsupported";
+    if (!("Notification" in window)) return "unsupported";
+    return Notification.permission;
+  });
+  if (Platform.OS !== "web" || perm === "unsupported") return null;
+
+  async function ask() {
+    if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+      try { await navigator.serviceWorker.register("/sw.js"); } catch {}
+    }
+    try {
+      const result = await Notification.requestPermission();
+      setPerm(result);
+    } catch {}
+  }
+
+  if (perm === "granted") {
+    return (
+      <View
+        style={{
+          flexDirection: "row", alignItems: "center", justifyContent: "center",
+          gap: 8, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10,
+          borderWidth: 1, borderColor: colors.primary, alignSelf: "center", marginTop: 8,
+        }}
+      >
+        <Feather name="bell" size={14} color={colors.primary} />
+        <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 12 }}>
+          Notificaciones activas
+        </Text>
+      </View>
+    );
+  }
+  if (perm === "denied") {
+    return (
+      <Text style={{
+        color: colors.mutedForeground, fontSize: 11, textAlign: "center",
+        marginTop: 8, fontStyle: "italic",
+      }}>
+        Notificaciones bloqueadas. Actívalas desde los ajustes del navegador.
+      </Text>
+    );
+  }
+  return (
+    <Pressable
+      onPress={ask}
+      style={{
+        flexDirection: "row", alignItems: "center", justifyContent: "center",
+        gap: 8, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10,
+        borderWidth: 2, borderColor: colors.primary,
+        backgroundColor: colors.primary + "22", alignSelf: "center", marginTop: 8,
+      }}
+    >
+      <Feather name="bell" size={16} color={colors.primary} />
+      <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 13 }}>
+        ACTIVAR NOTIFICACIONES
+      </Text>
+    </Pressable>
+  );
+}

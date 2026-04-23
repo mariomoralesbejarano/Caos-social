@@ -6,6 +6,7 @@ import {
   applyDrawCard,
   applyEndGame,
   applyJoin,
+  applyLeaveRoom,
   applyMarkDone,
   applyPanicVote,
   applyResetRoom,
@@ -201,6 +202,10 @@ export const useStartGame = makeSimpleMutation<{ playerId: string }>((room, b) =
 
 export const useResetRoom = makeSimpleMutation<{ playerId: string }>((room, b) =>
   applyResetRoom(room, b.playerId),
+);
+
+export const useLeaveRoom = makeSimpleMutation<{ playerId: string }>((room, b) =>
+  applyLeaveRoom(room, b.playerId),
 );
 
 export const useEndGame = makeSimpleMutation<{ playerId: string }>((room, b) =>

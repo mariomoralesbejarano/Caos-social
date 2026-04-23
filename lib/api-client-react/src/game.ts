@@ -702,6 +702,29 @@ export function applyEndGame(room: Room, playerId: string): GameResult {
   return room;
 }
 
+export function applyLeaveRoom(room: Room, playerId: string): GameResult {
+  const idx = room.players.findIndex((p) => p.id === playerId);
+  if (idx < 0) return { error: "No estás en la sala" };
+  const me = room.players[idx];
+  // Devolver cartas de mano al mazo (mezcladas).
+  if (room.status === "active" && me.hand.length > 0) {
+    room.drawPile = shuffle([...room.drawPile, ...me.hand]);
+  }
+  // Anular o devolver retos pendientes hacia este jugador.
+  for (const p of room.players) {
+    p.inbox = p.inbox.filter((t) => t.fromPlayerId !== me.id && t.toPlayerId !== me.id);
+  }
+  room.players.splice(idx, 1);
+  // Si el dueño se va, transferir a otro jugador (si queda alguno).
+  if (room.ownerId === me.id && room.players.length > 0) {
+    room.ownerId = room.players[0].id;
+    pushLog(room, `👑 ${room.players[0].name} es el nuevo dueño de la sala`);
+  }
+  pushLog(room, `👋 ${me.name} salió de la sala`);
+  bump(room);
+  return room;
+}
+
 export function applyResetRoom(room: Room, playerId: string): GameResult {
   if (room.ownerId !== playerId) return { error: "Solo el creador puede reiniciar" };
   room.status = "lobby";

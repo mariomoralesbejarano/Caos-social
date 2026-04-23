@@ -58,6 +58,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.104.0",
     "expo-sharing": "^55.0.18",
+    "lucide-react-native": "^0.460.0",
     "react-native-view-shot": "^4.0.3"
   }
 }
