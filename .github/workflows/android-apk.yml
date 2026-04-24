@@ -13,9 +13,6 @@ jobs:
     name: Build debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    defaults:
-      run:
-        working-directory: artifacts/caos-social
 
     steps:
       - name: Checkout
@@ -42,7 +39,6 @@ jobs:
           restore-keys: ${{ runner.os }}-pnpm-
 
       - name: Install workspace deps
-        working-directory: .
         run: pnpm install --frozen-lockfile
 
       - name: Setup Java 21
@@ -65,27 +61,53 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('artifacts/caos-social/android/**/*.gradle*', 'artifacts/caos-social/android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle-
 
+      # Build only Caos Social (skip Vite mockup-sandbox & demos that fail in CI).
+      # PORT=3000 prevents Vite-style PORT-required errors that bleed into the workspace context.
       - name: Export Expo web bundle
-        run: pnpm run build
+        env:
+          PORT: "3000"
+          EXPO_NO_TYPESCRIPT_SETUP: "1"
+          CI: "1"
+        run: PORT=3000 pnpm --filter "./artifacts/caos-social" run build
 
       - name: Add Android platform (if missing)
+        working-directory: artifacts/caos-social
         run: |
           if [ ! -d android ]; then
             pnpm exec cap add android
           fi
 
-      - name: Apply custom app icons
+      - name: Apply custom app icons (square + round)
+        working-directory: artifacts/caos-social
         run: |
-          if [ -d app-icons/android ]; then
-            cp -rv app-icons/android/* android/app/src/main/res/
+          if [ ! -d custom-icons/android ]; then
+            echo "::warning::custom-icons/android not found, skipping icon injection"
+            exit 0
           fi
+          # 1) Copy square launchers into the generated Android res/
+          cp -rv custom-icons/android/* android/app/src/main/res/
+
+          # 2) Generate round launchers from the same source PNGs
+          for d in android/app/src/main/res/mipmap-*; do
+            if [ -f "$d/ic_launcher.png" ]; then
+              cp -v "$d/ic_launcher.png" "$d/ic_launcher_round.png"
+            fi
+          done
+
+          # 3) Remove any leftover adaptive-icon XMLs that reference assets
+          #    we are not providing, so AAPT2 doesn't fail.
+          find android/app/src/main/res/mipmap-anydpi-v26 -type f -name "ic_launcher*.xml" -delete 2>/dev/null || true
+
+          echo "Final mipmap contents:"
+          ls -la android/app/src/main/res/mipmap-* || true
 
       - name: Capacitor sync
+        working-directory: artifacts/caos-social
         run: pnpm exec cap sync android
 
       - name: Build debug APK
+        working-directory: artifacts/caos-social/android
         run: |
-          cd android
           chmod +x ./gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace
 
