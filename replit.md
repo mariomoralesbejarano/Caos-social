@@ -24,10 +24,22 @@ Multiplayer party-game. Single Supabase table `caos_rooms (code pk, state jsonb,
 - `VOTO` — emitted by `usePanicVote` (optimistic, before DB write).
 - `VERIFICACION` — emitted by `useVerifyVote`.
 - `PUSH` — emitted by `sendPushNotification(roomCode, playerId, msg)`; targets a single player.
+- `CHAT` — emitted by `lib/chat.ts`; live in-room chat (user + system messages).
 
-### Native push (Capacitor)
+### Live chat (room)
 
-`artifacts/caos-social/lib/nativePush.ts` is a no-op on web and an adapter for OneSignal / `@capacitor/push-notifications` on native. Fill the marked TODOs and add the SDK to enable real background pushes when wrapping the Expo web build with Capacitor.
+`artifacts/caos-social/lib/chat.ts` + `components/ChatPanel.tsx`. Mensajes broadcast en el canal de sala (sin BBDD). El panel está anclado al final de `app/game.tsx` (fuera del ScrollView), con `KeyboardAvoidingView` y auto-scroll al último mensaje. `postSystemEvent(roomCode, body)` lo usa el flujo de juicio para difundir veredictos.
+
+### Regla del Juez (verificación)
+
+`applyVerifyVote` en `lib/api-client-react/src/game.ts`: si el votante es el thrower (`t.fromPlayerId`), `resolveVerificationByJudge` resuelve el reto al instante (✅ Superado / ❌ Fallado) sin esperar a mayoría. La UI de `app/game.tsx` filtra `room.tribunal` para mostrar los botones SOLO al thrower; el resto ve "Esperando veredicto de X". El veredicto se publica al chat de sala y dispara push real al receptor.
+
+### Push nativas reales (FCM HTTP v1)
+
+- `firebase/google-services.json` — staged en el repo. El workflow `.github/workflows/android-apk.yml` lo copia a `android/app/` y aplica el plugin Gradle `com.google.gms.google-services` (idempotente).
+- `lib/nativePush.ts` — usa `@capacitor/push-notifications` real (no-op en web/Expo Go). Listener de `registration` cachea el token y lo asocia al jugador vía `attachPlayerToPush(roomCode, playerId)`. Llamado desde `app/_layout.tsx` (init) y `app/game.tsx` (asociación).
+- `lib/playerTokens.ts` — upsert/lookup en tabla `player_tokens`. Crea la tabla con `db/player_tokens.sql` (SQL editor de Supabase, una vez).
+- `supabase/functions/send-push/index.ts` — Edge Function que firma JWT con el service-account de Firebase, pide access_token OAuth2 y envía push HTTP v1 a los tokens del jugador. Despliegue: `supabase functions deploy send-push`. Secrets requeridos: `FCM_PROJECT_ID`, `FCM_SERVICE_ACCOUNT_JSON`.
 
 ### Capacitor (Android/iOS)
 

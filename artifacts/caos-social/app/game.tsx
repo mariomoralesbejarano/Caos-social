@@ -44,7 +44,9 @@ import {
   showCaosNotification,
 } from "@/lib/notifications";
 import { sendPushNotification, subscribeToPush } from "@/lib/push";
-import { initNativePush } from "@/lib/nativePush";
+import { attachPlayerToPush, sendNativePush } from "@/lib/nativePush";
+import { ChatPanel } from "@/components/ChatPanel";
+import { postSystemEvent } from "@/lib/chat";
 
 export default function GameScreen() {
   const colors = useColors();
@@ -110,8 +112,7 @@ export default function GameScreen() {
   const lastTribunalIds = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (isWebNotifSupported()) ensureServiceWorker();
-    // Inicializa SDK de push nativo (no-op en web).
-    void initNativePush();
+    // El SDK de push nativo (FCM) ya se inicializa al boot en _layout.tsx.
   }, []);
 
   // Suscripción a PUSH entrantes para mí (broadcast instantáneo).
@@ -164,6 +165,12 @@ export default function GameScreen() {
   useEffect(() => {
     if (!session) router.replace("/");
     else if (room && room.status !== "active") router.replace("/players");
+    // Asocia este dispositivo (token push ya cacheado por initNativePush)
+    // con el jugador actual para que la Edge Function pueda enviarle
+    // notificaciones reales con la app cerrada.
+    else if (session) {
+      void attachPlayerToPush(session.roomCode, session.playerId);
+    }
   }, [room, session, router]);
 
   if (isLoading || !room || !session) {
@@ -315,10 +322,37 @@ export default function GameScreen() {
 
   async function handleVerify(throwId: string, ok: boolean) {
     try {
+      // Para mensaje de chat: necesitamos el receptor antes de que la
+      // mutación lo borre del inbox.
+      const t = (room!.tribunal ?? []).find((x) => x.id === throwId);
+      const receiver = t
+        ? room!.players.find((p) => p.id === t.toPlayerId)
+        : undefined;
+      const judge = me?.name ?? "Juez";
+
       await verifyMut.mutateAsync({
         code: room!.code,
         data: { playerId: session!.playerId, throwId, ok },
       });
+
+      // Difunde el veredicto al chat para que TODOS lo vean.
+      if (t && receiver) {
+        const cardName = t.secret ? "un reto secreto" : `"${t.card.title}"`;
+        const verdict = ok
+          ? `✅ ${judge} validó ${cardName} de ${receiver.name}.`
+          : `❌ ${judge} marcó como FALLADO ${cardName} de ${receiver.name}.`;
+        try {
+          await postSystemEvent(room!.code, verdict);
+        } catch {}
+        // Push real al receptor (con la app cerrada).
+        void sendNativePush(receiver.id, {
+          toPlayerId: receiver.id,
+          title: ok ? "✅ Reto validado" : "❌ Reto fallado",
+          body: verdict,
+          tag: `verify-${throwId}`,
+          ts: Date.now(),
+        });
+      }
       invalidate();
     } catch (e) {
       setErrMsg(extractErr(e));
@@ -398,9 +432,10 @@ export default function GameScreen() {
       )}
 
       <ScrollView
+        style={{ flex: 1 }}
         contentContainerStyle={[
           styles.scroll,
-          { paddingBottom: (isWeb ? 34 : insets.bottom) + 40 },
+          { paddingBottom: 24 },
         ]}
       >
         {/* Inbox */}
@@ -437,59 +472,116 @@ export default function GameScreen() {
           </View>
         )}
 
-        {/* Tribunal del Caos: votar verificaciones de otros */}
-        {(room.tribunal ?? []).length > 0 && (
-          <View
-            style={[
-              styles.inboxBox,
-              { borderColor: colors.secondary, backgroundColor: colors.card, shadowColor: colors.secondary },
-            ]}
-          >
-            <Text style={[styles.inboxTitle, { color: colors.secondary }]}>
-              🧑‍⚖️ TRIBUNAL DEL CAOS · {(room.tribunal ?? []).length} en juicio
-            </Text>
-            {(room.tribunal ?? []).map((t) => {
-              const owner = room.players.find((p) => p.id === t.toPlayerId);
-              const left = Math.max(0, t.verifyEndsAt - Date.now());
-              const mins = Math.floor(left / 60000);
-              const secs = Math.floor((left % 60000) / 1000);
-              const myVote = t.verifyVotes.find((v) => v.voterId === session.playerId);
-              const yes = t.verifyVotes.filter((v) => v.ok).length;
-              const no = t.verifyVotes.filter((v) => !v.ok).length;
-              return (
-                <View
-                  key={t.id}
-                  style={[
-                    styles.inboxRow,
-                    { borderColor: colors.border, backgroundColor: colors.background, flexDirection: "column", alignItems: "stretch", gap: 8 },
-                  ]}
-                >
-                  <Text style={[styles.inboxFrom, { color: colors.mutedForeground }]}>
-                    {owner?.name ?? "?"} dice haber cumplido · {mins}:{secs.toString().padStart(2, "0")} restantes
-                  </Text>
-                  <Text style={[styles.inboxCard, { color: colors.foreground }]}>
-                    {t.secret ? "🕶️ Reto secreto" : t.card.title}
-                  </Text>
-                  <View style={{ flexDirection: "row", gap: 8 }}>
-                    <NeonButton
-                      label={`✅ Superado${myVote?.ok ? " ✓" : ""} (${yes})`}
-                      onPress={() => handleVerify(t.id, true)}
-                      small
-                      style={{ flex: 1 }}
-                    />
-                    <NeonButton
-                      label={`❌ Falso${myVote && !myVote.ok ? " ✓" : ""} (${no})`}
-                      variant="danger"
-                      onPress={() => handleVerify(t.id, false)}
-                      small
-                      style={{ flex: 1 }}
-                    />
+        {/* Tribunal del Caos
+              REGLA DEL JUEZ: solo el jugador que LANZÓ la carta (fromPlayerId)
+              ve los botones Superado / Fallado y dicta sentencia. Para el
+              receptor y el resto la sección muestra estado pasivo. */}
+        {(() => {
+          const tribunal = room.tribunal ?? [];
+          const myJudgements = tribunal.filter(
+            (t) => t.fromPlayerId === session.playerId,
+          );
+          const otherJudgements = tribunal.filter(
+            (t) => t.fromPlayerId !== session.playerId,
+          );
+          if (tribunal.length === 0) return null;
+          return (
+            <View
+              style={[
+                styles.inboxBox,
+                {
+                  borderColor: colors.secondary,
+                  backgroundColor: colors.card,
+                  shadowColor: colors.secondary,
+                },
+              ]}
+            >
+              <Text style={[styles.inboxTitle, { color: colors.secondary }]}>
+                🧑‍⚖️ TRIBUNAL · {tribunal.length} en juicio
+              </Text>
+
+              {myJudgements.map((t) => {
+                const owner = room.players.find((p) => p.id === t.toPlayerId);
+                const left = Math.max(0, t.verifyEndsAt - Date.now());
+                const mins = Math.floor(left / 60000);
+                const secs = Math.floor((left % 60000) / 1000);
+                return (
+                  <View
+                    key={t.id}
+                    style={[
+                      styles.inboxRow,
+                      {
+                        borderColor: colors.primary,
+                        backgroundColor: colors.background,
+                        flexDirection: "column",
+                        alignItems: "stretch",
+                        gap: 8,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.inboxFrom, { color: colors.primary }]}>
+                      ⚖️ TÚ ERES EL JUEZ · {mins}:{secs.toString().padStart(2, "0")}
+                    </Text>
+                    <Text style={[styles.inboxCard, { color: colors.foreground }]}>
+                      {owner?.name ?? "?"} dice haber cumplido{" "}
+                      {t.secret ? "un reto secreto" : `"${t.card.title}"`}
+                    </Text>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <NeonButton
+                        label="✅ SUPERADO"
+                        onPress={() => handleVerify(t.id, true)}
+                        small
+                        style={{ flex: 1 }}
+                      />
+                      <NeonButton
+                        label="❌ FALLADO"
+                        variant="danger"
+                        onPress={() => handleVerify(t.id, false)}
+                        small
+                        style={{ flex: 1 }}
+                      />
+                    </View>
                   </View>
-                </View>
-              );
-            })}
-          </View>
-        )}
+                );
+              })}
+
+              {otherJudgements.map((t) => {
+                const owner = room.players.find((p) => p.id === t.toPlayerId);
+                const judge = room.players.find((p) => p.id === t.fromPlayerId);
+                const left = Math.max(0, t.verifyEndsAt - Date.now());
+                const mins = Math.floor(left / 60000);
+                const secs = Math.floor((left % 60000) / 1000);
+                return (
+                  <View
+                    key={t.id}
+                    style={[
+                      styles.inboxRow,
+                      {
+                        borderColor: colors.border,
+                        backgroundColor: colors.background,
+                        flexDirection: "column",
+                        alignItems: "stretch",
+                        gap: 4,
+                        opacity: 0.85,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[styles.inboxFrom, { color: colors.mutedForeground }]}
+                    >
+                      Esperando veredicto de {judge?.name ?? "el juez"} · {mins}:
+                      {secs.toString().padStart(2, "0")}
+                    </Text>
+                    <Text style={[styles.inboxCard, { color: colors.foreground }]}>
+                      {owner?.name ?? "?"} ·{" "}
+                      {t.secret ? "🕶️ Reto secreto" : t.card.title}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          );
+        })()}
 
         {/* Score */}
         <View style={styles.scoreRow}>
@@ -678,6 +770,15 @@ export default function GameScreen() {
           ))}
         </View>
       </ScrollView>
+
+      {/* Chat de sala (anclado abajo, fuera del ScrollView para que el
+          input no quede tapado y el auto-scroll funcione). */}
+      <ChatPanel
+        roomCode={room.code}
+        myPlayerId={session.playerId}
+        myName={me.name}
+        myAvatar={me.avatar}
+      />
 
       {/* Throw target modal */}
       <Modal
@@ -1134,24 +1235,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     justifyContent: "center",
   },
-  drawSection: { alignItems: "center", paddingVertical: 12 },
+  drawSection: { alignItems: "center", paddingVertical: 8 },
   drawBtn: {
-    width: 180,
-    height: 180,
-    borderRadius: 90,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     borderWidth: 3,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
-    shadowRadius: 30,
-    elevation: 12,
-    gap: 8,
+    shadowRadius: 24,
+    elevation: 10,
+    gap: 6,
   },
   drawText: {
     fontFamily: "Inter_700Bold",
-    fontSize: 16,
+    fontSize: 13,
     textAlign: "center",
     letterSpacing: 1,
   },

@@ -101,6 +101,48 @@ jobs:
           echo "Final mipmap contents:"
           ls -la android/app/src/main/res/mipmap-* || true
 
+      - name: Inject Firebase google-services.json
+        working-directory: artifacts/caos-social
+        run: |
+          if [ ! -f firebase/google-services.json ]; then
+            echo "::warning::firebase/google-services.json missing, push notifications disabled"
+            exit 0
+          fi
+          cp -v firebase/google-services.json android/app/google-services.json
+
+          # Aplica el plugin Gradle de Google Services al módulo app (idempotente).
+          APP_GRADLE=android/app/build.gradle
+          if ! grep -q "com.google.gms.google-services" "$APP_GRADLE"; then
+            echo "" >> "$APP_GRADLE"
+            echo "apply plugin: 'com.google.gms.google-services'" >> "$APP_GRADLE"
+          fi
+
+          # Añade la dependencia del classpath en el build.gradle raíz.
+          ROOT_GRADLE=android/build.gradle
+          if ! grep -q "com.google.gms:google-services" "$ROOT_GRADLE"; then
+            python3 - <<'PY'
+import re, pathlib
+p = pathlib.Path("android/build.gradle")
+s = p.read_text()
+dep = "        classpath 'com.google.gms:google-services:4.4.2'\n"
+if "buildscript" in s and "dependencies" in s:
+    # Insert inside the first buildscript { ... dependencies { ... } } block.
+    s = re.sub(
+        r"(buildscript\s*\{[\s\S]*?dependencies\s*\{)",
+        r"\1\n" + dep,
+        s,
+        count=1,
+    )
+else:
+    s = (
+        "buildscript {\n  repositories { google(); mavenCentral() }\n"
+        "  dependencies {\n" + dep + "  }\n}\n\n" + s
+    )
+p.write_text(s)
+print("[google-services] classpath injected")
+PY
+          fi
+
       - name: Capacitor sync
         working-directory: artifacts/caos-social
         run: pnpm exec cap sync android

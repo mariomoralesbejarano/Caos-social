@@ -18,6 +18,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { FloatingMusicToggle } from "@/components/MusicToggle";
 import { CaosSplash } from "@/components/SplashScreen";
 import { RoomProvider } from "@/contexts/RoomContext";
+import { initNativePush } from "@/lib/nativePush";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -59,6 +60,13 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
+
+  // Pide permisos y registra el dispositivo en FCM (no-op en web/Expo Go).
+  // Una vez registrado, el token queda cacheado y se asocia al jugador
+  // cuando entre a una sala (`attachPlayerToPush` desde game.tsx).
+  useEffect(() => {
+    void initNativePush();
+  }, []);
 
   if (!fontsLoaded && !fontError) return null;
 

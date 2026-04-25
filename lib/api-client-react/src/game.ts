@@ -360,10 +360,42 @@ export function applyVerifyVote(
   t.verifyVotes = t.verifyVotes.filter((v) => v.voterId !== voterId);
   t.verifyVotes.push({ voterId, ok } as VerificationVote);
   voter.lastSeen = Date.now();
+  // REGLA DEL JUEZ: el jugador que LANZÓ la carta es el único juez. Si su
+  // voto entra, se resuelve inmediatamente sin esperar a otros (mayoría).
+  if (voter.id === t.fromPlayerId) {
+    resolveVerificationByJudge(room, owner, t, ok);
+    bump(room);
+    return room;
+  }
   // Resolver si la mayoría ponderada ya está clara
   tryResolveVerification(room, owner, t);
   bump(room);
   return room;
+}
+
+/** El thrower (juez) cierra el reto inmediatamente con su veredicto. */
+function resolveVerificationByJudge(
+  room: Room,
+  owner: PlayerInternal,
+  t: PendingThrow,
+  ok: boolean,
+) {
+  if (ok) {
+    const undetected = true; // sin tribunal abierto: nadie ha "detectado" mentira
+    const gained = awardChallenge(owner, t.card, { secret: t.secret, undetected });
+    pushLog(
+      room,
+      t.secret
+        ? `🕶️✅ ${owner.name} cumplió un reto secreto. +${gained} pts (juez)`
+        : `✅ Juez valida "${t.card.title}" de ${owner.name}. +${gained} pts`,
+    );
+  } else {
+    const penalty = t.card.points * 2;
+    owner.score -= penalty;
+    pushLog(room, `❌ Juez: ${owner.name} no cumplió "${t.card.title}". -${penalty} pts`);
+  }
+  t.status = "resolved";
+  owner.inbox = owner.inbox.filter((x) => x.id !== t.id);
 }
 
 /** Suma pesos de votos (juez x2). Devuelve {yes, no, eligible}. */

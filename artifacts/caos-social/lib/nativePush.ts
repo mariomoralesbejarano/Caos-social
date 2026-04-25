@@ -1,62 +1,188 @@
-// Capa de adaptación para SDKs de push nativo (OneSignal o Firebase
-// Cloud Messaging) cuando la app se empaquete con Capacitor.
+// Capa de adaptación para push nativas (Android via FCM / iOS via APNs)
+// usando @capacitor/push-notifications. Seguro de cargar en web (no-op).
 //
-// Importante: este módulo es seguro de cargar tanto en web como en nativo.
-// En web es un no-op. En nativo, una vez instalado uno de los SDKs y
-// configurado en Capacitor, basta con rellenar las funciones marcadas
-// con TODO.
+// Configuración Android (FCM):
+//   * `android/app/google-services.json` se inyecta en CI desde
+//     `firebase/google-services.json` (ver workflow android-apk.yml).
+//   * El plugin Gradle `com.google.gms.google-services` se aplica en
+//     ese mismo paso del workflow.
 //
-// Pasos para activar (Android/iOS):
-//   1) pnpm add @capacitor/core @capacitor/push-notifications
-//      (o:  pnpm add onesignal-cordova-plugin onesignal-capacitor-plugin)
-//   2) En `app/_layout.tsx`, llamar a `initNativePush()` una sola vez al
-//      arrancar la app.
-//   3) Tras `register()`, guardar el `deviceToken` (o el `playerId` de
-//      OneSignal) asociado al `playerId` de la sala — p. ej. en una tabla
-//      `caos_devices(playerId, token)` de Supabase.
-//   4) En servidor (Edge Function) o vía REST de OneSignal/FCM, enviar
-//      la notificación al token correspondiente cuando llegue un PUSH.
+// Una vez que el dispositivo se registra, persistimos el token en la
+// tabla `player_tokens` de Supabase, asociado al (roomCode, playerId)
+// del jugador. La Edge Function `send-push` (ver `supabase/functions/
+// send-push/index.ts`) lo usa para enviar la notificación real con FCM
+// HTTP v1.
 
 import { Platform } from "react-native";
 
+import { getSupabase, SUPABASE_URL } from "@workspace/api-client-react";
+
 import type { PushPayload } from "@/lib/push";
+import { registerPlayerToken, type PushPlatform } from "@/lib/playerTokens";
 
 let initialised = false;
+let cachedToken: string | null = null;
+let cachedPlatform: PushPlatform | null = null;
 
+interface PendingRegistration {
+  roomCode: string;
+  playerId: string;
+}
+let pendingRegistration: PendingRegistration | null = null;
+
+function isCapacitorNative(): boolean {
+  if (Platform.OS === "web") return false;
+  // En Expo Go también devuelve "native", pero ahí @capacitor/* no existe.
+  // El try/catch a la hora de require() lo cubre.
+  return Platform.OS === "android" || Platform.OS === "ios";
+}
+
+/**
+ * Inicializa el SDK de push nativo UNA VEZ al arrancar la app.
+ * Pide permisos, registra el dispositivo y, si ya tenemos sesión,
+ * persiste el token en `player_tokens`. Si aún no hay sesión, queda
+ * encolado y se persiste cuando llamemos a `attachPlayerToPush`.
+ */
 export async function initNativePush(): Promise<void> {
   if (initialised) return;
   initialised = true;
-  if (Platform.OS === "web") return;
-  // TODO (nativo): inicializar OneSignal o @capacitor/push-notifications.
-  //
-  // Ejemplo OneSignal (pseudocódigo):
-  //   import OneSignal from "onesignal-cordova-plugin";
-  //   OneSignal.initialize("<ONESIGNAL_APP_ID>");
-  //   OneSignal.Notifications.requestPermission(true);
-  //   OneSignal.User.pushSubscription.addEventListener("change", (e) => {
-  //     // Persistir e.current.id ↔ playerId en Supabase.
-  //   });
-  //
-  // Ejemplo Firebase / Capacitor (pseudocódigo):
-  //   import { PushNotifications } from "@capacitor/push-notifications";
-  //   await PushNotifications.requestPermissions();
-  //   await PushNotifications.register();
-  //   PushNotifications.addListener("registration", (t) => {
-  //     // Persistir t.value ↔ playerId en Supabase.
-  //   });
+  if (!isCapacitorNative()) return;
+
+  let PushNotifications: any;
+  try {
+    // Carga perezosa: en web/Expo Go este módulo no existe y peta el bundler
+    // si lo importamos estáticamente.
+    PushNotifications =
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("@capacitor/push-notifications").PushNotifications;
+  } catch {
+    return;
+  }
+
+  try {
+    const perm = await PushNotifications.checkPermissions();
+    let granted = perm.receive === "granted";
+    if (!granted) {
+      const req = await PushNotifications.requestPermissions();
+      granted = req.receive === "granted";
+    }
+    if (!granted) return;
+
+    // Listener: registro exitoso → token FCM (Android) / APNs (iOS).
+    PushNotifications.addListener("registration", (t: { value: string }) => {
+      cachedToken = t.value;
+      cachedPlatform = (Platform.OS === "ios" ? "ios" : "android") as PushPlatform;
+      if (pendingRegistration && cachedToken) {
+        void registerPlayerToken({
+          room_code: pendingRegistration.roomCode,
+          player_id: pendingRegistration.playerId,
+          token: cachedToken,
+          platform: cachedPlatform,
+        });
+        pendingRegistration = null;
+      }
+    });
+
+    PushNotifications.addListener("registrationError", (err: unknown) => {
+      // eslint-disable-next-line no-console
+      console.warn("[nativePush] registrationError", err);
+    });
+
+    // Listener: notificación recibida con la app en primer plano.
+    PushNotifications.addListener(
+      "pushNotificationReceived",
+      (n: { title?: string; body?: string }) => {
+        // El sistema operativo NO muestra el banner si la app está en
+        // primer plano: no hace falta hacer nada extra; el listener de
+        // broadcast en `lib/push.ts` ya muestra una notif local.
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.log("[push] received", n.title, n.body);
+        }
+      },
+    );
+
+    // Listener: usuario tocó la notificación (app en background/cerrada).
+    PushNotifications.addListener(
+      "pushNotificationActionPerformed",
+      (action: unknown) => {
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.log("[push] tapped", action);
+        }
+      },
+    );
+
+    await PushNotifications.register();
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn("[nativePush] init failed", e);
+  }
 }
 
-export async function sendNativePush(
-  _toPlayerId: string,
-  _payload: PushPayload,
+/**
+ * Asocia el dispositivo actual (ya registrado en push) al jugador y la
+ * sala. Llamarla nada más entrar a la sala/partida.
+ *
+ * Si todavía no nos ha llegado el token (race con `register()`), queda
+ * encolado y se enviará en cuanto llegue el evento `registration`.
+ */
+export async function attachPlayerToPush(
+  roomCode: string,
+  playerId: string,
 ): Promise<void> {
-  if (Platform.OS === "web") return;
-  // TODO (nativo): llamar a la Edge Function que dispara la push real
-  // resolviendo `_toPlayerId` -> token de dispositivo.
-  //
-  //   await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
-  //     method: "POST",
-  //     headers: { "Content-Type": "application/json" },
-  //     body: JSON.stringify({ playerId: _toPlayerId, ..._payload }),
-  //   });
+  if (!isCapacitorNative()) return;
+  if (cachedToken && cachedPlatform) {
+    await registerPlayerToken({
+      room_code: roomCode,
+      player_id: playerId,
+      token: cachedToken,
+      platform: cachedPlatform,
+    });
+  } else {
+    pendingRegistration = { roomCode, playerId };
+  }
+}
+
+/**
+ * Envía una push REAL (con la app cerrada) llamando a la Edge Function
+ * `send-push` de Supabase, que usa FCM HTTP v1 con tu service-account.
+ *
+ * Nota: la Edge Function se despliega aparte (`supabase functions deploy
+ * send-push`). Si no está desplegada todavía, esta llamada falla en
+ * silencio y la notificación llega igualmente por broadcast/PWA cuando
+ * la app está abierta.
+ */
+export async function sendNativePush(
+  toPlayerId: string,
+  payload: PushPayload,
+): Promise<void> {
+  if (!toPlayerId) return;
+  try {
+    await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        // La anon key se mete por defecto en el cliente Supabase; aquí
+        // no la necesitamos porque Edge Function la valida internamente.
+      },
+      body: JSON.stringify({
+        playerId: toPlayerId,
+        title: payload.title,
+        body: payload.body,
+        roomCode: undefined,
+        tag: payload.tag,
+      }),
+      // No esperes respuesta: best-effort.
+      keepalive: true,
+    }).catch(() => undefined);
+  } catch {}
+}
+
+/** Helper: ¿tenemos ya un token push válido en este dispositivo? */
+export function getCurrentPushToken(): {
+  token: string | null;
+  platform: PushPlatform | null;
+} {
+  return { token: cachedToken, platform: cachedPlatform };
 }
