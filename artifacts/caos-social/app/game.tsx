@@ -3,6 +3,7 @@ import {
   GameCard,
   PendingThrow,
   RoomPlayer,
+  cardCooldownMs,
   getGetRoomQueryKey,
   useDrawCard,
   useLeaveRoom,
@@ -72,6 +73,7 @@ export default function GameScreen() {
   const [activeInbox, setActiveInbox] = useState<PendingThrow | null>(null);
   const [panicFor, setPanicFor] = useState<PendingThrow | null>(null);
   const [notifMsg, setNotifMsg] = useState<string | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
     if (notifMsg) {
@@ -771,14 +773,56 @@ export default function GameScreen() {
         </View>
       </ScrollView>
 
-      {/* Chat de sala (anclado abajo, fuera del ScrollView para que el
-          input no quede tapado y el auto-scroll funcione). */}
-      <ChatPanel
-        roomCode={room.code}
-        myPlayerId={session.playerId}
-        myName={me.name}
-        myAvatar={me.avatar}
-      />
+      {/* Botón flotante de chat */}
+      <Pressable
+        onPress={() => setChatOpen(true)}
+        style={[
+          styles.chatFab,
+          {
+            backgroundColor: colors.card,
+            borderColor: colors.primary,
+            shadowColor: colors.primary,
+          },
+        ]}
+      >
+        <Text style={{ fontSize: 22 }}>💬</Text>
+      </Pressable>
+
+      {/* Modal de chat */}
+      <Modal
+        visible={chatOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setChatOpen(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)" }}
+          onPress={() => setChatOpen(false)}
+        >
+          <Pressable
+            style={[
+              styles.chatOverlay,
+              { backgroundColor: colors.background, borderTopColor: colors.border },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
+              <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 14, letterSpacing: 1.5 }}>
+                💬 CHAT DE SALA
+              </Text>
+              <Pressable onPress={() => setChatOpen(false)} hitSlop={12}>
+                <Feather name="x" size={20} color={colors.foreground} />
+              </Pressable>
+            </View>
+            <ChatPanel
+              roomCode={room.code}
+              myPlayerId={session.playerId}
+              myName={me.name}
+              myAvatar={me.avatar}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Throw target modal */}
       <Modal
@@ -800,10 +844,20 @@ export default function GameScreen() {
             </Text>
             {others.map((p) => {
               const cdKey = `${session.playerId}->${p.id}`;
-              const last = room.cooldowns[cdKey] ?? 0;
-              const cd = Math.max(0, 10 * 60 * 1000 - (Date.now() - last));
+              const cdEndsAt = room.cooldowns[cdKey] ?? 0;
+              const cd = Math.max(0, cdEndsAt - Date.now());
               const shielded = p.shieldUntil > Date.now();
               const disabled = cd > 0 || shielded;
+              // Tipo de cooldown basado en la carta seleccionada
+              const selCard = room.myHand.find((c) => c.id === selectedCard);
+              const cdLabel = selCard
+                ? (() => {
+                    const ms = cardCooldownMs(selCard);
+                    if (ms <= 2 * 60 * 1000) return "2m";
+                    if (ms <= 5 * 60 * 1000) return "5m";
+                    return "10m";
+                  })()
+                : null;
               return (
                 <Pressable
                   key={p.id}
@@ -816,16 +870,23 @@ export default function GameScreen() {
                     },
                   ]}
                 >
-                  <Text style={[styles.targetName, { color: colors.foreground }]}>
-                    {p.name}
-                  </Text>
+                  <View>
+                    <Text style={[styles.targetName, { color: colors.foreground }]}>
+                      {p.name}
+                    </Text>
+                    {!disabled && cdLabel && (
+                      <Text style={{ color: colors.mutedForeground, fontSize: 10 }}>
+                        Cooldown si lanzas: {cdLabel}
+                      </Text>
+                    )}
+                  </View>
                   {shielded ? (
                     <Text style={{ color: colors.secondary, fontSize: 11 }}>
                       ESCUDO
                     </Text>
                   ) : cd > 0 ? (
                     <Text style={{ color: colors.destructive, fontSize: 11 }}>
-                      Cooldown {Math.ceil(cd / 60000)}m
+                      {Math.ceil(cd / 60000)}m restante
                     </Text>
                   ) : (
                     <Feather name="zap" size={16} color={colors.primary} />
@@ -1356,5 +1417,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
     marginTop: 8,
+  },
+  chatFab: {
+    position: "absolute",
+    bottom: 24,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  chatOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: "65%",
+    borderTopWidth: 1,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: "hidden",
   },
 });

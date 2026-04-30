@@ -12,7 +12,21 @@ import type {
 } from "./types";
 
 export const COOLDOWN_MS = 10 * 60 * 1000;
+export const COOLDOWN_CHILL_MS = 2 * 60 * 1000;
+export const COOLDOWN_NORMAL_MS = 5 * 60 * 1000;
 export const SHIELD_MS = 5 * 60 * 1000;
+
+/**
+ * Cooldown dinámico según categoría de carta:
+ * - beber / social  → 2 min (Chill/Básicas)
+ * - reto / ligar    → 5 min (Reto normal)
+ * - fisico / poder  → 10 min (Hidalgo/Especial)
+ */
+export function cardCooldownMs(card: GameCard): number {
+  if (card.category === "beber" || card.category === "social") return COOLDOWN_CHILL_MS;
+  if (card.category === "fisico" || card.category === "poder") return COOLDOWN_MS;
+  return COOLDOWN_NORMAL_MS;
+}
 export const SILENCE_MS = 5 * 60 * 1000;
 export const PANIC_WINDOW_MS = 2 * 60 * 1000;       // Pánico: 2 min de votación
 export const VERIFY_WINDOW_MS = 10 * 60 * 1000;     // Verificación: 10 min asíncrono
@@ -251,15 +265,15 @@ export function applyThrowCard(
   if (card.blockedBy && to.tags.some((t) => card.blockedBy!.includes(t)))
     return { error: "Esa carta no aplica al rol del objetivo" };
   const key = `${fromId}->${toId}`;
-  const last = room.cooldowns[key] ?? 0;
-  if (Date.now() - last < COOLDOWN_MS) {
-    const left = Math.ceil((COOLDOWN_MS - (Date.now() - last)) / 60000);
+  const cdEndsAt = room.cooldowns[key] ?? 0;
+  if (Date.now() < cdEndsAt) {
+    const left = Math.ceil((cdEndsAt - Date.now()) / 60000);
     return { error: `Cooldown ${left}m con ese jugador` };
   }
   from.hand = from.hand.filter((c) => c !== cardId);
   from.cardsThrown += 1;
   from.lastSeen = Date.now();
-  room.cooldowns[key] = Date.now();
+  room.cooldowns[key] = Date.now() + cardCooldownMs(card);
 
   if (to.panicShield) {
     to.panicShield = false;

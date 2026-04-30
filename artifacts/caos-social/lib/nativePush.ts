@@ -30,11 +30,36 @@ interface PendingRegistration {
 }
 let pendingRegistration: PendingRegistration | null = null;
 
+/**
+ * Detecta si corremos DENTRO de una app Capacitor nativa (Android / iOS).
+ * Usa `Capacitor.isNativePlatform()` que funciona tanto en builds nativos
+ * de Expo como en apps Capacitor donde `Platform.OS` siempre devuelve "web"
+ * (porque el bundle React corre en un WebView).
+ */
 function isCapacitorNative(): boolean {
-  if (Platform.OS === "web") return false;
-  // En Expo Go también devuelve "native", pero ahí @capacitor/* no existe.
-  // El try/catch a la hora de require() lo cubre.
-  return Platform.OS === "android" || Platform.OS === "ios";
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Capacitor } = require("@capacitor/core");
+    return Capacitor.isNativePlatform();
+  } catch {
+    // Fallback para builds Expo nativos (Expo Go / standalone)
+    return Platform.OS === "android" || Platform.OS === "ios";
+  }
+}
+
+/**
+ * Devuelve la plataforma nativa: "android" | "ios".
+ * Se llama solo cuando isCapacitorNative() === true.
+ */
+function nativePlatform(): PushPlatform {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Capacitor } = require("@capacitor/core");
+    const p = Capacitor.getPlatform();
+    return (p === "ios" ? "ios" : "android") as PushPlatform;
+  } catch {
+    return (Platform.OS === "ios" ? "ios" : "android") as PushPlatform;
+  }
 }
 
 /**
@@ -71,7 +96,7 @@ export async function initNativePush(): Promise<void> {
     // Listener: registro exitoso → token FCM (Android) / APNs (iOS).
     PushNotifications.addListener("registration", (t: { value: string }) => {
       cachedToken = t.value;
-      cachedPlatform = (Platform.OS === "ios" ? "ios" : "android") as PushPlatform;
+      cachedPlatform = nativePlatform();
       if (pendingRegistration && cachedToken) {
         void registerPlayerToken({
           room_code: pendingRegistration.roomCode,

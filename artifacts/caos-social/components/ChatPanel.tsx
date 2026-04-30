@@ -239,11 +239,10 @@ export function ChatPanel({
 
 const styles = StyleSheet.create({
   wrap: {
+    flex: 1,
     borderTopWidth: 1,
     paddingHorizontal: 10,
     paddingTop: 8,
-    minHeight: 220,
-    maxHeight: 320,
   },
   header: {
     flexDirection: "row",

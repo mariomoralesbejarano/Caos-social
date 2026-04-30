@@ -16,14 +16,18 @@ import {
   applyThrowCard,
   applyUsePower,
   applyVerifyVote,
+  cardCooldownMs,
   createInitialRoom,
   generateCode,
   serializeRoom,
+  COOLDOWN_CHILL_MS,
+  COOLDOWN_NORMAL_MS,
+  COOLDOWN_MS,
   PANIC_WINDOW_MS,
   VERIFY_WINDOW_MS,
 } from "./game";
 
-export { PANIC_WINDOW_MS, VERIFY_WINDOW_MS };
+export { cardCooldownMs, COOLDOWN_CHILL_MS, COOLDOWN_NORMAL_MS, COOLDOWN_MS, PANIC_WINDOW_MS, VERIFY_WINDOW_MS };
 import {
   existsRoom,
   gcRooms,
