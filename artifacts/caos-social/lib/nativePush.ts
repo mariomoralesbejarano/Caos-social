@@ -1,6 +1,11 @@
 // Push nativas (Android FCM / iOS APNs) via @capacitor/push-notifications.
-// SEGURO en web: todas las llamadas están envueltas en try-catch y la detección
-// de plataforma usa Capacitor.isNativePlatform() para no crashear en WebView.
+//
+// POLÍTICA DE SEGURIDAD:
+//   • CADA llamada tiene su propio try/catch individual.
+//   • La plataforma se verifica con Capacitor.getPlatform() === 'android' | 'ios'
+//     ANTES de invocar cualquier función de PushNotifications.
+//   • Si cualquier paso falla, solo se loguea — la app NO se cierra.
+//   • Delay de 2 s antes de register() para que Firebase termine de iniciarse.
 
 import { Platform } from "react-native";
 
@@ -13,178 +18,198 @@ let initialised = false;
 let cachedToken: string | null = null;
 let cachedPlatform: PushPlatform | null = null;
 
-interface PendingRegistration {
-  roomCode: string;
-  playerId: string;
-}
+interface PendingRegistration { roomCode: string; playerId: string }
 let pendingRegistration: PendingRegistration | null = null;
 
-function safeLog(...args: unknown[]) {
+/* ─── helpers de logging ──────────────────────────────────────────────────── */
+function safeLog(...a: unknown[]) { try { console.log("[nativePush]", ...a); } catch {} } // eslint-disable-line no-console
+function safeErr(...a: unknown[]) { try { console.error("[nativePush]", ...a); } catch {} } // eslint-disable-line no-console
+
+/* ─── detección de plataforma ─────────────────────────────────────────────── */
+
+/** Carga @capacitor/core de forma segura y devuelve el objeto Capacitor o null. */
+function getCapacitor(): any {
   try {
-    // eslint-disable-next-line no-console
-    console.log("[nativePush]", ...args);
-  } catch {}
-}
-function safeWarn(...args: unknown[]) {
-  try {
-    // eslint-disable-next-line no-console
-    console.warn("[nativePush]", ...args);
-  } catch {}
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require("@capacitor/core").Capacitor ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Detecta si corremos DENTRO de una app Capacitor nativa.
- * `Capacitor.isNativePlatform()` devuelve true en Android/iOS incluso cuando
- * el bundle React ve Platform.OS === "web" (porque corre en WebView).
+ * Devuelve "android" | "ios" | "web".
+ * En builds Capacitor la WebView siempre da "android"/"ios" incluso cuando
+ * Platform.OS === "web" (porque el bundle React corre dentro del WebView).
  */
+function capacitorPlatform(): string {
+  try {
+    const Cap = getCapacitor();
+    if (Cap && typeof Cap.getPlatform === "function") {
+      return Cap.getPlatform(); // "android" | "ios" | "web"
+    }
+  } catch (e) {
+    safeErr("getPlatform() falló", e);
+  }
+  // Fallback para Expo Go nativo
+  return Platform.OS;
+}
+
 function isCapacitorNative(): boolean {
+  const p = capacitorPlatform();
+  return p === "android" || p === "ios";
+}
+
+/* ─── carga lazy del plugin ───────────────────────────────────────────────── */
+function loadPushPlugin(): any {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { Capacitor } = require("@capacitor/core");
-    return typeof Capacitor?.isNativePlatform === "function"
-      ? Capacitor.isNativePlatform()
-      : false;
-  } catch {
-    return Platform.OS === "android" || Platform.OS === "ios";
+    const mod = require("@capacitor/push-notifications");
+    return mod?.PushNotifications ?? null;
+  } catch (e) {
+    safeErr("@capacitor/push-notifications no disponible", e);
+    return null;
   }
 }
 
-function nativePlatform(): PushPlatform {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { Capacitor } = require("@capacitor/core");
-    const p = Capacitor?.getPlatform?.();
-    return (p === "ios" ? "ios" : "android") as PushPlatform;
-  } catch {
-    return (Platform.OS === "ios" ? "ios" : "android") as PushPlatform;
-  }
-}
+/* ─── init principal ──────────────────────────────────────────────────────── */
 
 /**
- * Inicializa el SDK de push nativo UNA VEZ al arrancar la app.
+ * Inicializa push nativo UNA SOLA VEZ al arrancar la app.
  *
- * SAFETY: cada operación (check, request, addListener, register) tiene
- * su propio try-catch para que un fallo parcial no crashee la app.
- * Se aplica un delay de 2 s para asegurar que Capacitor y Firebase
- * han terminado de inicializarse antes de pedir el token.
+ * Flujo:
+ *   1. Verifica plataforma (Capacitor.getPlatform() === 'android' o 'ios')
+ *   2. Espera 2 s para que Firebase/Capacitor terminen de inicializarse
+ *   3. checkPermissions → requestPermissions si hace falta
+ *   4. addListener x4 (cada uno en su propio try-catch)
+ *   5. register() (en su propio try-catch)
  */
 export async function initNativePush(): Promise<void> {
   if (initialised) return;
   initialised = true;
 
-  if (!isCapacitorNative()) {
-    safeLog("no es nativo, skip");
+  const platform = capacitorPlatform();
+  safeLog("plataforma detectada:", platform);
+
+  if (platform !== "android" && platform !== "ios") {
+    safeLog("no es nativo, skip push");
     return;
   }
 
-  // Delay de seguridad: permite que Capacitor/Firebase carguen completamente.
-  await new Promise<void>((resolve) => setTimeout(resolve, 2000));
+  // ── Delay de seguridad ──────────────────────────────────────────────────
+  // Firebase necesita un momento para leer google-services.json e inicializar
+  // su instancia. Sin este delay, register() puede lanzar antes de estar listo.
+  await new Promise<void>((r) => setTimeout(r, 2000));
 
-  let PushNotifications: any;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    PushNotifications = require("@capacitor/push-notifications").PushNotifications;
-  } catch (e) {
-    safeWarn("módulo @capacitor/push-notifications no disponible", e);
-    return;
-  }
+  // ── Cargar plugin ───────────────────────────────────────────────────────
+  const Push = loadPushPlugin();
+  if (!Push) return;
 
-  // 1. Comprobar/pedir permisos.
+  // ── 1. Verificar / pedir permisos ───────────────────────────────────────
   let granted = false;
+
   try {
-    const perm = await PushNotifications.checkPermissions();
+    const perm = await Push.checkPermissions();
     granted = perm?.receive === "granted";
+    safeLog("checkPermissions →", perm?.receive);
   } catch (e) {
-    safeWarn("checkPermissions falló", e);
+    safeErr("checkPermissions() lanzó excepción", e);
   }
 
   if (!granted) {
     try {
-      const req = await PushNotifications.requestPermissions();
+      const req = await Push.requestPermissions();
       granted = req?.receive === "granted";
+      safeLog("requestPermissions →", req?.receive);
     } catch (e) {
-      safeWarn("requestPermissions falló", e);
+      safeErr("requestPermissions() lanzó excepción", e);
     }
   }
 
   if (!granted) {
-    safeLog("permisos denegados, skip registro");
+    safeLog("permisos no concedidos — skip registro");
     return;
   }
 
-  // 2. Registrar listeners antes de llamar a register().
+  // ── 2. Listeners (cada uno aislado) ────────────────────────────────────
+
+  // registration: token FCM/APNs recibido correctamente
   try {
-    PushNotifications.addListener("registration", (t: { value: string }) => {
+    Push.addListener("registration", (t: { value: string }) => {
       try {
-        cachedToken = t.value;
-        cachedPlatform = nativePlatform();
-        safeLog("token OK, plataforma:", cachedPlatform);
-        if (pendingRegistration && cachedToken) {
-          void registerPlayerToken({
-            room_code: pendingRegistration.roomCode,
-            player_id: pendingRegistration.playerId,
+        cachedToken = t?.value ?? null;
+        cachedPlatform = (platform === "ios" ? "ios" : "android") as PushPlatform;
+        safeLog("token recibido, plataforma:", cachedPlatform,
+                "token:", cachedToken?.slice(0, 20) + "…");
+        if (pendingRegistration && cachedToken && cachedPlatform) {
+          const { roomCode, playerId } = pendingRegistration;
+          pendingRegistration = null;
+          registerPlayerToken({
+            room_code: roomCode,
+            player_id: playerId,
             token: cachedToken,
             platform: cachedPlatform,
-          }).catch((err) => safeWarn("registerPlayerToken falló", err));
-          pendingRegistration = null;
+          }).catch((err) => safeErr("registerPlayerToken falló", err));
         }
       } catch (e) {
-        safeWarn("listener registration inner error", e);
+        safeErr("handler 'registration' lanzó excepción interna", e);
       }
     });
   } catch (e) {
-    safeWarn("addListener registration falló", e);
+    safeErr("addListener('registration') falló", e);
   }
 
+  // registrationError: Firebase no pudo obtener el token (sin crash)
   try {
-    PushNotifications.addListener("registrationError", (err: unknown) => {
-      safeWarn("registrationError del dispositivo", err);
-      // NO lanzamos: solo logeamos para no crashear.
+    Push.addListener("registrationError", (err: unknown) => {
+      try {
+        safeErr("registrationError del sistema (no es crash):", err);
+      } catch {}
     });
   } catch (e) {
-    safeWarn("addListener registrationError falló", e);
+    safeErr("addListener('registrationError') falló", e);
   }
 
+  // pushNotificationReceived: app en primer plano
   try {
-    PushNotifications.addListener(
-      "pushNotificationReceived",
+    Push.addListener("pushNotificationReceived",
       (n: { title?: string; body?: string }) => {
-        try {
-          safeLog("received en foreground", n.title, n.body);
-        } catch {}
-      },
-    );
+        try { safeLog("push recibida en foreground:", n?.title, n?.body); } catch {}
+      });
   } catch (e) {
-    safeWarn("addListener pushNotificationReceived falló", e);
+    safeErr("addListener('pushNotificationReceived') falló", e);
   }
 
+  // pushNotificationActionPerformed: usuario tocó la notificación
   try {
-    PushNotifications.addListener(
-      "pushNotificationActionPerformed",
-      (action: unknown) => {
-        try {
-          safeLog("tapped", action);
-        } catch {}
-      },
-    );
+    Push.addListener("pushNotificationActionPerformed", (action: unknown) => {
+      try { safeLog("notificación pulsada:", action); } catch {}
+    });
   } catch (e) {
-    safeWarn("addListener pushNotificationActionPerformed falló", e);
+    safeErr("addListener('pushNotificationActionPerformed') falló", e);
   }
 
-  // 3. Solicitar el token FCM/APNs. Esto puede fallar si google-services.json
-  //    no está configurado — lo capturamos sin crashear.
+  // ── 3. register() — solicita token FCM/APNs ────────────────────────────
+  // Este es el paso más probable de fallar si google-services.json no está
+  // o el plugin de Gradle no está aplicado. Lo capturamos SIN relanzar.
   try {
-    await PushNotifications.register();
-    safeLog("register() llamado correctamente");
+    safeLog("llamando register()…");
+    await Push.register();
+    safeLog("register() completado sin excepciones síncronas");
   } catch (e) {
-    safeWarn("register() falló — verifica google-services.json y build.gradle", e);
+    safeErr(
+      "register() lanzó excepción. Causas comunes:\n" +
+      "  • google-services.json no está en android/app/\n" +
+      "  • apply plugin: 'com.google.gms.google-services' falta en app/build.gradle\n" +
+      "  • MessagingService no declarado en AndroidManifest.xml",
+      e,
+    );
+    // NO relanzamos: la app sigue funcionando sin push nativo.
   }
 }
 
-/**
- * Asocia el dispositivo actual al jugador/sala.
- * Si el token aún no llegó (race con register()), queda encolado.
- */
+/* ─── attachPlayerToPush ─────────────────────────────────────────────────── */
+
 export async function attachPlayerToPush(
   roomCode: string,
   playerId: string,
@@ -202,14 +227,12 @@ export async function attachPlayerToPush(
       pendingRegistration = { roomCode, playerId };
     }
   } catch (e) {
-    safeWarn("attachPlayerToPush falló", e);
+    safeErr("attachPlayerToPush falló", e);
   }
 }
 
-/**
- * Envía push REAL via Edge Function `send-push` de Supabase.
- * Best-effort: no lanza si falla.
- */
+/* ─── sendNativePush ─────────────────────────────────────────────────────── */
+
 export async function sendNativePush(
   toPlayerId: string,
   payload: PushPayload,
@@ -230,9 +253,8 @@ export async function sendNativePush(
   } catch {}
 }
 
-export function getCurrentPushToken(): {
-  token: string | null;
-  platform: PushPlatform | null;
-} {
+/* ─── getCurrentPushToken ────────────────────────────────────────────────── */
+
+export function getCurrentPushToken(): { token: string | null; platform: PushPlatform | null } {
   return { token: cachedToken, platform: cachedPlatform };
 }

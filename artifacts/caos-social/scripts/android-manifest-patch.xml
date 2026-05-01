@@ -1,19 +1,40 @@
-<!-- AÑADIR al AndroidManifest.xml (android/app/src/main/AndroidManifest.xml) -->
-<!-- Pega los <uses-permission> ANTES de <application ...> -->
-<!-- Pega el <service> DENTRO de <application> ... </application> -->
+<!-- ═══════════════════════════════════════════════════════════════════════
+     PARCHE MANUAL para android/app/src/main/AndroidManifest.xml
+     Aplicar si patch-android.sh no está disponible.
+     ═══════════════════════════════════════════════════════════════════════ -->
 
-<!-- ═══ PERMISOS (antes de <application>) ═══════════════════════════════════ -->
+<!-- ① Añadir ANTES de <application ...>  ════════════════════════════════ -->
 <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 <uses-permission android:name="android.permission.VIBRATE" />
 <uses-permission android:name="android.permission.INTERNET" />
 <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-<!-- ═══ SERVICIO FCM (dentro de <application>) ══════════════════════════════ -->
+<!-- ② Añadir DENTRO de <application> ... </application>  ════════════════
+     IMPORTANTE: usar el nombre del plugin Capacitor, NO el de Firebase directo.
+     El plugin @capacitor/push-notifications registra su propio MessagingService
+     y lo conecta a FCM internamente. -->
 <service
-    android:name="com.google.firebase.messaging.FirebaseMessagingService"
+    android:name="com.capacitorjs.plugins.pushnotifications.MessagingService"
     android:exported="false">
     <intent-filter>
         <action android:name="com.google.firebase.MESSAGING_EVENT" />
     </intent-filter>
 </service>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     PARCHE MANUAL para android/app/build.gradle
+     Añadir AL FINAL del archivo (última línea):
+     ═══════════════════════════════════════════════════════════════════════
+
+     // Google Services — debe estar al final del archivo
+     apply plugin: 'com.google.gms.google-services'
+
+     ═══════════════════════════════════════════════════════════════════════
+     PARCHE MANUAL para android/build.gradle (raíz)
+     Añadir DENTRO del bloque buildscript > dependencies { ... }:
+     ═══════════════════════════════════════════════════════════════════════
+
+     classpath 'com.google.gms:google-services:4.4.2'
+
+     ═══════════════════════════════════════════════════════════════════════ -->
