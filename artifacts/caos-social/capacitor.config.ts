@@ -17,6 +17,8 @@ const config: CapacitorConfig = {
   plugins: {
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"],
+      // No pedir permisos automáticamente al arrancar: lo hace nativePush.ts
+      // con delay de 2 s para garantizar que Firebase está listo.
     },
     SplashScreen: {
       launchShowDuration: 1800,

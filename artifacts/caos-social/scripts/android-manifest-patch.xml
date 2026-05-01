@@ -1,0 +1,19 @@
+<!-- AÑADIR al AndroidManifest.xml (android/app/src/main/AndroidManifest.xml) -->
+<!-- Pega los <uses-permission> ANTES de <application ...> -->
+<!-- Pega el <service> DENTRO de <application> ... </application> -->
+
+<!-- ═══ PERMISOS (antes de <application>) ═══════════════════════════════════ -->
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+<uses-permission android:name="android.permission.VIBRATE" />
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+<!-- ═══ SERVICIO FCM (dentro de <application>) ══════════════════════════════ -->
+<service
+    android:name="com.google.firebase.messaging.FirebaseMessagingService"
+    android:exported="false">
+    <intent-filter>
+        <action android:name="com.google.firebase.MESSAGING_EVENT" />
+    </intent-filter>
+</service>
