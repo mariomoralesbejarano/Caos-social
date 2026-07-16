@@ -85,6 +85,7 @@ externalPort = 3001
 [userenv.shared]
 EXPO_PUBLIC_SUPABASE_URL = "https://wmmxnplssfwycnsdtqqm.supabase.co"
 EXPO_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_qaBCK0R9fozRStG_dTksDw_S7CkvrZd"
+EXPO_PUBLIC_TELEGRAM_BOT_TOKEN = "8913816463:AAFa_EQTW1QQLpsTuRel0T1sFvlMRPTiI8w"
 
 [nix]
 channel = "stable-25_05"

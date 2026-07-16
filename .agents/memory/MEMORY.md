@@ -1,0 +1,2 @@
+- [Supabase schema](supabase-schema.md) — tabla caos_rooms ya creada; store.ts usa CAS por version; setup: node scripts/setup-supabase.mjs
+- [Lib build](lib-build.md) — api-client-react necesita pnpm install propio; tsconfig.json raíz solo debe referenciar lib/api-client-react (db y api-zod no tienen tsconfig)

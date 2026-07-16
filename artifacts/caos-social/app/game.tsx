@@ -48,6 +48,7 @@ import { sendPushNotification, subscribeToPush } from "@/lib/push";
 import { attachPlayerToPush, sendNativePush } from "@/lib/nativePush";
 import { ChatPanel } from "@/components/ChatPanel";
 import { postSystemEvent } from "@/lib/chat";
+import { notifyCardThrown } from "@/lib/telegram";
 
 export default function GameScreen() {
   const colors = useColors();
@@ -273,6 +274,18 @@ export default function GameScreen() {
         body: `${me!.name} te ha lanzado: ${card?.title ?? "una carta"}`,
         tag: `throw-${targetId}-${Date.now()}`,
       });
+      // Notificación Telegram al grupo (fire-and-forget, falla en silencio).
+      if (card) {
+        const target = room!.players.find((p) => p.id === targetId);
+        notifyCardThrown({
+          fromName: me!.name,
+          toName: target?.name ?? "alguien",
+          cardTitle: card.title,
+          cardEffect: card.effect,
+          points: card.points,
+          roomCode: room!.code,
+        });
+      }
       setSelectedCard(null);
       setThrowTo(false);
       if (Platform.OS !== "web")
