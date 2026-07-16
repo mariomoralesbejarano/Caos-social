@@ -1,24 +1,20 @@
 /**
  * Telegram helpers: topics por sala + notificaciones de carta lanzada.
  *
- * Requiere (Expo env vars):
- *   EXPO_PUBLIC_TELEGRAM_BOT_TOKEN  — token del bot
- *   EXPO_PUBLIC_TELEGRAM_CHAT_ID    — ID del supergrupo (negativo, ej: -1004464995904)
+ * Metro/Expo SOLO inyecta variables EXPO_PUBLIC_* cuando se accede con
+ * notación de punto estática: process.env.EXPO_PUBLIC_FOO
+ * El acceso dinámico (process.env[key]) siempre devuelve undefined en el bundle.
  */
 
-function env(key: string): string {
-  if (typeof process !== "undefined" && process.env) {
-    return (process.env[key] as string | undefined) ?? "";
-  }
-  return "";
-}
+/* eslint-disable @typescript-eslint/no-explicit-any */
+declare const process: any;
 
 function getBotToken(): string {
-  return env("EXPO_PUBLIC_TELEGRAM_BOT_TOKEN") || env("TELEGRAM_BOT_TOKEN");
+  try { return process.env.EXPO_PUBLIC_TELEGRAM_BOT_TOKEN ?? ""; } catch { return ""; }
 }
 
 function getChatId(): string {
-  return env("EXPO_PUBLIC_TELEGRAM_CHAT_ID") || env("TELEGRAM_CHAT_ID");
+  try { return process.env.EXPO_PUBLIC_TELEGRAM_CHAT_ID ?? ""; } catch { return ""; }
 }
 
 /** Convierte -1004464995904 → 4464995904 para el formato t.me/c/ */
@@ -37,7 +33,11 @@ function escapeMarkdown(text: string): string {
 export async function createTelegramTopic(roomCode: string): Promise<number> {
   const token = getBotToken();
   const chatId = getChatId();
-  if (!token || !chatId) return 0;
+  console.log("[Telegram] createTelegramTopic →", { roomCode, hasToken: !!token, hasChatId: !!chatId });
+  if (!token || !chatId) {
+    console.warn("[Telegram] ⚠️ Faltan EXPO_PUBLIC_TELEGRAM_BOT_TOKEN o EXPO_PUBLIC_TELEGRAM_CHAT_ID");
+    return 0;
+  }
   try {
     const res = await fetch(
       `https://api.telegram.org/bot${token}/createForumTopic`,
@@ -47,22 +47,27 @@ export async function createTelegramTopic(roomCode: string): Promise<number> {
         body: JSON.stringify({
           chat_id: chatId,
           name: `🃏 Sala ${roomCode}`,
-          icon_color: 0xff93b2, // rosa neón
+          icon_color: 0xff93b2,
         }),
       },
     );
-    if (!res.ok) return 0;
-    const data = (await res.json()) as { ok: boolean; result?: { message_thread_id: number } };
+    const data = (await res.json()) as {
+      ok: boolean;
+      result?: { message_thread_id: number };
+      description?: string;
+    };
+    console.log("[Telegram] createForumTopic response:", JSON.stringify(data));
     if (data.ok && data.result) return data.result.message_thread_id;
+    console.warn("[Telegram] ❌ API error:", data.description ?? "no ok");
     return 0;
-  } catch {
+  } catch (e) {
+    console.error("[Telegram] fetch error:", e);
     return 0;
   }
 }
 
 /**
  * Devuelve el enlace directo al hilo de Telegram de la sala.
- * Si no hay threadId configurado, devuelve string vacío.
  */
 export function getTelegramTopicUrl(threadId: number): string {
   const chatId = getChatId();
@@ -109,5 +114,5 @@ export function notifyCardThrown(event: TelegramCardEvent): void {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  }).catch(() => {});
+  }).catch((e) => console.warn("[Telegram] notifyCardThrown error:", e));
 }

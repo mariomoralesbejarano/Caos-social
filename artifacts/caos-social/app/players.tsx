@@ -31,6 +31,100 @@ import { NeonButton } from "@/components/NeonButton";
 import { useRoom } from "@/contexts/RoomContext";
 import { useColors } from "@/hooks/useColors";
 
+// ── TelegramBlock ──────────────────────────────────────────────────────────
+function TelegramBlock({
+  room,
+  isOwner,
+  telegramMut,
+  onActivated,
+}: {
+  room: { code: string; telegramThreadId?: number };
+  isOwner: boolean;
+  telegramMut: ReturnType<typeof useActivateTelegramThread>;
+  onActivated: () => void;
+}) {
+  const threadId = room.telegramThreadId ?? 0;
+  const topicUrl = threadId > 0 ? getTelegramTopicUrl(threadId) : "";
+
+  if (threadId > 0) {
+    return (
+      <Pressable
+        onPress={() => {
+          console.log("[Telegram] Abriendo hilo:", topicUrl);
+          if (topicUrl) Linking.openURL(topicUrl);
+        }}
+        style={({ pressed }) => [telegramStyles.btn, { opacity: pressed ? 0.75 : 1 }]}
+      >
+        <Text style={telegramStyles.btnText}>📲 Ver avisos de la partida en Telegram</Text>
+        <Text style={telegramStyles.sub}>Cada carta lanzada aparecerá en el grupo</Text>
+      </Pressable>
+    );
+  }
+
+  if (isOwner) {
+    return (
+      <Pressable
+        onPress={() => {
+          console.log("[Telegram] Intentando activar Telegram para la sala:", room.code);
+          telegramMut.mutate({ code: room.code }, { onSuccess: onActivated });
+        }}
+        disabled={telegramMut.isPending}
+        style={({ pressed }) => [
+          telegramStyles.btn,
+          telegramStyles.btnInactive,
+          { opacity: telegramMut.isPending || pressed ? 0.6 : 1 },
+        ]}
+      >
+        <Text style={telegramStyles.btnText}>
+          {telegramMut.isPending ? "Creando hilo..." : "🃏 Activar avisos de partida en Telegram"}
+        </Text>
+        <Text style={telegramStyles.sub}>Crea un hilo privado para esta sala en vuestro grupo</Text>
+        {telegramMut.isError && (
+          <Text style={[telegramStyles.sub, { color: "#ff6b6b", marginTop: 4 }]}>
+            ❌ Error al crear hilo — revisa la consola
+          </Text>
+        )}
+      </Pressable>
+    );
+  }
+
+  return (
+    <View style={[telegramStyles.btn, telegramStyles.btnInactive, { opacity: 0.45 }]}>
+      <Text style={telegramStyles.btnText}>🕐 Esperando activación de Telegram por el anfitrión</Text>
+    </View>
+  );
+}
+
+const telegramStyles = StyleSheet.create({
+  btn: {
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "#2AABEE",
+    backgroundColor: "rgba(42,171,238,0.12)",
+    gap: 4,
+  },
+  btnInactive: {
+    borderColor: "#555",
+    backgroundColor: "rgba(80,80,80,0.15)",
+  },
+  btnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    letterSpacing: 0.5,
+    color: "#2AABEE",
+    textAlign: "center",
+  },
+  sub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "#888",
+    textAlign: "center",
+  },
+});
+// ───────────────────────────────────────────────────────────────────────────
+
 const TAG_INFO: { id: CardTag; label: string; desc: string }[] = [
   { id: "abstemio", label: "Abstemio", desc: "Sin cartas de beber" },
   { id: "pareja", label: "Con pareja", desc: "Sin cartas de ligar" },
@@ -399,63 +493,12 @@ export default function LobbyScreen() {
       )}
 
       {/* ── Bloque Telegram ──────────────────────────────────────── */}
-      {(() => {
-        const threadId = room.telegramThreadId ?? 0;
-        const topicUrl = threadId > 0 ? getTelegramTopicUrl(threadId) : "";
-        return (
-          <View style={styles.telegramBox}>
-            {threadId > 0 ? (
-              /* Hilo activo → botón de enlace */
-              <Pressable
-                onPress={() => topicUrl && Linking.openURL(topicUrl)}
-                style={({ pressed }) => [
-                  styles.telegramBtn,
-                  { opacity: pressed ? 0.75 : 1 },
-                ]}
-              >
-                <Text style={styles.telegramBtnText}>
-                  📲 Ver avisos de la partida en Telegram
-                </Text>
-                <Text style={styles.telegramSub}>
-                  Cada carta lanzada aparecerá en el grupo
-                </Text>
-              </Pressable>
-            ) : isOwner ? (
-              /* Hilo no creado → botón para activar (solo dueño) */
-              <Pressable
-                onPress={() => {
-                  telegramMut.mutate(
-                    { code: room.code },
-                    { onSuccess: () => invalidate() },
-                  );
-                }}
-                disabled={telegramMut.isPending}
-                style={({ pressed }) => [
-                  styles.telegramBtn,
-                  styles.telegramBtnInactive,
-                  { opacity: telegramMut.isPending || pressed ? 0.6 : 1 },
-                ]}
-              >
-                <Text style={styles.telegramBtnText}>
-                  {telegramMut.isPending
-                    ? "Creando hilo..."
-                    : "🃏 Activar avisos de partida en Telegram"}
-                </Text>
-                <Text style={styles.telegramSub}>
-                  Crea un hilo privado para esta sala en vuestro grupo
-                </Text>
-              </Pressable>
-            ) : (
-              /* Esperando a que el dueño active Telegram */
-              <View style={[styles.telegramBtn, styles.telegramBtnInactive, { opacity: 0.5 }]}>
-                <Text style={styles.telegramBtnText}>
-                  🕐 Esperando activación de Telegram por el anfitrión
-                </Text>
-              </View>
-            )}
-          </View>
-        );
-      })()}
+      <TelegramBlock
+        room={room}
+        isOwner={isOwner}
+        telegramMut={telegramMut}
+        onActivated={invalidate}
+      />
 
       {error && (
         <Text style={{ color: colors.destructive, textAlign: "center" }}>
@@ -615,35 +658,5 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     marginTop: 8,
-  },
-  telegramBox: {
-    borderRadius: 14,
-    overflow: "hidden",
-  },
-  telegramBtn: {
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: "#2AABEE",
-    backgroundColor: "rgba(42,171,238,0.12)",
-    gap: 4,
-  },
-  telegramBtnInactive: {
-    borderColor: "#555",
-    backgroundColor: "rgba(80,80,80,0.15)",
-  },
-  telegramBtnText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 13,
-    letterSpacing: 0.5,
-    color: "#2AABEE",
-    textAlign: "center",
-  },
-  telegramSub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: "#888",
-    textAlign: "center",
   },
 });
