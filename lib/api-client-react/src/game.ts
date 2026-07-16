@@ -153,6 +153,7 @@ export function createInitialRoom(opts: {
     endedAt: 0,
     createdAt: Date.now(),
     version: 1,
+    telegramThreadId: 0,
   };
   return { room, playerId: player.id };
 }
@@ -853,5 +854,6 @@ export function serializeRoom(room: Room, viewerId: string) {
     customCards: room.customCards,
     trophies: room.trophies,
     endedAt: room.endedAt,
+    telegramThreadId: room.telegramThreadId ?? 0,
   };
 }

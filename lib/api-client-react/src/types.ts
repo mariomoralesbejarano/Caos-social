@@ -113,6 +113,8 @@ export interface RoomState {
   customCards: GameCard[];
   trophies: Trophy[];
   endedAt: number;
+  /** ID del hilo de Telegram creado para esta sala (0 = no creado). */
+  telegramThreadId?: number;
 }
 
 // ----- Internal (what is stored in supabase JSONB) -----
@@ -152,6 +154,8 @@ export interface Room {
   endedAt: number;
   createdAt: number;
   version: number;
+  /** ID del hilo de Telegram creado para esta sala (0 = no creado aún). */
+  telegramThreadId?: number;
 }
 
 export type RespondAction =

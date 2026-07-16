@@ -2,6 +2,8 @@ import { Feather } from "@expo/vector-icons";
 import {
   CardTag,
   getGetRoomQueryKey,
+  getTelegramTopicUrl,
+  useActivateTelegramThread,
   useAddCustomCard,
   useLeaveRoom,
   useResetRoom,
@@ -10,6 +12,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
+import { Linking } from "react-native";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -47,6 +50,7 @@ export default function LobbyScreen() {
   const resetMut = useResetRoom();
   const customMut = useAddCustomCard();
   const leaveMut = useLeaveRoom();
+  const telegramMut = useActivateTelegramThread();
   const [error, setError] = useState<string | null>(null);
   const [ccTitle, setCcTitle] = useState("");
   const [ccEffect, setCcEffect] = useState("");
@@ -394,6 +398,65 @@ export default function LobbyScreen() {
         </View>
       )}
 
+      {/* ── Bloque Telegram ──────────────────────────────────────── */}
+      {(() => {
+        const threadId = room.telegramThreadId ?? 0;
+        const topicUrl = threadId > 0 ? getTelegramTopicUrl(threadId) : "";
+        return (
+          <View style={styles.telegramBox}>
+            {threadId > 0 ? (
+              /* Hilo activo → botón de enlace */
+              <Pressable
+                onPress={() => topicUrl && Linking.openURL(topicUrl)}
+                style={({ pressed }) => [
+                  styles.telegramBtn,
+                  { opacity: pressed ? 0.75 : 1 },
+                ]}
+              >
+                <Text style={styles.telegramBtnText}>
+                  📲 Ver avisos de la partida en Telegram
+                </Text>
+                <Text style={styles.telegramSub}>
+                  Cada carta lanzada aparecerá en el grupo
+                </Text>
+              </Pressable>
+            ) : isOwner ? (
+              /* Hilo no creado → botón para activar (solo dueño) */
+              <Pressable
+                onPress={() => {
+                  telegramMut.mutate(
+                    { code: room.code },
+                    { onSuccess: () => invalidate() },
+                  );
+                }}
+                disabled={telegramMut.isPending}
+                style={({ pressed }) => [
+                  styles.telegramBtn,
+                  styles.telegramBtnInactive,
+                  { opacity: telegramMut.isPending || pressed ? 0.6 : 1 },
+                ]}
+              >
+                <Text style={styles.telegramBtnText}>
+                  {telegramMut.isPending
+                    ? "Creando hilo..."
+                    : "🃏 Activar avisos de partida en Telegram"}
+                </Text>
+                <Text style={styles.telegramSub}>
+                  Crea un hilo privado para esta sala en vuestro grupo
+                </Text>
+              </Pressable>
+            ) : (
+              /* Esperando a que el dueño active Telegram */
+              <View style={[styles.telegramBtn, styles.telegramBtnInactive, { opacity: 0.5 }]}>
+                <Text style={styles.telegramBtnText}>
+                  🕐 Esperando activación de Telegram por el anfitrión
+                </Text>
+              </View>
+            )}
+          </View>
+        );
+      })()}
+
       {error && (
         <Text style={{ color: colors.destructive, textAlign: "center" }}>
           {error}
@@ -552,5 +615,35 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     marginTop: 8,
+  },
+  telegramBox: {
+    borderRadius: 14,
+    overflow: "hidden",
+  },
+  telegramBtn: {
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "#2AABEE",
+    backgroundColor: "rgba(42,171,238,0.12)",
+    gap: 4,
+  },
+  telegramBtnInactive: {
+    borderColor: "#555",
+    backgroundColor: "rgba(80,80,80,0.15)",
+  },
+  telegramBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    letterSpacing: 0.5,
+    color: "#2AABEE",
+    textAlign: "center",
+  },
+  telegramSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "#888",
+    textAlign: "center",
   },
 });

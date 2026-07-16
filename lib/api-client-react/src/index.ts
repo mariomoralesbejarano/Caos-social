@@ -36,6 +36,7 @@ import {
   mutateRoom,
 } from "./store";
 import { broadcastRoomEvent, getRoomChannel, getSupabase, ROOMS_TABLE } from "./supabase";
+import { createTelegramTopic, notifyCardThrown, getTelegramTopicUrl } from "./telegram";
 import type {
   CardTag,
   GameCard,
@@ -56,6 +57,8 @@ export {
 } from "./supabase";
 export type { RoomBroadcastEvent } from "./supabase";
 export { existsRoom };
+export { createTelegramTopic, notifyCardThrown, getTelegramTopicUrl } from "./telegram";
+export type { TelegramCardEvent } from "./telegram";
 
 export function useSpectatorJoin() {
   return useMutation({
@@ -204,7 +207,34 @@ export function useCreateRoom() {
         role: data.role,
       });
       await insertRoom(room);
+      // Crear hilo de Telegram para esta sala (best-effort, no bloquea).
+      const threadId = await createTelegramTopic(code);
+      if (threadId > 0) {
+        await mutateRoom(code, (r) => {
+          r.telegramThreadId = threadId;
+          r.version += 1;
+          return r;
+        });
+        room.telegramThreadId = threadId;
+      }
       return { playerId, room: serializeRoom(room, playerId) };
+    },
+  });
+}
+
+/** Hook para activar/reactivar el hilo de Telegram desde el lobby. */
+export function useActivateTelegramThread() {
+  return useMutation({
+    mutationFn: async ({ code }: { code: string }) => {
+      const threadId = await createTelegramTopic(code);
+      if (threadId > 0) {
+        await mutateRoom(code, (r) => {
+          r.telegramThreadId = threadId;
+          r.version += 1;
+          return r;
+        });
+      }
+      return threadId;
     },
   });
 }

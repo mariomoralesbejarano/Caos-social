@@ -274,7 +274,7 @@ export default function GameScreen() {
         body: `${me!.name} te ha lanzado: ${card?.title ?? "una carta"}`,
         tag: `throw-${targetId}-${Date.now()}`,
       });
-      // Notificación Telegram al grupo (fire-and-forget, falla en silencio).
+      // Notificación Telegram al hilo de la sala (fire-and-forget).
       if (card) {
         const target = room!.players.find((p) => p.id === targetId);
         notifyCardThrown({
@@ -284,6 +284,7 @@ export default function GameScreen() {
           cardEffect: card.effect,
           points: card.points,
           roomCode: room!.code,
+          threadId: room!.telegramThreadId ?? 0,
         });
       }
       setSelectedCard(null);
