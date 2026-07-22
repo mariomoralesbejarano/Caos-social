@@ -2,6 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import {
   GameCard,
   PendingThrow,
+  RECEIVER_COOLDOWN_MS,
   RoomPlayer,
   cardCooldownMs,
   getGetRoomQueryKey,
@@ -167,10 +168,8 @@ export default function GameScreen() {
 
   useEffect(() => {
     if (!session) router.replace("/");
-    else if (room && room.status !== "active") router.replace("/players");
-    // Asocia este dispositivo (token push ya cacheado por initNativePush)
-    // con el jugador actual para que la Edge Function pueda enviarle
-    // notificaciones reales con la app cerrada.
+    else if (room && room.status === "lobby") router.replace("/players");
+    // room.status === "ended" is handled inline with victory banner
     else if (session) {
       void attachPlayerToPush(session.roomCode, session.playerId);
     }
@@ -181,6 +180,55 @@ export default function GameScreen() {
       <View style={[styles.center, { backgroundColor: colors.background }]}>
         <ActivityIndicator color={colors.primary} />
       </View>
+    );
+  }
+
+  // Victory screen when game ends
+  if (room.status === "ended") {
+    const sorted = [...room.players].sort((a, b) => b.score - a.score);
+    const medals = ["🥇", "🥈", "🥉"];
+    return (
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.background }}
+        contentContainerStyle={{ padding: 24, gap: 18, paddingTop: (isWeb ? 67 : insets.top) + 24, paddingBottom: (isWeb ? 34 : insets.bottom) + 40 }}
+      >
+        <Text style={{ fontFamily: "Inter_700Bold", fontSize: 40, textAlign: "center", color: colors.primary, letterSpacing: -1 }}>🏆 PARTIDA{"\n"}TERMINADA</Text>
+        <View style={{ gap: 8 }}>
+          {sorted.map((p, i) => (
+            <View key={p.id} style={{ flexDirection: "row", alignItems: "center", gap: 14, padding: 14, borderRadius: 12, borderWidth: 2, borderColor: i === 0 ? colors.primary : colors.border, backgroundColor: i === 0 ? colors.primary + "15" : colors.card }}>
+              <Text style={{ fontSize: 28 }}>{medals[i] ?? "🎖️"}</Text>
+              <Text style={{ fontSize: 22 }}>{p.avatar || "👤"}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 16 }}>{p.name}</Text>
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                  {p.challengesCompleted} retos cumplidos
+                </Text>
+              </View>
+              <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 22 }}>{p.score}</Text>
+            </View>
+          ))}
+        </View>
+        {room.trophies.length > 0 && (
+          <>
+            <Text style={{ color: colors.secondary, fontFamily: "Inter_700Bold", fontSize: 13, letterSpacing: 2, marginTop: 8 }}>TROFEOS DEL CAOS</Text>
+            {room.trophies.map((t) => (
+              <View key={t.playerId + t.title} style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card }}>
+                <Text style={{ fontSize: 24 }}>{t.emoji}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 13 }}>{t.title}</Text>
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>{t.playerName} · {t.description}</Text>
+                </View>
+              </View>
+            ))}
+          </>
+        )}
+        <Pressable
+          onPress={() => router.replace("/players")}
+          style={{ paddingVertical: 14, borderRadius: 12, borderWidth: 2, borderColor: colors.primary, alignItems: "center", marginTop: 8 }}
+        >
+          <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 15, letterSpacing: 1 }}>VOLVER AL LOBBY</Text>
+        </Pressable>
+      </ScrollView>
     );
   }
 
@@ -536,7 +584,7 @@ export default function GameScreen() {
                     ]}
                   >
                     <Text style={[styles.inboxFrom, { color: colors.primary }]}>
-                      ⚖️ TÚ ERES EL JUEZ · {mins}:{secs.toString().padStart(2, "0")}
+                      ⚖️ TÚ LANZASTE ESTA CARTA · {mins}:{secs.toString().padStart(2, "0")}
                     </Text>
                     <Text style={[styles.inboxCard, { color: colors.foreground }]}>
                       {owner?.name ?? "?"} dice haber cumplido{" "}
@@ -585,7 +633,7 @@ export default function GameScreen() {
                     <Text
                       style={[styles.inboxFrom, { color: colors.mutedForeground }]}
                     >
-                      Esperando veredicto de {judge?.name ?? "el juez"} · {mins}:
+                      Esperando veredicto de {judge?.name ?? "el lanzador"} · {mins}:
                       {secs.toString().padStart(2, "0")}
                     </Text>
                     <Text style={[styles.inboxCard, { color: colors.foreground }]}>
@@ -860,9 +908,11 @@ export default function GameScreen() {
               const cdKey = `${session.playerId}->${p.id}`;
               const cdEndsAt = room.cooldowns[cdKey] ?? 0;
               const cd = Math.max(0, cdEndsAt - Date.now());
+              const recvCdEndsAt = room.cooldowns[`recv:${p.id}`] ?? 0;
+              const recvCd = Math.max(0, recvCdEndsAt - Date.now());
               const shielded = p.shieldUntil > Date.now();
-              const disabled = cd > 0 || shielded;
-              // Tipo de cooldown basado en la carta seleccionada
+              const recvProtected = recvCd > 0;
+              const disabled = cd > 0 || shielded || recvProtected;
               const selCard = room.myHand.find((c) => c.id === selectedCard);
               const cdLabel = selCard
                 ? (() => {
@@ -895,12 +945,14 @@ export default function GameScreen() {
                     )}
                   </View>
                   {shielded ? (
+                    <Text style={{ color: colors.secondary, fontSize: 11 }}>ESCUDO</Text>
+                  ) : recvProtected ? (
                     <Text style={{ color: colors.secondary, fontSize: 11 }}>
-                      ESCUDO
+                      🛡️ {Math.ceil(recvCd / 60000)}m protección
                     </Text>
                   ) : cd > 0 ? (
                     <Text style={{ color: colors.destructive, fontSize: 11 }}>
-                      {Math.ceil(cd / 60000)}m restante
+                      {Math.ceil(cd / 60000)}m espera
                     </Text>
                   ) : (
                     <Feather name="zap" size={16} color={colors.primary} />

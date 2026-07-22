@@ -16,6 +16,8 @@ import {
   applyThrowCard,
   applyUsePower,
   applyVerifyVote,
+  applyToggleCard,
+  applyEditCard,
   cardCooldownMs,
   createInitialRoom,
   generateCode,
@@ -25,9 +27,10 @@ import {
   COOLDOWN_MS,
   PANIC_WINDOW_MS,
   VERIFY_WINDOW_MS,
+  RECEIVER_COOLDOWN_MS,
 } from "./game";
 
-export { cardCooldownMs, COOLDOWN_CHILL_MS, COOLDOWN_NORMAL_MS, COOLDOWN_MS, PANIC_WINDOW_MS, VERIFY_WINDOW_MS };
+export { cardCooldownMs, COOLDOWN_CHILL_MS, COOLDOWN_NORMAL_MS, COOLDOWN_MS, PANIC_WINDOW_MS, VERIFY_WINDOW_MS, RECEIVER_COOLDOWN_MS };
 import {
   existsRoom,
   gcRooms,
@@ -183,6 +186,8 @@ interface MutateOpts {
     tags?: CardTag[];
     avatar?: string;
     role?: string;
+    pointLimit?: number;
+    gameTimerMs?: number;
   };
 }
 
@@ -205,6 +210,8 @@ export function useCreateRoom() {
         tags: data.tags,
         avatar: data.avatar,
         role: data.role,
+        pointLimit: data.pointLimit,
+        gameTimerMs: data.gameTimerMs,
       });
       await insertRoom(room);
       // Crear hilo de Telegram para esta sala (best-effort, no bloquea).
@@ -400,6 +407,18 @@ export const useAddCustomCard = makeSimpleMutation<{
     points: b.points,
   }),
 );
+
+export const useToggleCard = makeSimpleMutation<{
+  playerId: string;
+  cardId: string;
+}>((room, b) => applyToggleCard(room, b.playerId, b.cardId));
+
+export const useEditCard = makeSimpleMutation<{
+  playerId: string;
+  cardId: string;
+  title: string;
+  effect: string;
+}>((room, b) => applyEditCard(room, b.playerId, b.cardId, { title: b.title, effect: b.effect }));
 
 export const useUsePower = makeSimpleMutation<{
   playerId: string;

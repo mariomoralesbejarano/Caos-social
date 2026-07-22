@@ -1,14 +1,17 @@
 import { Feather } from "@expo/vector-icons";
 import {
+  ALL_CARDS,
   CardTag,
+  GameCard,
   getGetRoomQueryKey,
-  getTelegramTopicUrl,
-  useActivateTelegramThread,
+  getPackCardIds,
   useAddCustomCard,
+  useEditCard,
   useLeaveRoom,
   useResetRoom,
   useSetMyTags,
   useStartGame,
+  useToggleCard,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
@@ -16,6 +19,7 @@ import { Linking } from "react-native";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -31,67 +35,18 @@ import { NeonButton } from "@/components/NeonButton";
 import { useRoom } from "@/contexts/RoomContext";
 import { useColors } from "@/hooks/useColors";
 
-// ── TelegramBlock ──────────────────────────────────────────────────────────
-function TelegramBlock({
-  room,
-  isOwner,
-  telegramMut,
-  onActivated,
-}: {
-  room: { code: string; telegramThreadId?: number };
-  isOwner: boolean;
-  telegramMut: ReturnType<typeof useActivateTelegramThread>;
-  onActivated: () => void;
-}) {
-  const threadId = room.telegramThreadId ?? 0;
-  const topicUrl = threadId > 0 ? getTelegramTopicUrl(threadId) : "";
+const TELEGRAM_INVITE_URL = "https://t.me/+UW7Ayt57Qm04NmY0";
 
-  if (threadId > 0) {
-    return (
-      <Pressable
-        onPress={() => {
-          console.log("[Telegram] Abriendo hilo:", topicUrl);
-          if (topicUrl) Linking.openURL(topicUrl);
-        }}
-        style={({ pressed }) => [telegramStyles.btn, { opacity: pressed ? 0.75 : 1 }]}
-      >
-        <Text style={telegramStyles.btnText}>📲 Ver avisos de la partida en Telegram</Text>
-        <Text style={telegramStyles.sub}>Cada carta lanzada aparecerá en el grupo</Text>
-      </Pressable>
-    );
-  }
-
-  if (isOwner) {
-    return (
-      <Pressable
-        onPress={() => {
-          console.log("[Telegram] Intentando activar Telegram para la sala:", room.code);
-          telegramMut.mutate({ code: room.code }, { onSuccess: onActivated });
-        }}
-        disabled={telegramMut.isPending}
-        style={({ pressed }) => [
-          telegramStyles.btn,
-          telegramStyles.btnInactive,
-          { opacity: telegramMut.isPending || pressed ? 0.6 : 1 },
-        ]}
-      >
-        <Text style={telegramStyles.btnText}>
-          {telegramMut.isPending ? "Creando hilo..." : "🃏 Activar avisos de partida en Telegram"}
-        </Text>
-        <Text style={telegramStyles.sub}>Crea un hilo privado para esta sala en vuestro grupo</Text>
-        {telegramMut.isError && (
-          <Text style={[telegramStyles.sub, { color: "#ff6b6b", marginTop: 4 }]}>
-            ❌ Error al crear hilo — revisa la consola
-          </Text>
-        )}
-      </Pressable>
-    );
-  }
-
+// ── TelegramInviteButton ───────────────────────────────────────────────────
+function TelegramInviteButton() {
   return (
-    <View style={[telegramStyles.btn, telegramStyles.btnInactive, { opacity: 0.45 }]}>
-      <Text style={telegramStyles.btnText}>🕐 Esperando activación de Telegram por el anfitrión</Text>
-    </View>
+    <Pressable
+      onPress={() => Linking.openURL(TELEGRAM_INVITE_URL)}
+      style={({ pressed }) => [telegramStyles.btn, { opacity: pressed ? 0.75 : 1 }]}
+    >
+      <Text style={telegramStyles.btnText}>📲 Unirse al grupo de Telegram</Text>
+      <Text style={telegramStyles.sub}>Recibe avisos de la partida en tiempo real</Text>
+    </Pressable>
   );
 }
 
@@ -104,10 +59,6 @@ const telegramStyles = StyleSheet.create({
     borderColor: "#2AABEE",
     backgroundColor: "rgba(42,171,238,0.12)",
     gap: 4,
-  },
-  btnInactive: {
-    borderColor: "#555",
-    backgroundColor: "rgba(80,80,80,0.15)",
   },
   btnText: {
     fontFamily: "Inter_700Bold",
@@ -123,6 +74,173 @@ const telegramStyles = StyleSheet.create({
     textAlign: "center",
   },
 });
+// ───────────────────────────────────────────────────────────────────────────
+
+// ── CardManager ────────────────────────────────────────────────────────────
+function CardManager({
+  room,
+  session,
+  onClose,
+  onChanged,
+}: {
+  room: import("@workspace/api-client-react").RoomState;
+  session: { playerId: string; roomCode: string };
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const colors = useColors();
+  const toggleMut = useToggleCard();
+  const editMut = useEditCard();
+
+  const [editingCard, setEditingCard] = useState<GameCard | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editEffect, setEditEffect] = useState("");
+  const [filterPack, setFilterPack] = useState<string | null>(null);
+
+  const isOwner = room.ownerId === session.playerId;
+
+  // Collect all cards from selected packs
+  const packCards: { packId: string; cards: GameCard[] }[] = (room.packs ?? [room.pack]).map((packId) => {
+    const ids = getPackCardIds(packId);
+    const cards = ids.map((id) => {
+      const override = room.cardOverrides?.[id];
+      const base = ALL_CARDS.find((c) => c.id === id);
+      if (!base) return null;
+      return override ? { ...base, title: override.title, effect: override.effect } : base;
+    }).filter(Boolean) as GameCard[];
+    return { packId, cards };
+  });
+
+  const packs = filterPack ? packCards.filter((p) => p.packId === filterPack) : packCards;
+  const disabled = new Set(room.disabledCards ?? []);
+
+  function handleToggle(cardId: string) {
+    toggleMut.mutate(
+      { code: room.code, data: { playerId: session.playerId, cardId } },
+      { onSuccess: onChanged },
+    );
+  }
+
+  function openEdit(card: GameCard) {
+    setEditingCard(card);
+    setEditTitle(card.title);
+    setEditEffect(card.effect);
+  }
+
+  function handleSaveEdit() {
+    if (!editingCard) return;
+    editMut.mutate(
+      { code: room.code, data: { playerId: session.playerId, cardId: editingCard.id, title: editTitle, effect: editEffect } },
+      { onSuccess: () => { setEditingCard(null); onChanged(); } },
+    );
+  }
+
+  return (
+    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.92)" }}>
+        {/* Header */}
+        <View style={{ flexDirection: "row", alignItems: "center", padding: 20, paddingTop: 60, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+          <Text style={{ flex: 1, color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 18 }}>🃏 Gestor de Cartas</Text>
+          <Pressable onPress={onClose} hitSlop={10}>
+            <Feather name="x" size={24} color={colors.foreground} />
+          </Pressable>
+        </View>
+        {/* Pack filter */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 48 }} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8 }}>
+          <Pressable
+            onPress={() => setFilterPack(null)}
+            style={{ paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: !filterPack ? colors.primary : colors.border, backgroundColor: !filterPack ? colors.primary + "22" : "transparent" }}
+          >
+            <Text style={{ color: !filterPack ? colors.primary : colors.mutedForeground, fontFamily: "Inter_700Bold", fontSize: 11 }}>TODOS</Text>
+          </Pressable>
+          {(room.packs ?? [room.pack]).map((p) => (
+            <Pressable
+              key={p}
+              onPress={() => setFilterPack(filterPack === p ? null : p)}
+              style={{ paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: filterPack === p ? colors.primary : colors.border, backgroundColor: filterPack === p ? colors.primary + "22" : "transparent" }}
+            >
+              <Text style={{ color: filterPack === p ? colors.primary : colors.mutedForeground, fontFamily: "Inter_700Bold", fontSize: 11 }}>{p.toUpperCase()}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+        {/* Cards list */}
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 8 }}>
+          {packs.map(({ packId, cards }) => (
+            <View key={packId}>
+              <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 1.5, marginBottom: 8, marginTop: 8 }}>
+                {packId.toUpperCase()} · {cards.length} cartas
+              </Text>
+              {cards.map((card) => {
+                const isDisabled = disabled.has(card.id);
+                const hasOverride = !!room.cardOverrides?.[card.id];
+                return (
+                  <View key={card.id} style={{ flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: isDisabled ? colors.border : colors.primary + "55", backgroundColor: isDisabled ? "rgba(80,80,80,0.1)" : "rgba(57,255,20,0.04)", marginBottom: 6 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: isDisabled ? colors.mutedForeground : colors.foreground, fontFamily: "Inter_700Bold", fontSize: 13, opacity: isDisabled ? 0.5 : 1 }}>
+                        {card.title} {hasOverride ? "✏️" : ""}
+                      </Text>
+                      <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 2, opacity: isDisabled ? 0.4 : 0.8 }} numberOfLines={2}>
+                        {card.effect}
+                      </Text>
+                    </View>
+                    {isOwner && (
+                      <>
+                        <Pressable onPress={() => openEdit(card)} hitSlop={8}>
+                          <Feather name="edit-2" size={14} color={colors.mutedForeground} />
+                        </Pressable>
+                        <Pressable onPress={() => handleToggle(card.id)} hitSlop={8}>
+                          <Feather name={isDisabled ? "toggle-left" : "toggle-right"} size={22} color={isDisabled ? colors.border : colors.primary} />
+                        </Pressable>
+                      </>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          ))}
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11, textAlign: "center", marginTop: 16 }}>
+            {disabled.size} cartas desactivadas · activa/desactiva antes de empezar
+          </Text>
+        </ScrollView>
+        {/* Edit modal */}
+        {editingCard && (
+          <Modal visible animationType="fade" transparent onRequestClose={() => setEditingCard(null)}>
+            <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.9)", justifyContent: "center", padding: 24 }}>
+              <View style={{ backgroundColor: colors.card, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: colors.secondary, gap: 12 }}>
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 16 }}>✏️ Editar carta</Text>
+                <TextInput
+                  value={editTitle}
+                  onChangeText={setEditTitle}
+                  placeholder="Título"
+                  placeholderTextColor={colors.mutedForeground}
+                  maxLength={80}
+                  style={{ color: colors.foreground, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 10, fontFamily: "Inter_500Medium", backgroundColor: colors.background }}
+                />
+                <TextInput
+                  value={editEffect}
+                  onChangeText={setEditEffect}
+                  placeholder="Efecto/descripción"
+                  placeholderTextColor={colors.mutedForeground}
+                  maxLength={250}
+                  multiline
+                  style={{ color: colors.foreground, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 10, fontFamily: "Inter_400Regular", backgroundColor: colors.background, minHeight: 80, textAlignVertical: "top" }}
+                />
+                <View style={{ flexDirection: "row", gap: 10 }}>
+                  <Pressable onPress={() => setEditingCard(null)} style={{ flex: 1, paddingVertical: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border, alignItems: "center" }}>
+                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_700Bold" }}>Cancelar</Text>
+                  </Pressable>
+                  <Pressable onPress={handleSaveEdit} disabled={editMut.isPending} style={{ flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: colors.secondary, alignItems: "center" }}>
+                    <Text style={{ color: "#000", fontFamily: "Inter_700Bold" }}>{editMut.isPending ? "..." : "Guardar"}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        )}
+      </View>
+    </Modal>
+  );
+}
 // ───────────────────────────────────────────────────────────────────────────
 
 const TAG_INFO: { id: CardTag; label: string; desc: string }[] = [
@@ -144,11 +262,11 @@ export default function LobbyScreen() {
   const resetMut = useResetRoom();
   const customMut = useAddCustomCard();
   const leaveMut = useLeaveRoom();
-  const telegramMut = useActivateTelegramThread();
   const [error, setError] = useState<string | null>(null);
   const [ccTitle, setCcTitle] = useState("");
   const [ccEffect, setCcEffect] = useState("");
   const [ccPoints, setCcPoints] = useState("2");
+  const [cardManagerOpen, setCardManagerOpen] = useState(false);
 
   // If active, send to game
   useEffect(() => {
@@ -366,9 +484,9 @@ export default function LobbyScreen() {
                     </Text>
                   )}
                 </Text>
-                {(p.role || p.tags.length > 0) && (
+                {p.tags.length > 0 && (
                   <Text style={[styles.pTags, { color: colors.mutedForeground }]}>
-                    {[p.role, ...p.tags].filter(Boolean).join(" · ")}
+                    {p.tags.join(" · ")}
                   </Text>
                 )}
               </View>
@@ -378,9 +496,9 @@ export default function LobbyScreen() {
       </View>
 
       <View style={styles.sectionHead}>
-        <Feather name="user" size={18} color={colors.secondary} />
+        <Feather name="tag" size={18} color={colors.secondary} />
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-          Tu rol
+          Tus preferencias
         </Text>
       </View>
 
@@ -416,6 +534,33 @@ export default function LobbyScreen() {
           );
         })}
       </View>
+
+      {isOwner && room.status === "lobby" && (
+        <Pressable
+          onPress={() => setCardManagerOpen(true)}
+          style={[styles.creatorBox, { borderColor: colors.primary, backgroundColor: colors.card, flexDirection: "row", alignItems: "center", gap: 12 }]}
+        >
+          <Feather name="layers" size={22} color={colors.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground, fontSize: 14 }]}>
+              Gestor de Cartas
+            </Text>
+            <Text style={[styles.pTags, { color: colors.mutedForeground }]}>
+              Activa, desactiva y edita cartas del mazo · {(room.disabledCards?.length ?? 0) > 0 ? `${room.disabledCards.length} desactivadas` : "todas activas"}
+            </Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+        </Pressable>
+      )}
+
+      {cardManagerOpen && session && (
+        <CardManager
+          room={room}
+          session={{ playerId: session.playerId, roomCode: session.roomCode }}
+          onClose={() => setCardManagerOpen(false)}
+          onChanged={invalidate}
+        />
+      )}
 
       {isOwner && room.status === "lobby" && (
         <View
@@ -492,13 +637,8 @@ export default function LobbyScreen() {
         </View>
       )}
 
-      {/* ── Bloque Telegram ──────────────────────────────────────── */}
-      <TelegramBlock
-        room={room}
-        isOwner={isOwner}
-        telegramMut={telegramMut}
-        onActivated={invalidate}
-      />
+      {/* ── Invitación Telegram ──────────────────────────────────── */}
+      <TelegramInviteButton />
 
       {error && (
         <Text style={{ color: colors.destructive, textAlign: "center" }}>

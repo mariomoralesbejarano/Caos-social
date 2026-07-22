@@ -34,12 +34,18 @@ const TAGS: { id: CardTag; label: string }[] = [
 
 const AVATARS = ["🦄", "🐙", "🦊", "🐲", "🦋", "🐸", "🦝", "🐼", "🦖", "🐺", "👻", "🤖"];
 
-const ROLES: { id: string; label: string; emoji: string; tag?: CardTag }[] = [
-  { id: "infiltrado", label: "Infiltrado", emoji: "🕶️" },
-  { id: "juez", label: "Juez", emoji: "⚖️" },
-  { id: "victima", label: "Víctima", emoji: "🎯" },
-  { id: "fotografo", label: "Fotógrafo", emoji: "📸" },
-  { id: "abstemio", label: "Abstemio", emoji: "🚫", tag: "abstemio" },
+const POINT_LIMITS = [
+  { value: 0, label: "Sin límite" },
+  { value: 50, label: "50 pts" },
+  { value: 100, label: "100 pts" },
+  { value: 200, label: "200 pts" },
+];
+
+const GAME_TIMERS = [
+  { value: 0, label: "Sin tiempo" },
+  { value: 30 * 60 * 1000, label: "30 min" },
+  { value: 60 * 60 * 1000, label: "60 min" },
+  { value: 90 * 60 * 1000, label: "90 min" },
 ];
 
 export default function HomeScreen() {
@@ -55,18 +61,13 @@ export default function HomeScreen() {
   const [packs, setPacks] = useState<PackId[]>(["banco"]);
   const [tags, setTags] = useState<CardTag[]>([]);
   const [avatar, setAvatar] = useState<string>(AVATARS[0]);
-  const [role, setRole] = useState<string>("infiltrado");
+  const [pointLimit, setPointLimit] = useState<number>(0);
+  const [gameTimerMs, setGameTimerMs] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
 
   const createMut = useCreateRoom();
   const joinMut = useJoinRoom();
   const spectateMut = useSpectatorJoin();
-
-  function effectiveTags(): CardTag[] {
-    const r = ROLES.find((x) => x.id === role);
-    if (r?.tag && !tags.includes(r.tag)) return [...tags, r.tag];
-    return tags;
-  }
 
   // If session already loaded, jump to right screen
   useEffect(() => {
@@ -98,14 +99,13 @@ export default function HomeScreen() {
         return;
       }
       const res = await createMut.mutateAsync({
-        data: { name: name.trim(), packs, tags: effectiveTags(), avatar, role },
+        data: { name: name.trim(), packs, tags, avatar, pointLimit, gameTimerMs },
       });
       await setSession({
         roomCode: res.room.code,
         playerId: res.playerId,
         name: name.trim(),
         avatar,
-        role,
       });
       router.replace("/players");
     } catch (e) {
@@ -122,14 +122,13 @@ export default function HomeScreen() {
     try {
       const res = await joinMut.mutateAsync({
         code: code.trim().toUpperCase(),
-        data: { name: name.trim(), tags: effectiveTags(), avatar, role },
+        data: { name: name.trim(), tags, avatar },
       });
       await setSession({
         roomCode: res.room.code,
         playerId: res.playerId,
         name: name.trim(),
         avatar,
-        role,
       });
       router.replace(res.room.status === "active" ? "/game" : "/players");
     } catch (e) {
@@ -318,40 +317,6 @@ export default function HomeScreen() {
 
       <View style={styles.section}>
         <Text style={[styles.label, { color: colors.mutedForeground }]}>
-          ROL EN LA PARTIDA
-        </Text>
-        <View style={styles.tagRow}>
-          {ROLES.map((r) => {
-            const active = r.id === role;
-            return (
-              <Pressable
-                key={r.id}
-                onPress={() => setRole(r.id)}
-                style={[
-                  styles.roleChip,
-                  {
-                    borderColor: active ? colors.secondary : colors.border,
-                    backgroundColor: active ? colors.secondary + "22" : "transparent",
-                  },
-                ]}
-              >
-                <Text style={styles.roleEmoji}>{r.emoji}</Text>
-                <Text
-                  style={[
-                    styles.tagChipText,
-                    { color: active ? colors.secondary : colors.mutedForeground },
-                  ]}
-                >
-                  {r.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={[styles.label, { color: colors.mutedForeground }]}>
           EXTRAS (opcional)
         </Text>
         <View style={styles.tagRow}>
@@ -382,6 +347,60 @@ export default function HomeScreen() {
           })}
         </View>
       </View>
+
+      {mode === "create" && (
+        <View style={styles.section}>
+          <Text style={[styles.label, { color: colors.mutedForeground }]}>
+            CONDICIÓN DE VICTORIA · (opcional)
+          </Text>
+          <Text style={[styles.sublabel, { color: colors.mutedForeground }]}>Límite de puntos</Text>
+          <View style={styles.tagRow}>
+            {POINT_LIMITS.map((opt) => {
+              const active = pointLimit === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  onPress={() => setPointLimit(opt.value)}
+                  style={[
+                    styles.tagChip,
+                    {
+                      borderColor: active ? colors.secondary : colors.border,
+                      backgroundColor: active ? colors.secondary + "22" : "transparent",
+                    },
+                  ]}
+                >
+                  <Text style={[styles.tagChipText, { color: active ? colors.secondary : colors.mutedForeground }]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={[styles.sublabel, { color: colors.mutedForeground }]}>Temporizador de partida</Text>
+          <View style={styles.tagRow}>
+            {GAME_TIMERS.map((opt) => {
+              const active = gameTimerMs === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  onPress={() => setGameTimerMs(opt.value)}
+                  style={[
+                    styles.tagChip,
+                    {
+                      borderColor: active ? colors.secondary : colors.border,
+                      backgroundColor: active ? colors.secondary + "22" : "transparent",
+                    },
+                  ]}
+                >
+                  <Text style={[styles.tagChipText, { color: active ? colors.secondary : colors.mutedForeground }]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
 
       {mode === "create" && (
         <View style={styles.section}>
@@ -540,6 +559,13 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 11,
     letterSpacing: 1.5,
+  },
+  sublabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    letterSpacing: 1,
+    marginTop: 6,
+    marginBottom: 2,
   },
   input: {
     borderWidth: 1,

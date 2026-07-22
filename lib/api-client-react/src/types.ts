@@ -85,6 +85,8 @@ export interface RoomPlayer {
   shieldUntil: number;
   challengesCompleted: number;
   connected: boolean;
+  /** Timestamp until which this player cannot receive new cards. */
+  receiverCooldownUntil: number;
 }
 
 export interface Trophy {
@@ -115,6 +117,16 @@ export interface RoomState {
   endedAt: number;
   /** ID del hilo de Telegram creado para esta sala (0 = no creado). */
   telegramThreadId?: number;
+  /** IDs de cartas desactivadas por el anfitrión antes de empezar. */
+  disabledCards: string[];
+  /** Overrides de texto para cartas del mazo (por ID). */
+  cardOverrides: Record<string, { title: string; effect: string }>;
+  /** Límite de puntos para fin de partida automático (0 = sin límite). */
+  pointLimit: number;
+  /** Duración de partida en ms (0 = sin límite). */
+  gameTimerMs: number;
+  /** Timestamp de inicio de partida (para calcular tiempo restante). */
+  gameStartedAt: number;
 }
 
 // ----- Internal (what is stored in supabase JSONB) -----
@@ -156,6 +168,16 @@ export interface Room {
   version: number;
   /** ID del hilo de Telegram creado para esta sala (0 = no creado aún). */
   telegramThreadId?: number;
+  /** IDs de cartas desactivadas por el anfitrión. */
+  disabledCards: string[];
+  /** Overrides de texto para cartas del mazo (por ID). */
+  cardOverrides: Record<string, { title: string; effect: string }>;
+  /** Límite de puntos para fin de partida automático (0 = sin límite). */
+  pointLimit: number;
+  /** Duración de partida en ms (0 = sin límite). */
+  gameTimerMs: number;
+  /** Timestamp de inicio de partida. */
+  gameStartedAt: number;
 }
 
 export type RespondAction =

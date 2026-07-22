@@ -15,6 +15,8 @@ export const COOLDOWN_MS = 10 * 60 * 1000;
 export const COOLDOWN_CHILL_MS = 2 * 60 * 1000;
 export const COOLDOWN_NORMAL_MS = 5 * 60 * 1000;
 export const SHIELD_MS = 5 * 60 * 1000;
+/** Cooldown de recepción: ventana de protección del receptor (nadie puede volver a elegirle). */
+export const RECEIVER_COOLDOWN_MS = 20 * 60 * 1000;
 
 /**
  * Cooldown dinámico según categoría de carta:
@@ -53,14 +55,28 @@ export function generateCode(): string {
   return code;
 }
 
-function buildPile(packs: PackId[], customCards: GameCard[]): string[] {
+function buildPile(packs: PackId[], customCards: GameCard[], disabledCards: string[] = []): string[] {
+  const disabled = new Set(disabledCards);
   const set = new Set<string>();
-  for (const p of packs) for (const id of getPackCardIds(p)) set.add(id);
-  for (const c of customCards) set.add(c.id);
+  for (const p of packs) for (const id of getPackCardIds(p)) if (!disabled.has(id)) set.add(id);
+  for (const c of customCards) if (!disabled.has(c.id)) set.add(c.id);
   const ids = [...set];
   const deck: string[] = [];
   for (let i = 0; i < 4; i++) deck.push(...ids);
   return shuffle(shuffle(deck));
+}
+
+/** Devuelve la carta aplicando overrides de texto del anfitrión. */
+function getCardWithOverrides(
+  id: string,
+  customCards: GameCard[],
+  overrides: Record<string, { title: string; effect: string }> = {},
+): GameCard | undefined {
+  const card = getCard(id, customCards);
+  if (!card) return undefined;
+  const o = overrides[id];
+  if (!o) return card;
+  return { ...card, title: o.title, effect: o.effect };
 }
 
 function effectivePacks(room: Room): PackId[] {
@@ -89,14 +105,9 @@ function bump(room: Room) {
   room.version += 1;
 }
 
-/** Peso de voto: el Juez vale x2 en pánico y verificación. */
-function voteWeight(p: PlayerInternal | undefined): number {
-  return p?.role === "juez" ? 2 : 1;
-}
-
-/** Multiplicador de puntuación por rol (víctima +20 %). */
-function roleScoreMultiplier(p: PlayerInternal): number {
-  return p.role === "victima" ? 1.2 : 1;
+/** Peso de voto: igual para todos (sin roles fijos). */
+function voteWeight(_p: PlayerInternal | undefined): number {
+  return 1;
 }
 
 function newPlayer(
@@ -104,8 +115,6 @@ function newPlayer(
   tags: CardTag[] = [],
   extra: { avatar?: string; role?: string } = {},
 ): PlayerInternal {
-  // El Abstemio fuerza la tag para filtrar cartas de alcohol.
-  if (extra.role === "abstemio" && !tags.includes("abstemio")) tags = [...tags, "abstemio"];
   return {
     id: newId("p_"),
     name: name.trim() || "Jugador",
@@ -134,6 +143,8 @@ export function createInitialRoom(opts: {
   tags?: CardTag[];
   avatar?: string;
   role?: string;
+  pointLimit?: number;
+  gameTimerMs?: number;
 }): { room: Room; playerId: string } {
   const player = newPlayer(opts.name, opts.tags ?? [], { avatar: opts.avatar, role: opts.role });
   const packs = opts.packs && opts.packs.length > 0 ? opts.packs : [opts.pack ?? "allin"];
@@ -154,6 +165,11 @@ export function createInitialRoom(opts: {
     createdAt: Date.now(),
     version: 1,
     telegramThreadId: 0,
+    disabledCards: [],
+    cardOverrides: {},
+    pointLimit: opts.pointLimit ?? 0,
+    gameTimerMs: opts.gameTimerMs ?? 0,
+    gameStartedAt: 0,
   };
   return { room, playerId: player.id };
 }
@@ -202,11 +218,12 @@ export function applySetMyTags(room: Room, playerId: string, tags: CardTag[]): G
 export function applyStartGame(room: Room, playerId: string): GameResult {
   if (room.ownerId !== playerId) return { error: "Solo el creador puede empezar" };
   if (room.players.length < 2) return { error: "Necesitas 2+ jugadores" };
-  room.drawPile = buildPile(effectivePacks(room), room.customCards);
+  room.drawPile = buildPile(effectivePacks(room), room.customCards, room.disabledCards ?? []);
   room.cooldowns = {};
   room.silentUntil = 0;
   room.trophies = [];
   room.endedAt = 0;
+  room.gameStartedAt = Date.now();
   for (const p of room.players) {
     p.hand = [];
     p.inbox = [];
@@ -283,8 +300,16 @@ export function applyThrowCard(
     return room;
   }
 
-  // Solo el Infiltrado puede marcar como secreto. Si llega cualquier otro, ignora.
-  const isSecret = !!opts.secret && from.role === "infiltrado";
+  // Cooldown de recepción: nadie puede volver a elegir a toId durante RECEIVER_COOLDOWN_MS
+  const recvKey = `recv:${toId}`;
+  const recvCooldown = room.cooldowns[recvKey] ?? 0;
+  if (Date.now() < recvCooldown) {
+    const left = Math.ceil((recvCooldown - Date.now()) / 60000);
+    return { error: `${to.name} está protegido/a durante ${left}min más` };
+  }
+  room.cooldowns[recvKey] = Date.now() + RECEIVER_COOLDOWN_MS;
+
+  const isSecret = false; // Roles eliminados: no hay infiltrado
   const now = Date.now();
   const pending: PendingThrow = {
     id: newId("t_"),
@@ -302,22 +327,15 @@ export function applyThrowCard(
     secret: isSecret,
   };
   to.inbox.push(pending);
-  pushLog(
-    room,
-    isSecret
-      ? `🕶️ El Infiltrado lanzó un reto SECRETO a ${to.name}`
-      : `${from.name} lanzó "${card.title}" a ${to.name}`,
-  );
+  pushLog(room, `${from.name} lanzó "${card.title}" a ${to.name}`);
   bump(room);
   return room;
 }
 
 /** Aplica los puntos de un reto cumplido al jugador. */
-function awardChallenge(p: PlayerInternal, card: GameCard, opts: { secret?: boolean; undetected?: boolean } = {}) {
+function awardChallenge(p: PlayerInternal, card: GameCard) {
   const isHardcore = p.tags.includes("hardcore");
-  const roleMul = roleScoreMultiplier(p);
-  const secretMul = opts.secret && opts.undetected ? 3 : 1; // Infiltrado x3 si nadie lo descubrió
-  const gained = Math.round(card.points * p.multiplier * (isHardcore ? 2 : 1) * roleMul * secretMul);
+  const gained = Math.round(card.points * p.multiplier * (isHardcore ? 2 : 1));
   p.score += gained;
   p.multiplier = 1;
   p.challengesCompleted += 1;
@@ -337,17 +355,10 @@ export function applyMarkDone(
   const t = me.inbox.find((x) => x.id === throwId);
   if (!t) return { error: "Carta no encontrada en tu bandeja" };
   if (t.status !== "pending") return { error: "Este reto ya está en otra fase" };
-  // Solo el Fotógrafo puede subir prueba; al resto se la ignoramos.
-  const allowEvidence = me.role === "fotografo";
   t.status = "verifying";
   t.verifyEndsAt = Date.now() + VERIFY_WINDOW_MS;
-  if (evidenceUrl && allowEvidence) t.evidenceUrl = evidenceUrl;
-  pushLog(
-    room,
-    t.secret
-      ? `🕶️ ${me.name} dice haber cumplido un reto SECRETO. ¡Adivinad cuál!`
-      : `🧑‍⚖️ ${me.name} marcó "${t.card.title}" como HECHO. Tribunal en marcha (10 min).`,
-  );
+  if (evidenceUrl) t.evidenceUrl = evidenceUrl;
+  pushLog(room, `🧑‍⚖️ ${me.name} marcó "${t.card.title}" como HECHO. Tribunal en marcha (10 min).`);
   me.lastSeen = Date.now();
   bump(room);
   return room;
@@ -388,7 +399,7 @@ export function applyVerifyVote(
   return room;
 }
 
-/** El thrower (juez) cierra el reto inmediatamente con su veredicto. */
+/** El lanzador cierra el reto inmediatamente con su veredicto. */
 function resolveVerificationByJudge(
   room: Room,
   owner: PlayerInternal,
@@ -396,24 +407,18 @@ function resolveVerificationByJudge(
   ok: boolean,
 ) {
   if (ok) {
-    const undetected = true; // sin tribunal abierto: nadie ha "detectado" mentira
-    const gained = awardChallenge(owner, t.card, { secret: t.secret, undetected });
-    pushLog(
-      room,
-      t.secret
-        ? `🕶️✅ ${owner.name} cumplió un reto secreto. +${gained} pts (juez)`
-        : `✅ Juez valida "${t.card.title}" de ${owner.name}. +${gained} pts`,
-    );
+    const gained = awardChallenge(owner, t.card);
+    pushLog(room, `✅ Lanzador validó "${t.card.title}" de ${owner.name}. +${gained} pts`);
   } else {
     const penalty = t.card.points * 2;
     owner.score -= penalty;
-    pushLog(room, `❌ Juez: ${owner.name} no cumplió "${t.card.title}". -${penalty} pts`);
+    pushLog(room, `❌ Lanzador: ${owner.name} no cumplió "${t.card.title}". -${penalty} pts`);
   }
   t.status = "resolved";
   owner.inbox = owner.inbox.filter((x) => x.id !== t.id);
 }
 
-/** Suma pesos de votos (juez x2). Devuelve {yes, no, eligible}. */
+/** Tally de votos de verificación. */
 function tallyVerification(room: Room, t: PendingThrow) {
   let yes = 0, no = 0;
   for (const v of t.verifyVotes) {
@@ -441,17 +446,9 @@ function tryResolveVerification(room: Room, owner: PlayerInternal, t: PendingThr
   else if (yes === no) valid = true; // empate → beneficio de la duda
   else valid = yes > no;
 
-  // Detectado: alguien votó "no". Para infiltrado eso elimina el x3.
-  const undetected = no === 0;
-
   if (valid) {
-    const gained = awardChallenge(owner, t.card, { secret: t.secret, undetected });
-    pushLog(
-      room,
-      t.secret
-        ? `🕶️✅ ${owner.name} cumplió el reto secreto. +${gained} pts${undetected ? " (x3 sin ser detectado)" : ""}`
-        : `✅ Tribunal valida "${t.card.title}" de ${owner.name}. +${gained} pts`,
-    );
+    const gained = awardChallenge(owner, t.card);
+    pushLog(room, `✅ Tribunal valida "${t.card.title}" de ${owner.name}. +${gained} pts`);
   } else {
     // Falso → se restan el doble de los puntos asignados a la carta
     const penalty = t.card.points * 2;
@@ -463,7 +460,7 @@ function tryResolveVerification(room: Room, owner: PlayerInternal, t: PendingThr
   owner.inbox = owner.inbox.filter((x) => x.id !== t.id);
 }
 
-/** Resuelve verificaciones y pánicos vencidos (idempotente, llamado en cada lectura). */
+/** Resuelve verificaciones, pánicos vencidos y condiciones de victoria (idempotente). */
 export function resolveTimeouts(room: Room): boolean {
   const now = Date.now();
   let changed = false;
@@ -475,7 +472,6 @@ export function resolveTimeouts(room: Room): boolean {
         changed = true;
       }
       if (t.status === "pending" && now >= t.panicEndsAt && t.panicAgainst.length > 0) {
-        // Resolver pánico al expirar la ventana
         const yes = t.panicAgainst.reduce((s, voterId) => {
           const v = room.players.find((x) => x.id === voterId);
           return s + voteWeight(v);
@@ -492,8 +488,48 @@ export function resolveTimeouts(room: Room): boolean {
       }
     }
   }
+  // ── Condiciones de victoria automáticas ──
+  if (room.status === "active") {
+    const pointLimit = room.pointLimit ?? 0;
+    const gameTimerMs = room.gameTimerMs ?? 0;
+    const gameStartedAt = room.gameStartedAt ?? 0;
+    let autoEnd = false;
+    if (pointLimit > 0) {
+      const topScore = Math.max(...room.players.map((p) => p.score));
+      if (topScore >= pointLimit) autoEnd = true;
+    }
+    if (gameTimerMs > 0 && gameStartedAt > 0 && now - gameStartedAt >= gameTimerMs) {
+      autoEnd = true;
+    }
+    if (autoEnd) {
+      internalEndGame(room);
+      changed = true;
+    }
+  }
   if (changed) bump(room);
   return changed;
+}
+
+/** Cierra la partida internamente (sin requerir ownerId). */
+function internalEndGame(room: Room) {
+  const trophies: Trophy[] = [];
+  if (room.players.length > 0) {
+    const top = [...room.players].sort((a, b) => b.score - a.score)[0];
+    trophies.push({ playerId: top.id, playerName: top.name, title: "El Rey del Caos", description: `Ganador con ${top.score} pts`, emoji: "👑" });
+    const valiente = [...room.players].sort((a, b) => b.challengesCompleted - a.challengesCompleted)[0];
+    if (valiente?.challengesCompleted > 0)
+      trophies.push({ playerId: valiente.id, playerName: valiente.name, title: "El Más Valiente", description: `Cumplió ${valiente.challengesCompleted} retos`, emoji: "🦁" });
+    const rajado = [...room.players].sort((a, b) => b.challengesRejected - a.challengesRejected)[0];
+    if (rajado?.challengesRejected > 0)
+      trophies.push({ playerId: rajado.id, playerName: rajado.name, title: "El Rajado", description: `Rechazó ${rajado.challengesRejected} retos`, emoji: "🐔" });
+    const provocador = [...room.players].sort((a, b) => b.cardsThrown - a.cardsThrown)[0];
+    if (provocador?.cardsThrown > 0)
+      trophies.push({ playerId: provocador.id, playerName: provocador.name, title: "El Provocador", description: `Lanzó ${provocador.cardsThrown} cartas`, emoji: "🔥" });
+  }
+  room.status = "ended";
+  room.endedAt = Date.now();
+  room.trophies = trophies;
+  pushLog(room, "🏆 ¡Condición de victoria alcanzada! Ver podio.");
 }
 
 export function applyRespondToThrow(room: Room, playerId: string, throwId: string, action: RespondAction): GameResult {
@@ -615,6 +651,33 @@ export function applyAddCustomCard(room: Room, playerId: string, body: { title: 
   };
   room.customCards.push(card);
   pushLog(room, `✨ Carta personalizada añadida: "${title}"`);
+  bump(room);
+  return room;
+}
+
+/** Activa o desactiva una carta del mazo para esta sala (solo en lobby). */
+export function applyToggleCard(room: Room, playerId: string, cardId: string): GameResult {
+  if (room.ownerId !== playerId) return { error: "Solo el anfitrión puede gestionar cartas" };
+  if (room.status !== "lobby") return { error: "Solo se pueden modificar cartas antes de empezar" };
+  const disabled = room.disabledCards ?? [];
+  room.disabledCards = disabled.includes(cardId)
+    ? disabled.filter((id) => id !== cardId)
+    : [...disabled, cardId];
+  bump(room);
+  return room;
+}
+
+/** Sobreescribe el texto de una carta del mazo para esta sala (solo en lobby). */
+export function applyEditCard(
+  room: Room,
+  playerId: string,
+  cardId: string,
+  override: { title: string; effect: string },
+): GameResult {
+  if (room.ownerId !== playerId) return { error: "Solo el anfitrión puede editar cartas" };
+  if (room.status !== "lobby") return { error: "Solo se pueden editar cartas antes de empezar" };
+  if (!override.title.trim() || !override.effect.trim()) return { error: "Título y efecto obligatorios" };
+  room.cardOverrides = { ...(room.cardOverrides ?? {}), [cardId]: { title: override.title.trim().slice(0, 80), effect: override.effect.trim().slice(0, 250) } };
   bump(room);
   return room;
 }
@@ -811,9 +874,10 @@ function migratePending(t: PendingThrow): PendingThrow {
 }
 
 export function serializeRoom(room: Room, viewerId: string) {
-  // Calcular en lectura cualquier timeout vencido (no muta DB; el próximo write lo persiste).
   resolveTimeouts(room);
   const me = room.players.find((p) => p.id === viewerId);
+  const overrides = room.cardOverrides ?? {};
+  const now = Date.now();
   // Tribunal global = todas las cartas en verificación de OTROS jugadores
   const tribunal: PendingThrow[] = [];
   for (const p of room.players) {
@@ -828,24 +892,28 @@ export function serializeRoom(room: Room, viewerId: string) {
     pack: room.pack,
     packs: effectivePacks(room),
     status: room.status,
-    players: room.players.map((p) => ({
-      id: p.id,
-      name: p.name,
-      avatar: p.avatar,
-      role: p.role,
-      tags: p.tags,
-      handCount: p.hand.length,
-      score: p.score,
-      multiplier: p.multiplier,
-      shieldUntil: p.shieldUntil,
-      challengesCompleted: p.challengesCompleted,
-      connected: Date.now() - p.lastSeen < 30 * 1000,
-    })),
+    players: room.players.map((p) => {
+      const recvCd = room.cooldowns[`recv:${p.id}`] ?? 0;
+      return {
+        id: p.id,
+        name: p.name,
+        avatar: p.avatar,
+        role: p.role,
+        tags: p.tags,
+        handCount: p.hand.length,
+        score: p.score,
+        multiplier: p.multiplier,
+        shieldUntil: p.shieldUntil,
+        challengesCompleted: p.challengesCompleted,
+        connected: now - p.lastSeen < 30 * 1000,
+        receiverCooldownUntil: recvCd,
+      };
+    }),
     log: room.log,
-    myHand: me ? (me.hand.map((id) => getCard(id, room.customCards)).filter(Boolean) as GameCard[]) : [],
+    myHand: me ? (me.hand.map((id) => getCardWithOverrides(id, room.customCards, overrides)).filter(Boolean) as GameCard[]) : [],
     myInbox: me ? me.inbox.map((t) => migratePending({
       ...t,
-      card: getCard(t.cardId, room.customCards)!,
+      card: getCardWithOverrides(t.cardId, room.customCards, overrides)!,
     })) : [],
     tribunal,
     cooldowns: room.cooldowns,
@@ -855,5 +923,10 @@ export function serializeRoom(room: Room, viewerId: string) {
     trophies: room.trophies,
     endedAt: room.endedAt,
     telegramThreadId: room.telegramThreadId ?? 0,
+    disabledCards: room.disabledCards ?? [],
+    cardOverrides: overrides,
+    pointLimit: room.pointLimit ?? 0,
+    gameTimerMs: room.gameTimerMs ?? 0,
+    gameStartedAt: room.gameStartedAt ?? 0,
   };
 }
