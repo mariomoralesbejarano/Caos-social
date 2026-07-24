@@ -359,14 +359,14 @@ export default function HomeScreen() {
               value={pointLimit === 0 ? "0" : String(pointLimit)}
               onChangeText={(v) => {
                 const n = parseInt(v.replace(/[^0-9]/g, ""), 10);
-                setPointLimit(isNaN(n) ? 0 : Math.min(500, n));
+                setPointLimit(isNaN(n) ? 0 : Math.max(0, n));
               }}
               keyboardType="number-pad"
               selectTextOnFocus
               style={[styles.stepInput, { color: colors.foreground, borderColor: colors.secondary }]}
             />
             <Pressable
-              onPress={() => setPointLimit((v) => Math.min(500, v + 10))}
+              onPress={() => setPointLimit((v) => v + 10)}
               style={[styles.stepBtn, { borderColor: colors.border }]}
             >
               <Text style={[styles.stepBtnText, { color: colors.foreground }]}>+</Text>
@@ -404,14 +404,14 @@ export default function HomeScreen() {
               value={gameTimerMin === 0 ? "0" : String(gameTimerMin)}
               onChangeText={(v) => {
                 const n = parseInt(v.replace(/[^0-9]/g, ""), 10);
-                setGameTimerMin(isNaN(n) ? 0 : Math.min(180, n));
+                setGameTimerMin(isNaN(n) ? 0 : Math.max(0, n));
               }}
               keyboardType="number-pad"
               selectTextOnFocus
               style={[styles.stepInput, { color: colors.foreground, borderColor: colors.secondary }]}
             />
             <Pressable
-              onPress={() => setGameTimerMin((v) => Math.min(180, v + 5))}
+              onPress={() => setGameTimerMin((v) => v + 5)}
               style={[styles.stepBtn, { borderColor: colors.border }]}
             >
               <Text style={[styles.stepBtnText, { color: colors.foreground }]}>+</Text>
@@ -428,7 +428,7 @@ export default function HomeScreen() {
                 }]}
               >
                 <Text style={[styles.presetChipText, { color: gameTimerMin === t ? colors.secondary : colors.mutedForeground }]}>
-                  {t === 0 ? "∞" : `${t}m`}
+                  {t === 0 ? "∞" : `${t} min`}
                 </Text>
               </Pressable>
             ))}

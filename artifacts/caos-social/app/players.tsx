@@ -31,6 +31,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { CustomDeckModal } from "@/components/CustomDeckModal";
 import { NeonButton } from "@/components/NeonButton";
 import { useRoom } from "@/contexts/RoomContext";
 import { useColors } from "@/hooks/useColors";
@@ -267,6 +268,7 @@ export default function LobbyScreen() {
   const [ccEffect, setCcEffect] = useState("");
   const [ccPoints, setCcPoints] = useState("2");
   const [cardManagerOpen, setCardManagerOpen] = useState(false);
+  const [customDeckOpen, setCustomDeckOpen] = useState(false);
 
   // If active, send to game
   useEffect(() => {
@@ -558,6 +560,33 @@ export default function LobbyScreen() {
           room={room}
           session={{ playerId: session.playerId, roomCode: session.roomCode }}
           onClose={() => setCardManagerOpen(false)}
+          onChanged={invalidate}
+        />
+      )}
+
+      {isOwner && room.status === "lobby" && (
+        <Pressable
+          onPress={() => setCustomDeckOpen(true)}
+          style={[styles.creatorBox, { borderColor: colors.secondary, backgroundColor: colors.card, flexDirection: "row", alignItems: "center", gap: 12 }]}
+        >
+          <Feather name="plus-square" size={22} color={colors.secondary} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground, fontSize: 14 }]}>
+              Crear Mazo Personalizado
+            </Text>
+            <Text style={[styles.pTags, { color: colors.mutedForeground }]}>
+              Crea cartas desde cero o importa de mazos oficiales · {room.customCards?.length ? `${room.customCards.length} carta${room.customCards.length !== 1 ? "s" : ""} añadidas` : "sin cartas aún"}
+            </Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+        </Pressable>
+      )}
+
+      {customDeckOpen && session && (
+        <CustomDeckModal
+          room={room}
+          session={{ playerId: session.playerId, roomCode: session.roomCode }}
+          onClose={() => setCustomDeckOpen(false)}
           onChanged={invalidate}
         />
       )}
