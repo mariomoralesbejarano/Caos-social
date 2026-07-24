@@ -49,8 +49,15 @@ export function RoomProvider({ children }: { children: React.ReactNode }) {
   );
 
   async function setSession(s: Session | null) {
-    if (s) await saveSession(s);
-    else await clearSession();
+    if (s) {
+      await saveSession(s);
+    } else {
+      // Clear session storage AND purge stale query cache immediately so
+      // navigation guards in game/players screens don't see outdated room
+      // data and loop back to the wrong screen.
+      await clearSession();
+      qc.clear();
+    }
     setSessionState(s);
     if (s) {
       qc.invalidateQueries({

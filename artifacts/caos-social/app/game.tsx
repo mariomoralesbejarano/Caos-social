@@ -91,7 +91,7 @@ export default function GameScreen() {
         data: { playerId: session!.playerId },
       });
     } catch {}
-    setSession(null);
+    await setSession(null);   // awaited: clears storage + query cache
     router.replace("/");
   }
 
@@ -366,7 +366,8 @@ export default function GameScreen() {
       | "espejo"
       | "bloqueo"
       | "robo-carta"
-      | "comodin",
+      | "comodin"
+      | "bucaquen",
   ) {
     try {
       await respondMut.mutateAsync({
@@ -1085,7 +1086,8 @@ function ResolveInbox({
       | "espejo"
       | "bloqueo"
       | "robo-carta"
-      | "comodin",
+      | "comodin"
+      | "bucaquen",
   ) => void;
   onPanic: () => void;
   busy: boolean;
@@ -1095,8 +1097,9 @@ function ResolveInbox({
   const isWeb = Platform.OS === "web";
   const COUNTER_IDS = new Set([
     "reversa",
-    "espejo",
     "bloqueo",
+    "bucaquen",
+    "espejo",
     "robo-carta",
     "comodin",
   ]);
@@ -1143,6 +1146,13 @@ function ResolveInbox({
         />
       </View>
 
+      {/* Evidence hint — no Supabase Storage required: share via chat */}
+      <View style={[styles.evidenceHint, { borderColor: colors.border, backgroundColor: colors.card }]}>
+        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11, textAlign: "center", lineHeight: 16 }}>
+          📷 ¿Necesitas prueba visual? Comparte la foto directamente en el{"\n"}💬 chat de la sala o en el grupo de Telegram.
+        </Text>
+      </View>
+
       {counters.length > 0 && (
         <View style={styles.counterSection}>
           <Text style={[styles.counterLabel, { color: colors.mutedForeground }]}>
@@ -1160,7 +1170,8 @@ function ResolveInbox({
                     | "espejo"
                     | "bloqueo"
                     | "robo-carta"
-                    | "comodin",
+                    | "comodin"
+                    | "bucaquen",
                 )
               }
               disabled={busy}
@@ -1450,6 +1461,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   resolveWrap: { padding: 20, gap: 12 },
+  evidenceHint: { borderWidth: 1, borderRadius: 10, padding: 12, marginTop: 4 },
   resolveHeader: {
     flexDirection: "row",
     alignItems: "center",

@@ -187,4 +187,5 @@ export type RespondAction =
   | "espejo"
   | "bloqueo"
   | "robo-carta"
-  | "comodin";
+  | "comodin"
+  | "bucaquen";

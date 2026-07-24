@@ -34,19 +34,9 @@ const TAGS: { id: CardTag; label: string }[] = [
 
 const AVATARS = ["🦄", "🐙", "🦊", "🐲", "🦋", "🐸", "🦝", "🐼", "🦖", "🐺", "👻", "🤖"];
 
-const POINT_LIMITS = [
-  { value: 0, label: "Sin límite" },
-  { value: 50, label: "50 pts" },
-  { value: 100, label: "100 pts" },
-  { value: 200, label: "200 pts" },
-];
-
-const GAME_TIMERS = [
-  { value: 0, label: "Sin tiempo" },
-  { value: 30 * 60 * 1000, label: "30 min" },
-  { value: 60 * 60 * 1000, label: "60 min" },
-  { value: 90 * 60 * 1000, label: "90 min" },
-];
+// Presets rápidos para los steppers
+const POINT_PRESETS = [0, 50, 100, 200, 300, 500];
+const TIMER_PRESETS = [0, 15, 30, 60, 90, 120];
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -62,7 +52,7 @@ export default function HomeScreen() {
   const [tags, setTags] = useState<CardTag[]>([]);
   const [avatar, setAvatar] = useState<string>(AVATARS[0]);
   const [pointLimit, setPointLimit] = useState<number>(0);
-  const [gameTimerMs, setGameTimerMs] = useState<number>(0);
+  const [gameTimerMin, setGameTimerMin] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
 
   const createMut = useCreateRoom();
@@ -99,7 +89,7 @@ export default function HomeScreen() {
         return;
       }
       const res = await createMut.mutateAsync({
-        data: { name: name.trim(), packs, tags, avatar, pointLimit, gameTimerMs },
+        data: { name: name.trim(), packs, tags, avatar, pointLimit, gameTimerMs: gameTimerMin * 60_000 },
       });
       await setSession({
         roomCode: res.room.code,
@@ -353,51 +343,95 @@ export default function HomeScreen() {
           <Text style={[styles.label, { color: colors.mutedForeground }]}>
             CONDICIÓN DE VICTORIA · (opcional)
           </Text>
-          <Text style={[styles.sublabel, { color: colors.mutedForeground }]}>Límite de puntos</Text>
-          <View style={styles.tagRow}>
-            {POINT_LIMITS.map((opt) => {
-              const active = pointLimit === opt.value;
-              return (
-                <Pressable
-                  key={opt.value}
-                  onPress={() => setPointLimit(opt.value)}
-                  style={[
-                    styles.tagChip,
-                    {
-                      borderColor: active ? colors.secondary : colors.border,
-                      backgroundColor: active ? colors.secondary + "22" : "transparent",
-                    },
-                  ]}
-                >
-                  <Text style={[styles.tagChipText, { color: active ? colors.secondary : colors.mutedForeground }]}>
-                    {opt.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
+
+          {/* ── Puntos ── */}
+          <Text style={[styles.sublabel, { color: colors.mutedForeground }]}>
+            Límite de puntos · {pointLimit === 0 ? "sin límite" : `gana el primero en llegar a ${pointLimit} pts`}
+          </Text>
+          <View style={styles.stepperRow}>
+            <Pressable
+              onPress={() => setPointLimit((v) => Math.max(0, v - 10))}
+              style={[styles.stepBtn, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.stepBtnText, { color: colors.foreground }]}>−</Text>
+            </Pressable>
+            <TextInput
+              value={pointLimit === 0 ? "0" : String(pointLimit)}
+              onChangeText={(v) => {
+                const n = parseInt(v.replace(/[^0-9]/g, ""), 10);
+                setPointLimit(isNaN(n) ? 0 : Math.min(500, n));
+              }}
+              keyboardType="number-pad"
+              selectTextOnFocus
+              style={[styles.stepInput, { color: colors.foreground, borderColor: colors.secondary }]}
+            />
+            <Pressable
+              onPress={() => setPointLimit((v) => Math.min(500, v + 10))}
+              style={[styles.stepBtn, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.stepBtnText, { color: colors.foreground }]}>+</Text>
+            </Pressable>
           </View>
-          <Text style={[styles.sublabel, { color: colors.mutedForeground }]}>Temporizador de partida</Text>
-          <View style={styles.tagRow}>
-            {GAME_TIMERS.map((opt) => {
-              const active = gameTimerMs === opt.value;
-              return (
-                <Pressable
-                  key={opt.value}
-                  onPress={() => setGameTimerMs(opt.value)}
-                  style={[
-                    styles.tagChip,
-                    {
-                      borderColor: active ? colors.secondary : colors.border,
-                      backgroundColor: active ? colors.secondary + "22" : "transparent",
-                    },
-                  ]}
-                >
-                  <Text style={[styles.tagChipText, { color: active ? colors.secondary : colors.mutedForeground }]}>
-                    {opt.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
+          <View style={[styles.tagRow, { marginTop: 6 }]}>
+            {POINT_PRESETS.map((p) => (
+              <Pressable
+                key={p}
+                onPress={() => setPointLimit(p)}
+                style={[styles.presetChip, {
+                  borderColor: pointLimit === p ? colors.secondary : colors.border,
+                  backgroundColor: pointLimit === p ? colors.secondary + "22" : "transparent",
+                }]}
+              >
+                <Text style={[styles.presetChipText, { color: pointLimit === p ? colors.secondary : colors.mutedForeground }]}>
+                  {p === 0 ? "∞" : `${p}`}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {/* ── Tiempo ── */}
+          <Text style={[styles.sublabel, { color: colors.mutedForeground, marginTop: 14 }]}>
+            Tiempo de partida · {gameTimerMin === 0 ? "sin límite" : `termina a los ${gameTimerMin} min`}
+          </Text>
+          <View style={styles.stepperRow}>
+            <Pressable
+              onPress={() => setGameTimerMin((v) => Math.max(0, v - 5))}
+              style={[styles.stepBtn, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.stepBtnText, { color: colors.foreground }]}>−</Text>
+            </Pressable>
+            <TextInput
+              value={gameTimerMin === 0 ? "0" : String(gameTimerMin)}
+              onChangeText={(v) => {
+                const n = parseInt(v.replace(/[^0-9]/g, ""), 10);
+                setGameTimerMin(isNaN(n) ? 0 : Math.min(180, n));
+              }}
+              keyboardType="number-pad"
+              selectTextOnFocus
+              style={[styles.stepInput, { color: colors.foreground, borderColor: colors.secondary }]}
+            />
+            <Pressable
+              onPress={() => setGameTimerMin((v) => Math.min(180, v + 5))}
+              style={[styles.stepBtn, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.stepBtnText, { color: colors.foreground }]}>+</Text>
+            </Pressable>
+          </View>
+          <View style={[styles.tagRow, { marginTop: 6 }]}>
+            {TIMER_PRESETS.map((t) => (
+              <Pressable
+                key={t}
+                onPress={() => setGameTimerMin(t)}
+                style={[styles.presetChip, {
+                  borderColor: gameTimerMin === t ? colors.secondary : colors.border,
+                  backgroundColor: gameTimerMin === t ? colors.secondary + "22" : "transparent",
+                }]}
+              >
+                <Text style={[styles.presetChipText, { color: gameTimerMin === t ? colors.secondary : colors.mutedForeground }]}>
+                  {t === 0 ? "∞" : `${t}m`}
+                </Text>
+              </Pressable>
+            ))}
           </View>
         </View>
       )}
@@ -565,7 +599,47 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 1,
     marginTop: 6,
-    marginBottom: 2,
+    marginBottom: 4,
+  },
+  stepperRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 4,
+  },
+  stepBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+    lineHeight: 26,
+    textAlign: "center",
+  },
+  stepInput: {
+    flex: 1,
+    height: 42,
+    borderWidth: 2,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    textAlign: "center",
+  },
+  presetChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  presetChipText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
   },
   input: {
     borderWidth: 1,

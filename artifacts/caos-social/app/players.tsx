@@ -356,7 +356,7 @@ export default function LobbyScreen() {
         data: { playerId: session!.playerId },
       });
     } catch {}
-    setSession(null);
+    await setSession(null);   // awaited: clears storage + query cache
     router.replace("/");
   }
 

@@ -106,10 +106,11 @@ const NOCHE: GameCard[] = [
   C("no-baño-libre", "Misión al Baño", "Pregunta a 3 desconocidos dónde está el baño aunque ya lo sepas.", "Hazlo con cara seria.", "social", 15, { pack: "noche" }),
 ];
 
-// PACK ESTRATÉGICO / PODERES (15)
+// PACK ESTRATÉGICO / PODERES (15 + 1 reacción nueva)
 const ESTRATEGICO: GameCard[] = [
   C("reversa", "Reversa", "Devuelve el reto al jugador que te lo lanzó.", "El emisor original cumple sin opción a rechazar.", "poder", 5, { isPower: true, pack: "estrategico" }),
   C("bloqueo", "Bloqueo", "Inmunidad temporal: nadie te puede lanzar cartas por 5 minutos.", "Activa un escudo neón sobre tu perfil.", "poder", 5, { isPower: true, pack: "estrategico" }),
+  C("bucaquen", "💥 Bucaquen", "Convierte el reto recibido en un reto colectivo para TODA la sala.", "Todos los demás jugadores reciben el mismo reto. Tú quedas libre.", "poder", 15, { isPower: true, pack: "estrategico" }),
   C("espejo", "Espejo", "Quien lanzó la carta debe cumplir el reto él mismo.", "Tú ganas los puntos sin hacer nada.", "poder", 10, { isPower: true, pack: "estrategico" }),
   C("robo-carta", "Robo de Mano", "Roba una carta aleatoria de la mano del emisor.", "Queda en tu mano.", "poder", 5, { isPower: true, pack: "estrategico" }),
   C("comodin", "Comodín de Pánico", "Anula automáticamente el siguiente reto que te lancen.", "Un solo uso por partida.", "poder", 10, { isPower: true, pack: "estrategico" }),
@@ -124,6 +125,9 @@ const ESTRATEGICO: GameCard[] = [
   C("regalo", "Regalo Envenenado", "Pasa una carta de tu mano al jugador que elijas.", "Sin que pueda rechazarla.", "poder", 5, { isPower: true, pack: "estrategico" }),
   C("revelacion", "Revelación", "Mira la mano completa de un jugador.", "Sin que él lo sepa.", "poder", 5, { isPower: true, pack: "estrategico" }),
 ];
+
+// IDs de las 3 cartas de reacción fundamentales (siempre en todos los mazos)
+const REACCION_IDS = ["reversa", "bloqueo", "bucaquen"];
 
 // LEGACY
 const LEGACY: GameCard[] = [
@@ -201,20 +205,24 @@ export const ALL_CARDS: GameCard[] = [
 
 const idsOf = (arr: GameCard[]) => arr.map((c) => c.id);
 
+// Deduplicate while preserving order (reaction cards added to every pack)
+const withReactions = (ids: string[]) =>
+  [...new Set([...ids, ...REACCION_IDS])];
+
 export const PACKS: { id: PackId; cardIds: string[] }[] = [
-  { id: "tardeo", cardIds: [...idsOf(TARDEO), ...idsOf(ESTRATEGICO).slice(0, 5)] },
-  { id: "feria", cardIds: [...idsOf(FERIA), ...idsOf(ESTRATEGICO).slice(0, 5)] },
-  { id: "familiar", cardIds: [...idsOf(FAMILIAR), ...idsOf(ESTRATEGICO).slice(5, 9)] },
-  { id: "noche", cardIds: [...idsOf(NOCHE), ...idsOf(ESTRATEGICO)] },
-  { id: "banco", cardIds: [...idsOf(BANCO), ...idsOf(ESTRATEGICO).slice(0, 4)] },
-  { id: "after", cardIds: [...idsOf(AFTER), ...idsOf(ESTRATEGICO).slice(0, 5)] },
-  { id: "tercer-tiempo", cardIds: [...idsOf(TERCER), ...idsOf(ESTRATEGICO).slice(0, 4)] },
-  { id: "estrategico", cardIds: idsOf(ESTRATEGICO) },
-  { id: "clasico", cardIds: [...idsOf(LEGACY), "reversa", "bloqueo", "espejo", "robo-carta", "comodin"] },
-  { id: "discoteca", cardIds: [...idsOf(NOCHE).slice(0, 12), "reversa", "bloqueo", "espejo"] },
-  { id: "cena", cardIds: [...idsOf(FAMILIAR).slice(0, 12), "reversa", "bloqueo", "espejo"] },
-  { id: "gimnasio", cardIds: ["burpees", "plancha", "sentadillas", "imitacion", "reversa", "bloqueo", "espejo", "robo-carta"] },
-  { id: "allin", cardIds: ALL_CARDS.map((c) => c.id) },
+  { id: "tardeo",       cardIds: withReactions([...idsOf(TARDEO), ...idsOf(ESTRATEGICO).slice(0, 5)]) },
+  { id: "feria",        cardIds: withReactions([...idsOf(FERIA), ...idsOf(ESTRATEGICO).slice(0, 5)]) },
+  { id: "familiar",     cardIds: withReactions([...idsOf(FAMILIAR), ...idsOf(ESTRATEGICO).slice(5, 9)]) },
+  { id: "noche",        cardIds: withReactions([...idsOf(NOCHE), ...idsOf(ESTRATEGICO)]) },
+  { id: "banco",        cardIds: withReactions([...idsOf(BANCO), ...idsOf(ESTRATEGICO).slice(0, 4)]) },
+  { id: "after",        cardIds: withReactions([...idsOf(AFTER), ...idsOf(ESTRATEGICO).slice(0, 5)]) },
+  { id: "tercer-tiempo",cardIds: withReactions([...idsOf(TERCER), ...idsOf(ESTRATEGICO).slice(0, 4)]) },
+  { id: "estrategico",  cardIds: idsOf(ESTRATEGICO) },
+  { id: "clasico",      cardIds: withReactions([...idsOf(LEGACY), "reversa", "bloqueo", "espejo", "robo-carta", "comodin"]) },
+  { id: "discoteca",    cardIds: withReactions([...idsOf(NOCHE).slice(0, 12), "reversa", "bloqueo", "espejo"]) },
+  { id: "cena",         cardIds: withReactions([...idsOf(FAMILIAR).slice(0, 12), "reversa", "bloqueo", "espejo"]) },
+  { id: "gimnasio",     cardIds: withReactions(["burpees", "plancha", "sentadillas", "imitacion", "reversa", "bloqueo", "espejo", "robo-carta"]) },
+  { id: "allin",        cardIds: ALL_CARDS.map((c) => c.id) },
 ];
 
 export function getCard(id: string, customCards: GameCard[] = []): GameCard | undefined {

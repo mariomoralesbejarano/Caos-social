@@ -592,6 +592,29 @@ export function applyRespondToThrow(room: Room, playerId: string, throwId: strin
       }
     } else if (action === "comodin") {
       pushLog(room, `🃏 ${me.name} usó COMODÍN: anula "${card.title}" sin consecuencias`);
+    } else if (action === "bucaquen") {
+      // Spread the challenge to all other players (excluding the original sender)
+      const now = Date.now();
+      let spread = 0;
+      for (const other of room.players) {
+        if (other.id === me.id || other.id === pending.fromPlayerId) continue;
+        other.inbox.push({
+          ...pending,
+          id: newId("t_"),
+          toPlayerId: other.id,
+          fromPlayerId: me.id,
+          fromName: me.name,
+          status: "pending",
+          panicEndsAt: now + PANIC_WINDOW_MS,
+          verifyVotes: [],
+          verifyEndsAt: 0,
+          panicAgainst: [],
+          createdAt: now,
+          secret: false,
+        });
+        spread++;
+      }
+      pushLog(room, `💥 ${me.name} activó BUCAQUEN: "${card.title}" ahora es un reto para ${spread} jugador${spread !== 1 ? "es" : ""}.`);
     }
     me.inbox.splice(idx, 1);
   }
