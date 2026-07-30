@@ -19,12 +19,16 @@ export const SHIELD_MS = 5 * 60 * 1000;
 export const RECEIVER_COOLDOWN_MS = 20 * 60 * 1000;
 
 /**
- * Cooldown dinámico según categoría de carta:
+ * Cooldown dinámico según la carta lanzada.
+ * Prioridad: cooldownMinutes propio de la carta (en minutos).
+ * Fallback por categoría si no está definido:
  * - beber / social  → 2 min (Chill/Básicas)
  * - reto / ligar    → 5 min (Reto normal)
  * - fisico / poder  → 10 min (Hidalgo/Especial)
  */
 export function cardCooldownMs(card: GameCard): number {
+  if (typeof card.cooldownMinutes === "number" && card.cooldownMinutes > 0)
+    return card.cooldownMinutes * 60 * 1000;
   if (card.category === "beber" || card.category === "social") return COOLDOWN_CHILL_MS;
   if (card.category === "fisico" || card.category === "poder") return COOLDOWN_MS;
   return COOLDOWN_NORMAL_MS;
@@ -656,7 +660,11 @@ export function applyPanicVote(room: Room, voterId: string, throwId: string, aga
   return room;
 }
 
-export function applyAddCustomCard(room: Room, playerId: string, body: { title: string; effect: string; points: number }): GameResult {
+export function applyAddCustomCard(
+  room: Room,
+  playerId: string,
+  body: { title: string; effect: string; points: number; cooldownMinutes?: number },
+): GameResult {
   if (room.ownerId !== playerId) return { error: "Solo el creador puede añadir cartas" };
   if (room.status !== "lobby") return { error: "Solo se pueden añadir cartas antes de empezar" };
   const title = (body.title ?? "").trim();
@@ -665,12 +673,17 @@ export function applyAddCustomCard(room: Room, playerId: string, body: { title: 
   if (title.length > 60 || effect.length > 200) return { error: "Texto demasiado largo" };
   if (room.customCards.length >= 25) return { error: "Máximo 25 cartas personalizadas" };
   const points = Math.max(5, Math.min(100, Math.round(body.points || 15)));
+  const cooldownMinutes = typeof body.cooldownMinutes === "number" && body.cooldownMinutes > 0
+    ? body.cooldownMinutes
+    : 15; // default 15 min for custom cards
   const card: GameCard = {
     id: "custom-" + newId(""),
     title, effect,
     power: "Carta personalizada por el grupo.",
     category: "social",
-    points, custom: true,
+    points,
+    cooldownMinutes,
+    custom: true,
   };
   room.customCards.push(card);
   pushLog(room, `✨ Carta personalizada añadida: "${title}"`);

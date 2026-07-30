@@ -30,6 +30,10 @@ export interface GameCard {
   power: string;
   category: CardCategory;
   points: number;
+  /** Cooldown en minutos que se aplica al par lanzador→receptor tras tirar esta carta.
+   *  Fáciles/Chill: 5-10 · Medias/Sociales: 15-20 · Difíciles/Hardcore: 30+
+   *  Si no se define, se usa la lógica por categoría como fallback. */
+  cooldownMinutes?: number;
   blockedBy?: CardTag[];
   isPower?: boolean;
   pack?: PackId;

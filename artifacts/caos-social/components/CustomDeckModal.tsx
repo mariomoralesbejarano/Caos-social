@@ -70,6 +70,7 @@ export function CustomDeckModal({
   const [newTitle, setNewTitle] = useState("");
   const [newEffect, setNewEffect] = useState("");
   const [newPoints, setNewPoints] = useState("2");
+  const [newCooldown, setNewCooldown] = useState("15");
   const [newErr, setNewErr] = useState<string | null>(null);
   const [newOk, setNewOk] = useState(false);
 
@@ -80,6 +81,7 @@ export function CustomDeckModal({
   const [impTitle, setImpTitle] = useState("");
   const [impEffect, setImpEffect] = useState("");
   const [impPoints, setImpPoints] = useState("2");
+  const [impCooldown, setImpCooldown] = useState("15");
   const [impErr, setImpErr] = useState<string | null>(null);
   const [impOk, setImpOk] = useState(false);
 
@@ -117,6 +119,7 @@ export function CustomDeckModal({
       return;
     }
     const pts = Math.max(1, parseInt(newPoints, 10) || 2);
+    const cooldownMinutes = Math.max(1, parseInt(newCooldown, 10) || 15);
     try {
       await addMut.mutateAsync({
         code: room.code,
@@ -125,11 +128,13 @@ export function CustomDeckModal({
           title: newTitle.trim().slice(0, 60),
           effect: newEffect.trim().slice(0, 200),
           points: pts,
+          cooldownMinutes,
         },
       });
       setNewTitle("");
       setNewEffect("");
       setNewPoints("2");
+      setNewCooldown("15");
       setNewOk(true);
       setTimeout(() => setNewOk(false), 2000);
       onChanged();
@@ -145,6 +150,7 @@ export function CustomDeckModal({
     setImpTitle(card.title);
     setImpEffect(card.effect);
     setImpPoints(String(card.points));
+    setImpCooldown(String(card.cooldownMinutes ?? 15));
     setImpErr(null);
     setImpOk(false);
   }
@@ -158,6 +164,7 @@ export function CustomDeckModal({
       return;
     }
     const pts = Math.max(1, parseInt(impPoints, 10) || selected.points);
+    const cooldownMinutes = Math.max(1, parseInt(impCooldown, 10) || selected.cooldownMinutes || 15);
     try {
       await addMut.mutateAsync({
         code: room.code,
@@ -166,6 +173,7 @@ export function CustomDeckModal({
           title: impTitle.trim().slice(0, 60),
           effect: impEffect.trim().slice(0, 200),
           points: pts,
+          cooldownMinutes,
         },
       });
       setImpOk(true);
@@ -292,6 +300,38 @@ export function CustomDeckModal({
               style={[s.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
             />
 
+            <Text style={[s.fieldLabel, { color: colors.mutedForeground, marginTop: 12 }]}>
+              COOLDOWN (minutos) · ⏱ cuánto esperar antes de poder tirarla de nuevo
+            </Text>
+            <View style={s.cooldownRow}>
+              {[5, 10, 15, 20, 30].map((v) => (
+                <Pressable
+                  key={v}
+                  onPress={() => setNewCooldown(String(v))}
+                  style={[
+                    s.cdChip,
+                    {
+                      borderColor: newCooldown === String(v) ? colors.secondary : colors.border,
+                      backgroundColor: newCooldown === String(v) ? colors.secondary + "22" : "transparent",
+                    },
+                  ]}
+                >
+                  <Text style={[s.cdChipText, { color: newCooldown === String(v) ? colors.secondary : colors.mutedForeground }]}>
+                    {v} min
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <TextInput
+              value={newCooldown}
+              onChangeText={(v) => setNewCooldown(v.replace(/[^0-9]/g, ""))}
+              placeholder="15"
+              placeholderTextColor={colors.mutedForeground}
+              keyboardType="number-pad"
+              maxLength={3}
+              style={[s.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background, marginTop: 6 }]}
+            />
+
             {newErr && (
               <Text style={[s.errText, { color: colors.destructive }]}>{newErr}</Text>
             )}
@@ -414,6 +454,38 @@ export function CustomDeckModal({
                   style={[s.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
                 />
 
+                <Text style={[s.fieldLabel, { color: colors.mutedForeground, marginTop: 12 }]}>
+                  COOLDOWN (minutos) · ⏱ cooldown original: {selected?.cooldownMinutes ?? 15} min
+                </Text>
+                <View style={s.cooldownRow}>
+                  {[5, 10, 15, 20, 30].map((v) => (
+                    <Pressable
+                      key={v}
+                      onPress={() => setImpCooldown(String(v))}
+                      style={[
+                        s.cdChip,
+                        {
+                          borderColor: impCooldown === String(v) ? colors.secondary : colors.border,
+                          backgroundColor: impCooldown === String(v) ? colors.secondary + "22" : "transparent",
+                        },
+                      ]}
+                    >
+                      <Text style={[s.cdChipText, { color: impCooldown === String(v) ? colors.secondary : colors.mutedForeground }]}>
+                        {v} min
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <TextInput
+                  value={impCooldown}
+                  onChangeText={(v) => setImpCooldown(v.replace(/[^0-9]/g, ""))}
+                  placeholder="15"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="number-pad"
+                  maxLength={3}
+                  style={[s.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background, marginTop: 6 }]}
+                />
+
                 {impErr && (
                   <Text style={[s.errText, { color: colors.destructive }]}>{impErr}</Text>
                 )}
@@ -457,7 +529,7 @@ export function CustomDeckModal({
                         {card.effect}
                       </Text>
                       <Text style={[s.cardMeta, { color: colors.mutedForeground }]}>
-                        {PACK_LABELS[card.pack ?? ""] ?? card.pack} · {card.points} pts
+                        {PACK_LABELS[card.pack ?? ""] ?? card.pack} · {card.points} pts · ⏱ {card.cooldownMinutes ?? 15} min
                       </Text>
                     </View>
                     <Feather name="plus-circle" size={20} color={colors.secondary} />
@@ -616,5 +688,21 @@ const s = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     marginBottom: 4,
+  },
+  cooldownRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 2,
+  },
+  cdChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  cdChipText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
   },
 });

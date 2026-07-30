@@ -400,11 +400,13 @@ export const useAddCustomCard = makeSimpleMutation<{
   title: string;
   effect: string;
   points: number;
+  cooldownMinutes?: number;
 }>((room, b) =>
   applyAddCustomCard(room, b.playerId, {
     title: b.title,
     effect: b.effect,
     points: b.points,
+    cooldownMinutes: b.cooldownMinutes,
   }),
 );
 

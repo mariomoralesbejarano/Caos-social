@@ -267,6 +267,7 @@ export default function LobbyScreen() {
   const [ccTitle, setCcTitle] = useState("");
   const [ccEffect, setCcEffect] = useState("");
   const [ccPoints, setCcPoints] = useState("2");
+  const [ccCooldown, setCcCooldown] = useState("15");
   const [cardManagerOpen, setCardManagerOpen] = useState(false);
   const [customDeckOpen, setCustomDeckOpen] = useState(false);
 
@@ -328,6 +329,7 @@ export default function LobbyScreen() {
   async function handleAddCustom() {
     setError(null);
     const points = Math.max(1, Math.min(10, parseInt(ccPoints, 10) || 2));
+    const cooldownMinutes = Math.max(1, parseInt(ccCooldown, 10) || 15);
     if (ccTitle.trim().length < 3 || ccEffect.trim().length < 3) {
       setError("Título y efecto requeridos (mínimo 3 caracteres)");
       return;
@@ -340,11 +342,13 @@ export default function LobbyScreen() {
           title: ccTitle.trim().slice(0, 60),
           effect: ccEffect.trim().slice(0, 200),
           points,
+          cooldownMinutes,
         },
       });
       setCcTitle("");
       setCcEffect("");
       setCcPoints("2");
+      setCcCooldown("15");
       invalidate();
     } catch (e) {
       setError(extractErr(e));
@@ -647,6 +651,22 @@ export default function LobbyScreen() {
             placeholderTextColor={colors.mutedForeground}
             keyboardType="number-pad"
             maxLength={2}
+            style={[
+              styles.input,
+              {
+                color: colors.foreground,
+                borderColor: colors.border,
+                backgroundColor: colors.background,
+              },
+            ]}
+          />
+          <TextInput
+            value={ccCooldown}
+            onChangeText={(t) => setCcCooldown(t.replace(/[^0-9]/g, ""))}
+            placeholder="Cooldown en minutos (ej: 15)"
+            placeholderTextColor={colors.mutedForeground}
+            keyboardType="number-pad"
+            maxLength={3}
             style={[
               styles.input,
               {
