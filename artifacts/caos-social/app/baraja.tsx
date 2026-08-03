@@ -1,22 +1,27 @@
 /**
  * Baraja Española — game selector screen.
- * Shows all 10 traditional games with metadata chips and a "Cómo Jugar" modal.
+ * Shows 20 traditional games with metadata chips and a "Cómo Jugar" modal.
+ * The JUGAR button creates a multiplayer room synced with Supabase.
  */
 
+import { useCreateRoom, useJoinRoom } from "@workspace/api-client-react";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useRoom } from "@/contexts/RoomContext";
 import { useColors } from "@/hooks/useColors";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -552,16 +557,561 @@ const GAMES: Game[] = [
       },
     ],
   },
+  // ── 10 NUEVOS JUEGOS ────────────────────────────────────────────────────────
+  {
+    id: "escoba",
+    emoji: "🧹",
+    title: "La Escoba",
+    tagline: "Suma 15 con las cartas del centro y barre la mesa",
+    players: "2-4",
+    duration: "20-35 min",
+    difficulty: "Medio",
+    sections: [
+      {
+        icon: "🎯",
+        heading: "Objetivo",
+        bullets: [
+          "Capturar cartas del centro formando sumas de exactamente 15.",
+          "Gana quien más puntos acumule al acabar el mazo.",
+        ],
+      },
+      {
+        icon: "🃏",
+        heading: "Preparación",
+        bullets: [
+          "Se usa baraja española de 40 cartas. Figuras valen: Sota=8, Caballo=9, Rey=10.",
+          "Se reparten 3 cartas a cada jugador y se colocan 4 cartas boca arriba en el centro.",
+          "Si las 4 cartas del centro suman 15, se barajan de nuevo.",
+        ],
+      },
+      {
+        icon: "🔄",
+        heading: "Turno",
+        bullets: [
+          "El jugador juega 1 carta de su mano intentando capturar 1 o más cartas del centro cuya suma, incluida la jugada, sea exactamente 15.",
+          "Si no puede capturar, coloca su carta en el centro.",
+          "Cuando los jugadores se quedan sin cartas, se reparten 3 más hasta agotar el mazo.",
+          "Las cartas no capturadas al final van al último jugador que capturó.",
+        ],
+      },
+      {
+        icon: "🧹",
+        heading: "Escoba y puntuación",
+        bullets: [
+          "ESCOBA: capturar TODAS las cartas del centro en un turno → +1 punto extra.",
+          "Puntuación: más cartas totales=1pt · más oros=1pt · 7 de oros=1pt · 7 de copas=1pt · cada escoba=1pt.",
+          "Empate en cartas u oros: el punto no se otorga.",
+          "Gana quien llegue primero a 21 puntos (o quien más tenga al terminar el mazo).",
+        ],
+      },
+    ],
+  },
+  {
+    id: "brisca",
+    emoji: "⚡",
+    title: "La Brisca",
+    tagline: "Bazas rápidas — Ases y Treses valen puntos clave",
+    players: "2-4",
+    duration: "15-30 min",
+    difficulty: "Fácil",
+    sections: [
+      {
+        icon: "🎯",
+        heading: "Objetivo",
+        bullets: [
+          "Capturar cartas de valor en bazas para sumar más de 60 puntos.",
+          "As=11 · Tres=10 · Rey=4 · Caballo=3 · Sota=2 · resto=0.",
+        ],
+      },
+      {
+        icon: "🃏",
+        heading: "Preparación",
+        bullets: [
+          "Se reparten 3 cartas a cada jugador.",
+          "La carta siguiente del mazo queda visible: su palo es el triunfo (briscola).",
+          "Esta carta se coloca bajo el mazo y será la última en repartirse.",
+        ],
+      },
+      {
+        icon: "🔄",
+        heading: "Turno",
+        bullets: [
+          "El primer jugador echa cualquier carta. Los demás echan 1 carta cada uno.",
+          "NO hay obligación de seguir palo — puedes echar cualquier carta.",
+          "Gana la baza quien eche el triunfo más alto, o (sin triunfos) la carta del palo liderador más alta.",
+          "El ganador lidera la siguiente baza y todos roban 1 carta del mazo.",
+        ],
+      },
+      {
+        icon: "🏆",
+        heading: "Final",
+        bullets: [
+          "Al agotar el mazo, se juegan las cartas restantes en mano.",
+          "Se cuentan los puntos. Más de 60 = victoria. Exacto 60 = victoria del que lidere.",
+          "Con 4 jugadores (2 parejas): se suman los puntos de cada pareja.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "remigio",
+    emoji: "🎴",
+    title: "El Remigio",
+    tagline: "Forma combinaciones con 10 cartas y cierra antes que nadie",
+    players: "2-5",
+    duration: "25-45 min",
+    difficulty: "Medio",
+    sections: [
+      {
+        icon: "🎯",
+        heading: "Objetivo",
+        bullets: [
+          "Combinar todas las cartas en tríos (mismo número) y escaleras (mismo palo, consecutivas).",
+          "Minimizar puntos en cartas sueltas. Acumular menos de 100 para no ser eliminado.",
+        ],
+      },
+      {
+        icon: "🃏",
+        heading: "Preparación",
+        bullets: [
+          "Se reparten 10 cartas a cada jugador.",
+          "El As puede ir después del Rey (escalera cerrada) o antes del 2 (escalera abierta).",
+          "El resto del mazo queda boca abajo; se voltea 1 carta para iniciar el descarte.",
+        ],
+      },
+      {
+        icon: "🔄",
+        heading: "Turno",
+        bullets: [
+          "El jugador activo ROBA del mazo o del descarte.",
+          "Puede BAJAR combinaciones al centro (mínimo 3 cartas por combinación).",
+          "Puede AÑADIR cartas a combinaciones ya bajadas por cualquier jugador.",
+          "Descarta 1 carta al final del turno.",
+        ],
+      },
+      {
+        icon: "🚪",
+        heading: "Cierre y puntuación",
+        bullets: [
+          "REMIGIO: combinar las 10 cartas en un solo turno sin haber bajado antes → los rivales doblan sus puntos.",
+          "Cierre normal: bajar todo y descartar la última carta.",
+          "Puntos negativos por cartas sueltas: figuras=-10, As=-15, resto=-valor.",
+          "El eliminado acumula 100 puntos negativos. Gana quien quede en pie.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "chanchullo",
+    emoji: "💥",
+    title: "El Chanchullo",
+    tagline: "Velocidad, farol y descarte rápido antes que el resto",
+    players: "3-6",
+    duration: "10-20 min",
+    difficulty: "Fácil",
+    sections: [
+      {
+        icon: "🎯",
+        heading: "Objetivo",
+        bullets: [
+          "Ser el primero en deshacerte de todas tus cartas.",
+          "Puedes mentir sobre el valor que descartas… si nadie te pilla.",
+        ],
+      },
+      {
+        icon: "🃏",
+        heading: "Preparación",
+        bullets: [
+          "Se reparten todas las cartas a partes iguales.",
+          "Se establece un orden de valores (As, 2, 3… Rey) que se sigue en cada ronda.",
+        ],
+      },
+      {
+        icon: "🔄",
+        heading: "Turno",
+        bullets: [
+          "En tu turno descartas 1-4 cartas boca abajo, declarando un valor (el del turno actual).",
+          "Si alguien grita '¡CHANCHULLO!' antes del siguiente turno, se revelan las cartas.",
+          "Si mentías → recoges todo el montón.",
+          "Si decías la verdad → el acusador recoge el montón y puede elegir 3 cartas para darte.",
+          "Nadie acusa → el turno pasa y el valor avanza al siguiente.",
+        ],
+      },
+      {
+        icon: "⚡",
+        heading: "Comodines",
+        bullets: [
+          "Los 7s son comodines: pueden declararse como cualquier valor sin ser farol.",
+          "Si alguien acusa tus 7s creyendo que son farol → el acusador recibe penalización doble.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "golfo",
+    emoji: "👑",
+    title: "El Golfo",
+    tagline: "Póker tradicional español de 4 cartas — el más bajo gana",
+    players: "3-6",
+    duration: "20-40 min",
+    difficulty: "Medio",
+    sections: [
+      {
+        icon: "🎯",
+        heading: "Objetivo",
+        bullets: [
+          "Tener la mano de menor valor al final de la ronda.",
+          "El valor de la mano es la suma de tus 4 cartas (figuras=10, As=1).",
+        ],
+      },
+      {
+        icon: "🃏",
+        heading: "Preparación",
+        bullets: [
+          "Se reparten 4 cartas boca abajo a cada jugador.",
+          "Los jugadores miran solo sus 2 cartas interiores al inicio.",
+          "Se forman apuestas con fichas o puntos.",
+        ],
+      },
+      {
+        icon: "🔄",
+        heading: "Turno",
+        bullets: [
+          "En sentido horario: ROBAR del mazo e intercambiar con una de tus 4 cartas (la descartada va boca arriba).",
+          "O tomar la carta del descarte visible.",
+          "O pasar (sin cambiar nada).",
+          "Las cartas boca arriba en el descarte son visibles para todos.",
+        ],
+      },
+      {
+        icon: "🎯",
+        heading: "Golfo y final",
+        bullets: [
+          "Cuando crees tener la mano más baja, di '¡GOLFO!' en tu turno.",
+          "Los demás tienen 1 turno más para mejorar.",
+          "Se revelan todas las manos. El de menor suma gana.",
+          "Si el que cantó Golfo NO tiene la menor suma, recibe penalización doble.",
+          "Cartas especiales: Rey=0 pts · Sota de Copas = intercambia tu mano con otro jugador.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "cauca",
+    emoji: "🃏",
+    title: "El Cauca",
+    tagline: "Cartas ocultas, memoria y apuestas — conoce tu mano sin mirarla",
+    players: "3-5",
+    duration: "20-35 min",
+    difficulty: "Medio",
+    sections: [
+      {
+        icon: "🎯",
+        heading: "Objetivo",
+        bullets: [
+          "Tener la mano de menor valor acumulado al final.",
+          "La clave es memorizar tus propias cartas y vigilar las del resto.",
+        ],
+      },
+      {
+        icon: "🃏",
+        heading: "Preparación",
+        bullets: [
+          "4 cartas boca abajo a cada jugador. Solo puedes mirar tus 2 cartas del extremo izquierdo al inicio.",
+          "Valor: figuras=10, As=1, resto=valor numérico.",
+          "Rey Rojo (Copas/Espadas): -5 puntos. Rey Negro (Oros/Bastos): +10 puntos.",
+        ],
+      },
+      {
+        icon: "🔄",
+        heading: "Turno",
+        bullets: [
+          "ROBAR del mazo: miras la carta y decides si la intercambias con una de las tuyas (sin mirar la tuya) o la descartas.",
+          "Si descartas la robada, cualquier otro jugador puede cogerla en lugar de la suya.",
+          "Habilidades especiales: 7/8 = espiar una de TUS cartas; 9/10 = espiar una carta AJENA; Sota = intercambiar una tuya con una ajena (a ciegas).",
+        ],
+      },
+      {
+        icon: "🔮",
+        heading: "Cauca y final",
+        bullets: [
+          "Cuando crees tener la mano más baja di '¡CAUCA!'.",
+          "Todos revelan. El menor suma gana.",
+          "Si quien dijo Cauca no gana → recibe +10 puntos de penalización.",
+          "Empate: ambos ganan y nadie recibe penalización.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "rueda",
+    emoji: "🔄",
+    title: "La Rueda (Uno Español)",
+    tagline: "Descarta siguiendo palo o número — las figuras tienen efectos especiales",
+    players: "2-8",
+    duration: "15-30 min",
+    difficulty: "Fácil",
+    sections: [
+      {
+        icon: "🎯",
+        heading: "Objetivo",
+        bullets: [
+          "Ser el primero en quedarte sin cartas.",
+          "Di '¡UNA!' cuando te quede solo 1 carta o recibirás 2 de penalización.",
+        ],
+      },
+      {
+        icon: "🃏",
+        heading: "Preparación",
+        bullets: [
+          "Se reparten 7 cartas a cada jugador.",
+          "Se voltea 1 carta para iniciar el descarte. El resto es el mazo.",
+        ],
+      },
+      {
+        icon: "🔄",
+        heading: "Turno",
+        bullets: [
+          "Descarta 1 carta que coincida en PALO o en NÚMERO con la carta superior del descarte.",
+          "Si no puedes, roba 1 carta del mazo (puedes jugarla si coincide).",
+          "Si tampoco puedes, pasas.",
+        ],
+      },
+      {
+        icon: "⚡",
+        heading: "Figuras y efectos",
+        bullets: [
+          "Sota: el siguiente jugador pierde su turno.",
+          "Caballo: se invierte el sentido de la ronda.",
+          "Rey: el siguiente jugador roba 4 cartas y pierde su turno.",
+          "As: el jugador elige el palo que debe seguir el descarte.",
+          "7 del mismo palo que el descarte: el siguiente roba 2 cartas.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "cinquillo",
+    emoji: "🖐️",
+    title: "El Cinquillo",
+    tagline: "Construye escaleras a partir de los 5s — el primero en vaciar gana",
+    players: "2-5",
+    duration: "15-25 min",
+    difficulty: "Fácil",
+    sections: [
+      {
+        icon: "🎯",
+        heading: "Objetivo",
+        bullets: [
+          "Ser el primero en colocar todas tus cartas en las escaleras del centro.",
+        ],
+      },
+      {
+        icon: "🃏",
+        heading: "Preparación",
+        bullets: [
+          "Se reparten todas las cartas a partes iguales (pueden quedar cartas fuera si no dividen exacto).",
+          "En el centro hay 4 posiciones de escalera, una por palo. Todas empiezan vacías.",
+        ],
+      },
+      {
+        icon: "🔄",
+        heading: "Turno",
+        bullets: [
+          "Solo se puede iniciar una escalera con el 5 de ese palo.",
+          "Una vez iniciada: se puede colocar el 4 o el 6 del mismo palo en los extremos.",
+          "Las escaleras van de As (extremo bajo) a Rey (extremo alto).",
+          "Si no tienes carta jugable, PASAS. Solo puedes colocar 1 carta por turno.",
+        ],
+      },
+      {
+        icon: "🏆",
+        heading: "Final",
+        bullets: [
+          "El primero en colocar todas sus cartas gana.",
+          "Variante competitiva: los demás cuentan sus cartas restantes (puntos negativos). El acumulado decide el ranking.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "pocha",
+    emoji: "🎯",
+    title: "La Pocha",
+    tagline: "Predice exactamente cuántas bazas ganarás cada ronda — ni una más, ni una menos",
+    players: "3-6",
+    duration: "30-60 min",
+    difficulty: "Difícil",
+    sections: [
+      {
+        icon: "🎯",
+        heading: "Objetivo",
+        bullets: [
+          "Acumular más puntos prediciendo con exactitud cuántas bazas ganarás en cada ronda.",
+          "Se juegan rondas de 1 a N cartas (donde N = 40 ÷ nº jugadores) y vuelta a bajar.",
+        ],
+      },
+      {
+        icon: "🃏",
+        heading: "Preparación y triunfo",
+        bullets: [
+          "Se escogen 40 cartas y se retiran según jugadores para que el reparto sea limpio.",
+          "Al repartir, la siguiente carta del mazo revela el palo de triunfo.",
+          "Si es una figura → el triunfo lo elige el repartidor.",
+        ],
+      },
+      {
+        icon: "🗣️",
+        heading: "Fase de apuestas",
+        bullets: [
+          "En sentido horario cada jugador declara cuántas bazas va a ganar (0 a N).",
+          "El último en declarar NO puede elegir una cifra que haga que la suma de apuestas iguale el número de cartas repartidas.",
+        ],
+      },
+      {
+        icon: "🔄",
+        heading: "Juego de bazas",
+        bullets: [
+          "Hay que seguir el palo si se puede. Sin ese palo, se puede matar con triunfo o fallar.",
+          "Gana la baza el triunfo más alto o la carta de palo liderador más alta.",
+        ],
+      },
+      {
+        icon: "🏆",
+        heading: "Puntuación",
+        bullets: [
+          "Acertar exactamente tu predicción: +10 + nº de bazas ganadas.",
+          "Fallar: solo 1 punto por baza ganada, sin bonus.",
+          "Acertar con 0 bazas: +10 puntos directos.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "relojito",
+    emoji: "⏱️",
+    title: "El Relojito",
+    tagline: "Di el número de tu carta antes de que alguien más lo diga — o roba",
+    players: "3-8",
+    duration: "10-20 min",
+    difficulty: "Fácil",
+    sections: [
+      {
+        icon: "🎯",
+        heading: "Objetivo",
+        bullets: [
+          "Quedarte sin cartas siendo el más rápido en nombrar el número que se voltea.",
+        ],
+      },
+      {
+        icon: "🃏",
+        heading: "Preparación",
+        bullets: [
+          "Se reparten todas las cartas a partes iguales boca abajo (mazo personal).",
+          "El jugador inicial voltea la primera carta de su mazo al centro diciendo su número en voz alta.",
+        ],
+      },
+      {
+        icon: "🔄",
+        heading: "Turno (voltear)",
+        bullets: [
+          "En sentido horario, cada jugador voltea la carta superior de su mazo personal al centro.",
+          "Al mismo tiempo dice en voz alta el número de la carta volteada.",
+          "Si el número coincide con el número de la carta que acaba de voltear el jugador anterior → ¡DUELO!",
+        ],
+      },
+      {
+        icon: "⚡",
+        heading: "Duelo y penalización",
+        bullets: [
+          "DUELO: los dos implicados en la coincidencia deben tocar el montón central.",
+          "El más lento recoge TODAS las cartas del montón central.",
+          "Si alguien dice mal el número de su carta → recoge las cartas del montón.",
+          "Gana el primero en vaciar su mazo personal.",
+        ],
+      },
+    ],
+  },
 ];
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
+
+const AVATARS = ["🦄", "🐙", "🦊", "🐲", "🦋", "🐸", "🦝", "🐼", "🦖", "🐺", "👻", "🤖"];
+
+function extractErr(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  return String(e);
+}
 
 export default function BarajaScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === "web";
   const router = useRouter();
+  const { setSession } = useRoom();
+
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
+  const [joiningGame, setJoiningGame] = useState<Game | null>(null);
+  const [lobbyMode, setLobbyMode] = useState<"create" | "join">("create");
+  const [playerName, setPlayerName] = useState("");
+  const [roomCode, setRoomCode] = useState("");
+  const [avatar, setAvatar] = useState(AVATARS[0]);
+  const [lobbyError, setLobbyError] = useState<string | null>(null);
+
+  const createMut = useCreateRoom();
+  const joinMut = useJoinRoom();
+  const busy = createMut.isPending || joinMut.isPending;
+
+  async function handleCreate() {
+    setLobbyError(null);
+    if (!playerName.trim()) { setLobbyError("Pon tu nombre"); return; }
+    try {
+      const res = await createMut.mutateAsync({
+        data: {
+          name: playerName.trim(),
+          packs: ["banco"],
+          tags: [],
+          avatar,
+          pointLimit: 0,
+          gameTimerMs: 0,
+        },
+      });
+      await setSession({
+        roomCode: res.room.code,
+        playerId: res.playerId,
+        name: playerName.trim(),
+        avatar,
+      });
+      setJoiningGame(null);
+      router.replace("/players");
+    } catch (e) {
+      setLobbyError(extractErr(e));
+    }
+  }
+
+  async function handleJoin() {
+    setLobbyError(null);
+    if (!playerName.trim() || !roomCode.trim()) {
+      setLobbyError("Necesitas nombre y código de sala");
+      return;
+    }
+    try {
+      const res = await joinMut.mutateAsync({
+        code: roomCode.trim().toUpperCase(),
+        data: { name: playerName.trim(), tags: [], avatar },
+      });
+      await setSession({
+        roomCode: res.room.code,
+        playerId: res.playerId,
+        name: playerName.trim(),
+        avatar,
+      });
+      setJoiningGame(null);
+      router.replace(res.room.status === "active" ? "/game" : "/players");
+    } catch (e) {
+      setLobbyError(extractErr(e));
+    }
+  }
 
   const diffColor = (d: Game["difficulty"]) =>
     d === "Fácil" ? colors.primary : d === "Medio" ? "#FFB800" : colors.destructive;
@@ -663,16 +1213,26 @@ export default function BarajaScreen() {
                 </Text>
               </Pressable>
 
-              <View
-                style={[
-                  styles.comingBtn,
-                  { borderColor: colors.border },
+              <Pressable
+                onPress={() => {
+                  setJoiningGame(game);
+                  setLobbyMode("create");
+                  setLobbyError(null);
+                  setRoomCode("");
+                }}
+                style={({ pressed }) => [
+                  styles.playBtn,
+                  {
+                    borderColor: colors.primary,
+                    backgroundColor: colors.primary + (pressed ? "44" : "22"),
+                    shadowColor: colors.primary,
+                  },
                 ]}
               >
-                <Text style={[styles.comingText, { color: colors.mutedForeground }]}>
-                  🎮  Próximamente
+                <Text style={[styles.playBtnText, { color: colors.primary }]}>
+                  🎮  JUGAR
                 </Text>
-              </View>
+              </Pressable>
             </View>
           </View>
         ))}
@@ -683,6 +1243,144 @@ export default function BarajaScreen() {
         game={selectedGame}
         onClose={() => setSelectedGame(null)}
       />
+
+      {/* ── Lobby modal ── */}
+      <Modal
+        visible={!!joiningGame}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setJoiningGame(null)}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: "#00000090" }]}>
+          <TouchableWithoutFeedback onPress={() => setJoiningGame(null)}>
+            <View style={StyleSheet.absoluteFill} />
+          </TouchableWithoutFeedback>
+
+          <View
+            style={[
+              styles.lobbyPanel,
+              {
+                backgroundColor: colors.background,
+                borderColor: colors.primary,
+                paddingBottom: (insets.bottom || 20) + 16,
+              },
+            ]}
+          >
+            {/* handle */}
+            <View style={[styles.handle, { backgroundColor: colors.border }]} />
+
+            {/* title */}
+            <View style={styles.lobbyHeader}>
+              <Text style={styles.lobbyEmoji}>{joiningGame?.emoji ?? "🎮"}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.lobbyTitle, { color: colors.primary }]}>
+                  {joiningGame?.title}
+                </Text>
+                <Text style={[styles.lobbySubtitle, { color: colors.mutedForeground }]}>
+                  Sala multijugador en tiempo real
+                </Text>
+              </View>
+              <Pressable onPress={() => setJoiningGame(null)} style={[styles.modalClose, { borderColor: colors.border }]}>
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_700Bold", fontSize: 16 }}>✕</Text>
+              </Pressable>
+            </View>
+
+            {/* tabs */}
+            <View style={[styles.tabs, { borderColor: colors.border }]}>
+              {(["create", "join"] as const).map((m) => (
+                <Pressable
+                  key={m}
+                  onPress={() => { setLobbyMode(m); setLobbyError(null); }}
+                  style={[
+                    styles.tab,
+                    lobbyMode === m && { backgroundColor: colors.primary + "33", borderBottomColor: colors.primary, borderBottomWidth: 2 },
+                  ]}
+                >
+                  <Text style={[styles.tabText, { color: lobbyMode === m ? colors.primary : colors.mutedForeground }]}>
+                    {m === "create" ? "🆕 Crear Sala" : "🔗 Unirse"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} keyboardShouldPersistTaps="handled">
+              {/* name */}
+              <View style={{ gap: 6 }}>
+                <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>Tu nombre</Text>
+                <TextInput
+                  value={playerName}
+                  onChangeText={setPlayerName}
+                  placeholder="Cómo te llamas…"
+                  placeholderTextColor={colors.mutedForeground}
+                  maxLength={20}
+                  style={[styles.input, { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.card }]}
+                />
+              </View>
+
+              {/* code (join only) */}
+              {lobbyMode === "join" && (
+                <View style={{ gap: 6 }}>
+                  <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>Código de sala</Text>
+                  <TextInput
+                    value={roomCode}
+                    onChangeText={setRoomCode}
+                    placeholder="ABCD12"
+                    placeholderTextColor={colors.mutedForeground}
+                    maxLength={8}
+                    autoCapitalize="characters"
+                    style={[styles.input, { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.card }]}
+                  />
+                </View>
+              )}
+
+              {/* avatar */}
+              <View style={{ gap: 8 }}>
+                <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>Avatar</Text>
+                <View style={styles.avatarRow}>
+                  {AVATARS.map((a) => (
+                    <Pressable
+                      key={a}
+                      onPress={() => setAvatar(a)}
+                      style={[
+                        styles.avatarBtn,
+                        {
+                          borderColor: avatar === a ? colors.primary : colors.border,
+                          backgroundColor: avatar === a ? colors.primary + "22" : colors.card,
+                        },
+                      ]}
+                    >
+                      <Text style={styles.avatarEmoji}>{a}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              {/* error */}
+              {lobbyError && (
+                <Text style={[styles.errorText, { color: colors.destructive }]}>{lobbyError}</Text>
+              )}
+
+              {/* CTA */}
+              <Pressable
+                onPress={lobbyMode === "create" ? handleCreate : handleJoin}
+                disabled={busy}
+                style={[
+                  styles.ctaBtn,
+                  { borderColor: colors.primary, backgroundColor: colors.primary + "33",
+                    shadowColor: colors.primary, opacity: busy ? 0.6 : 1 },
+                ]}
+              >
+                {busy
+                  ? <ActivityIndicator color={colors.primary} />
+                  : <Text style={[styles.ctaBtnText, { color: colors.primary }]}>
+                      {lobbyMode === "create" ? "🚀  CREAR SALA" : "🔗  UNIRSE A SALA"}
+                    </Text>
+                }
+              </Pressable>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -937,15 +1635,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   rulesBtnText: { fontFamily: "Inter_700Bold", fontSize: 13 },
-  comingBtn: {
+
+  playBtn: {
     flex: 1,
     paddingVertical: 11,
     borderRadius: 10,
-    borderWidth: 1,
+    borderWidth: 2,
     alignItems: "center",
-    borderStyle: "dashed",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
   },
-  comingText: { fontFamily: "Inter_500Medium", fontSize: 12 },
+  playBtnText: { fontFamily: "Inter_700Bold", fontSize: 13, letterSpacing: 1 },
 
   // chip
   chip: {
@@ -955,7 +1656,7 @@ const styles = StyleSheet.create({
   },
   chipText: { fontFamily: "Inter_700Bold", fontSize: 11 },
 
-  // modal
+  // modal shared
   modalOverlay: {
     flex: 1,
     justifyContent: "flex-end",
@@ -999,7 +1700,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  // sections
+  // sections (rules modal)
   section: {
     borderRadius: 14,
     borderWidth: 1,
@@ -1037,4 +1738,70 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     flex: 1,
   },
+
+  // lobby modal
+  lobbyPanel: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 2,
+    borderBottomWidth: 0,
+    maxHeight: "92%",
+    paddingTop: 12,
+  },
+  lobbyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingBottom: 4,
+  },
+  lobbyEmoji: { fontSize: 32, lineHeight: 40 },
+  lobbyTitle: { fontFamily: "Inter_700Bold", fontSize: 18 },
+  lobbySubtitle: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 },
+
+  tabs: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    marginHorizontal: 20,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  tabText: { fontFamily: "Inter_700Bold", fontSize: 13 },
+
+  inputLabel: { fontFamily: "Inter_500Medium", fontSize: 12 },
+  input: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+  },
+
+  avatarRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  avatarBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarEmoji: { fontSize: 22, lineHeight: 26, textAlign: "center" },
+
+  errorText: { fontFamily: "Inter_500Medium", fontSize: 13, textAlign: "center" },
+
+  ctaBtn: {
+    paddingVertical: 15,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: "center",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 10,
+  },
+  ctaBtnText: { fontFamily: "Inter_700Bold", fontSize: 15, letterSpacing: 1.5 },
 });

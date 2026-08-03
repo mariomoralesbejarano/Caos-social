@@ -22,9 +22,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 
-const PLAYLIST_ID = "37i9dQZF1DXaXB8fQg7xof"; // Spotify "Fiesta" playlist
+const PLAYLIST_ID = "37i9dQZF1DXcBWIGoYBM5M"; // Spotify "Fiesta en casa" playlist
 const EMBED_URL = `https://open.spotify.com/embed/playlist/${PLAYLIST_ID}?utm_source=generator&theme=0`;
 const OPEN_URL = `https://open.spotify.com/playlist/${PLAYLIST_ID}`;
+const DEEP_LINK = `spotify:playlist:${PLAYLIST_ID}`;
 
 // ─── Web-only iframe rendered via React.createElement (avoids TS type error) ──
 function SpotifyIframe() {
@@ -152,6 +153,20 @@ export function SpotifyWidget() {
                     <SpotifyIframe />
                   </View>
 
+                  {/* Cyberpunk open-in-app button */}
+                  <Pressable
+                    onPress={async () => {
+                      const canDeep = await Linking.canOpenURL(DEEP_LINK);
+                      Linking.openURL(canDeep ? DEEP_LINK : OPEN_URL);
+                    }}
+                    style={({ pressed }) => [
+                      styles.openAppBtn,
+                      { opacity: pressed ? 0.75 : 1 },
+                    ]}
+                  >
+                    <Text style={styles.openAppText}>📲  ABRIR EN LA APP DE SPOTIFY</Text>
+                  </Pressable>
+
                   <Text
                     style={[
                       styles.hint,
@@ -245,5 +260,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: "center",
     fontStyle: "italic",
+  },
+  openAppBtn: {
+    backgroundColor: "#1DB954",
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#39FF14",
+    shadowColor: "#39FF14",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 8,
+  },
+  openAppText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    color: "#000",
+    letterSpacing: 1.5,
   },
 });
