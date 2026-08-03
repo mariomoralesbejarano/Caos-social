@@ -1,14 +1,6 @@
-import { Feather } from "@expo/vector-icons";
-import {
-  CardTag,
-  PackId,
-  useCreateRoom,
-  useJoinRoom,
-  useSpectatorJoin,
-} from "@workspace/api-client-react";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -16,135 +8,91 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { NeonButton } from "@/components/NeonButton";
-import { PACKS } from "@/constants/cards";
 import { useRoom } from "@/contexts/RoomContext";
 import { useColors } from "@/hooks/useColors";
 
-const TAGS: { id: CardTag; label: string }[] = [
-  { id: "abstemio", label: "Abstemio" },
-  { id: "pareja", label: "Con pareja" },
-  { id: "hardcore", label: "Hardcore" },
+// ─── Game mode catalog ────────────────────────────────────────────────────────
+
+interface GameMode {
+  id: string;
+  emoji: string;
+  title: string;
+  subtitle: string;
+  tag: string;
+  active: boolean;
+  route?: string;
+  glowColor: string;
+}
+
+const GAME_MODES: GameMode[] = [
+  {
+    id: "caos",
+    emoji: "🃏",
+    title: "Caos Social",
+    subtitle: "Retos, beber y puro caos entre amigos",
+    tag: "JUGAR",
+    active: true,
+    route: "/caos",
+    glowColor: "#39FF14",
+  },
+  {
+    id: "baraja",
+    emoji: "🎴",
+    title: "Baraja Española",
+    subtitle: "Mus, Briscas, Tute y más clásicos",
+    tag: "PRONTO",
+    active: false,
+    glowColor: "#B026FF",
+  },
+  {
+    id: "poker",
+    emoji: "♠️",
+    title: "Poker",
+    subtitle: "Texas Hold'em online con amigos",
+    tag: "PRONTO",
+    active: false,
+    glowColor: "#B026FF",
+  },
+  {
+    id: "oca",
+    emoji: "🎲",
+    title: "Oca & Parchís",
+    subtitle: "Los clásicos de mesa en tu móvil",
+    tag: "PRONTO",
+    active: false,
+    glowColor: "#B026FF",
+  },
+  {
+    id: "mini",
+    emoji: "👾",
+    title: "Sala de Minijuegos",
+    subtitle: "Trivia, palabras, retos relámpago…",
+    tag: "PRONTO",
+    active: false,
+    glowColor: "#FF2D6F",
+  },
 ];
 
-const AVATARS = ["🦄", "🐙", "🦊", "🐲", "🦋", "🐸", "🦝", "🐼", "🦖", "🐺", "👻", "🤖"];
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
-// Presets rápidos para los steppers
-const POINT_PRESETS = [0, 50, 100, 200, 300, 500];
-const TIMER_PRESETS = [0, 15, 30, 60, 90, 120];
-
-export default function HomeScreen() {
+export default function HubScreen() {
   const router = useRouter();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === "web";
-  const { session, room, hydrated, setSession } = useRoom();
+  const { session, room, hydrated } = useRoom();
 
-  const [mode, setMode] = useState<"create" | "join">("create");
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [packs, setPacks] = useState<PackId[]>(["banco"]);
-  const [tags, setTags] = useState<CardTag[]>([]);
-  const [avatar, setAvatar] = useState<string>(AVATARS[0]);
-  const [pointLimit, setPointLimit] = useState<number>(0);
-  const [gameTimerMin, setGameTimerMin] = useState<number>(0);
-  const [error, setError] = useState<string | null>(null);
-
-  const createMut = useCreateRoom();
-  const joinMut = useJoinRoom();
-  const spectateMut = useSpectatorJoin();
-
-  // If session already loaded, jump to right screen
+  // If the user already has an active session, skip the hub.
   useEffect(() => {
     if (!hydrated || !session || !room) return;
     if (session.spectator) router.replace("/ranking");
     else if (room.status === "active") router.replace("/game");
     else router.replace("/players");
   }, [hydrated, session, room, router]);
-
-  function toggleTag(tag: CardTag) {
-    setTags((prev) => {
-      const has = prev.includes(tag);
-      let next = has ? prev.filter((t) => t !== tag) : [...prev, tag];
-      if (!has && tag === "hardcore") next = ["hardcore"];
-      else if (!has) next = next.filter((t) => t !== "hardcore");
-      return next;
-    });
-  }
-
-  async function handleCreate() {
-    setError(null);
-    if (!name.trim()) {
-      setError("Pon tu nombre");
-      return;
-    }
-    try {
-      if (packs.length === 0) {
-        setError("Elige al menos un pack");
-        return;
-      }
-      const res = await createMut.mutateAsync({
-        data: { name: name.trim(), packs, tags, avatar, pointLimit, gameTimerMs: gameTimerMin * 60_000 },
-      });
-      await setSession({
-        roomCode: res.room.code,
-        playerId: res.playerId,
-        name: name.trim(),
-        avatar,
-      });
-      router.replace("/players");
-    } catch (e) {
-      setError(extractErr(e));
-    }
-  }
-
-  async function handleJoin() {
-    setError(null);
-    if (!name.trim() || !code.trim()) {
-      setError("Necesitas nombre y código");
-      return;
-    }
-    try {
-      const res = await joinMut.mutateAsync({
-        code: code.trim().toUpperCase(),
-        data: { name: name.trim(), tags, avatar },
-      });
-      await setSession({
-        roomCode: res.room.code,
-        playerId: res.playerId,
-        name: name.trim(),
-        avatar,
-      });
-      router.replace(res.room.status === "active" ? "/game" : "/players");
-    } catch (e) {
-      setError(extractErr(e));
-    }
-  }
-
-  async function handleSpectate() {
-    setError(null);
-    if (!code.trim()) {
-      setError("Necesitas el código de la sala");
-      return;
-    }
-    try {
-      const res = await spectateMut.mutateAsync({ code: code.trim() });
-      await setSession({
-        roomCode: res.roomCode,
-        playerId: "",
-        name: name.trim() || "Espectador",
-        spectator: true,
-      });
-      router.replace("/ranking");
-    } catch (e) {
-      setError(extractErr(e));
-    }
-  }
 
   if (!hydrated) {
     return (
@@ -154,658 +102,216 @@ export default function HomeScreen() {
     );
   }
 
-  const busy = createMut.isPending || joinMut.isPending || spectateMut.isPending;
-
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
       contentContainerStyle={[
         styles.container,
         {
-          paddingTop: (isWeb ? 67 : insets.top) + 20,
-          paddingBottom: (isWeb ? 34 : insets.bottom) + 40,
+          paddingTop: (isWeb ? 67 : insets.top) + 24,
+          paddingBottom: (isWeb ? 34 : insets.bottom) + 48,
         },
       ]}
     >
+      {/* ── Hero ── */}
       <View style={styles.hero}>
-        <Text style={[styles.tag, { color: colors.primary }]}>
-          PARTY ONLINE · 18+
+        <Text style={[styles.eyebrow, { color: colors.primary }]}>
+          · PARTY ONLINE 18+ ·
         </Text>
-        <Text style={[styles.title, { color: colors.foreground }]}>
-          CAOS{"\n"}
-          <Text style={{ color: colors.secondary }}>SOCIAL</Text>
+        <Text style={[styles.heroTitle, { color: colors.foreground }]}>
+          CAOS
+          {"\n"}
+          <Text style={{ color: colors.secondary }}>ARCADE</Text>
         </Text>
-        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-          Crea una sala, comparte el código y mandad cartas a vuestros amigos
-          desde cada móvil cuando queráis.
+        <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>
+          Elige tu modalidad de juego
         </Text>
-        <NotificationsButton />
       </View>
 
-      <View style={styles.tabs}>
-        <Pressable
-          onPress={() => setMode("create")}
-          style={[
-            styles.tab,
-            {
-              borderColor: mode === "create" ? colors.primary : colors.border,
-              backgroundColor: mode === "create" ? colors.primary + "22" : colors.card,
-            },
-          ]}
-        >
-          <Feather
-            name="plus-circle"
-            size={16}
-            color={mode === "create" ? colors.primary : colors.mutedForeground}
+      {/* ── Grid ── */}
+      <View style={styles.grid}>
+        {GAME_MODES.map((mode) => (
+          <GameCard
+            key={mode.id}
+            mode={mode}
+            onPress={() => {
+              if (mode.active && mode.route) router.push(mode.route as never);
+            }}
           />
-          <Text
-            style={[
-              styles.tabText,
-              { color: mode === "create" ? colors.primary : colors.mutedForeground },
-            ]}
-          >
-            Crear sala
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setMode("join")}
-          style={[
-            styles.tab,
-            {
-              borderColor: mode === "join" ? colors.secondary : colors.border,
-              backgroundColor: mode === "join" ? colors.secondary + "22" : colors.card,
-            },
-          ]}
-        >
-          <Feather
-            name="log-in"
-            size={16}
-            color={mode === "join" ? colors.secondary : colors.mutedForeground}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              { color: mode === "join" ? colors.secondary : colors.mutedForeground },
-            ]}
-          >
-            Unirme
-          </Text>
-        </Pressable>
+        ))}
       </View>
 
-      <View style={styles.section}>
-        <Text style={[styles.label, { color: colors.mutedForeground }]}>
-          TU NOMBRE
-        </Text>
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          placeholder="Cómo te llaman"
-          placeholderTextColor={colors.mutedForeground}
-          autoCapitalize="words"
-          style={[
-            styles.input,
-            {
-              color: colors.foreground,
-              borderColor: colors.border,
-              backgroundColor: colors.card,
-            },
-          ]}
-        />
-      </View>
-
-      {mode === "join" && (
-        <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.mutedForeground }]}>
-            CÓDIGO DE SALA
-          </Text>
-          <TextInput
-            value={code}
-            onChangeText={(t) => setCode(t.toUpperCase())}
-            placeholder="ABCDE"
-            placeholderTextColor={colors.mutedForeground}
-            autoCapitalize="characters"
-            maxLength={5}
-            style={[
-              styles.input,
-              styles.codeInput,
-              {
-                color: colors.primary,
-                borderColor: colors.primary,
-                backgroundColor: colors.card,
-              },
-            ]}
-          />
-        </View>
-      )}
-
-      <View style={styles.section}>
-        <Text style={[styles.label, { color: colors.mutedForeground }]}>
-          AVATAR
-        </Text>
-        <View style={styles.avatarRow}>
-          {AVATARS.map((a) => {
-            const active = a === avatar;
-            return (
-              <Pressable
-                key={a}
-                onPress={() => setAvatar(a)}
-                style={[
-                  styles.avatarChip,
-                  {
-                    borderColor: active ? colors.primary : colors.border,
-                    backgroundColor: active ? colors.primary + "22" : colors.card,
-                  },
-                ]}
-              >
-                <Text style={styles.avatarEmoji}>{a}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={[styles.label, { color: colors.mutedForeground }]}>
-          EXTRAS (opcional)
-        </Text>
-        <View style={styles.tagRow}>
-          {TAGS.map((t) => {
-            const active = tags.includes(t.id);
-            return (
-              <Pressable
-                key={t.id}
-                onPress={() => toggleTag(t.id)}
-                style={[
-                  styles.tagChip,
-                  {
-                    borderColor: active ? colors.primary : colors.border,
-                    backgroundColor: active ? colors.primary + "22" : "transparent",
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.tagChipText,
-                    { color: active ? colors.primary : colors.mutedForeground },
-                  ]}
-                >
-                  {t.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      {mode === "create" && (
-        <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.mutedForeground }]}>
-            CONDICIÓN DE VICTORIA · (opcional)
-          </Text>
-
-          {/* ── Puntos ── */}
-          <Text style={[styles.sublabel, { color: colors.mutedForeground }]}>
-            Límite de puntos · {pointLimit === 0 ? "sin límite" : `gana el primero en llegar a ${pointLimit} pts`}
-          </Text>
-          <View style={styles.stepperRow}>
-            <Pressable
-              onPress={() => setPointLimit((v) => Math.max(0, v - 10))}
-              style={[styles.stepBtn, { borderColor: colors.border }]}
-            >
-              <Text style={[styles.stepBtnText, { color: colors.foreground }]}>−</Text>
-            </Pressable>
-            <TextInput
-              value={pointLimit === 0 ? "0" : String(pointLimit)}
-              onChangeText={(v) => {
-                const n = parseInt(v.replace(/[^0-9]/g, ""), 10);
-                setPointLimit(isNaN(n) ? 0 : Math.max(0, n));
-              }}
-              keyboardType="number-pad"
-              selectTextOnFocus
-              style={[styles.stepInput, { color: colors.foreground, borderColor: colors.secondary }]}
-            />
-            <Pressable
-              onPress={() => setPointLimit((v) => v + 10)}
-              style={[styles.stepBtn, { borderColor: colors.border }]}
-            >
-              <Text style={[styles.stepBtnText, { color: colors.foreground }]}>+</Text>
-            </Pressable>
-          </View>
-          <View style={[styles.tagRow, { marginTop: 6 }]}>
-            {POINT_PRESETS.map((p) => (
-              <Pressable
-                key={p}
-                onPress={() => setPointLimit(p)}
-                style={[styles.presetChip, {
-                  borderColor: pointLimit === p ? colors.secondary : colors.border,
-                  backgroundColor: pointLimit === p ? colors.secondary + "22" : "transparent",
-                }]}
-              >
-                <Text style={[styles.presetChipText, { color: pointLimit === p ? colors.secondary : colors.mutedForeground }]}>
-                  {p === 0 ? "∞" : `${p}`}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          {/* ── Tiempo ── */}
-          <Text style={[styles.sublabel, { color: colors.mutedForeground, marginTop: 14 }]}>
-            Tiempo de partida · {gameTimerMin === 0 ? "sin límite" : `termina a los ${gameTimerMin} min`}
-          </Text>
-          <View style={styles.stepperRow}>
-            <Pressable
-              onPress={() => setGameTimerMin((v) => Math.max(0, v - 5))}
-              style={[styles.stepBtn, { borderColor: colors.border }]}
-            >
-              <Text style={[styles.stepBtnText, { color: colors.foreground }]}>−</Text>
-            </Pressable>
-            <TextInput
-              value={gameTimerMin === 0 ? "0" : String(gameTimerMin)}
-              onChangeText={(v) => {
-                const n = parseInt(v.replace(/[^0-9]/g, ""), 10);
-                setGameTimerMin(isNaN(n) ? 0 : Math.max(0, n));
-              }}
-              keyboardType="number-pad"
-              selectTextOnFocus
-              style={[styles.stepInput, { color: colors.foreground, borderColor: colors.secondary }]}
-            />
-            <Pressable
-              onPress={() => setGameTimerMin((v) => v + 5)}
-              style={[styles.stepBtn, { borderColor: colors.border }]}
-            >
-              <Text style={[styles.stepBtnText, { color: colors.foreground }]}>+</Text>
-            </Pressable>
-          </View>
-          <View style={[styles.tagRow, { marginTop: 6 }]}>
-            {TIMER_PRESETS.map((t) => (
-              <Pressable
-                key={t}
-                onPress={() => setGameTimerMin(t)}
-                style={[styles.presetChip, {
-                  borderColor: gameTimerMin === t ? colors.secondary : colors.border,
-                  backgroundColor: gameTimerMin === t ? colors.secondary + "22" : "transparent",
-                }]}
-              >
-                <Text style={[styles.presetChipText, { color: gameTimerMin === t ? colors.secondary : colors.mutedForeground }]}>
-                  {t === 0 ? "∞" : `${t} min`}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {mode === "create" && (
-        <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.mutedForeground }]}>
-            MEZCLA DE PACKS · marca varios para combinar
-          </Text>
-          {PACKS.map((p) => {
-            const active = packs.includes(p.id);
-            return (
-              <Pressable
-                key={p.id}
-                onPress={() =>
-                  setPacks((prev) => {
-                    // 'allin' es exclusivo: si lo activas, descarta el resto
-                    if (p.id === "allin") return active ? [] : ["allin"];
-                    const next = active
-                      ? prev.filter((x) => x !== p.id)
-                      : [...prev.filter((x) => x !== "allin"), p.id];
-                    return next;
-                  })
-                }
-                style={[
-                  styles.packCard,
-                  {
-                    borderColor: active ? colors.primary : colors.border,
-                    backgroundColor: colors.card,
-                    shadowColor: active ? colors.primary : "transparent",
-                  },
-                ]}
-              >
-                <LinearGradient
-                  colors={
-                    active
-                      ? p.id === "allin"
-                        ? ["#3d0a1e", "#15042A"]
-                        : ["#1a4d0a", "#15042A"]
-                      : ["#15042A", "#15042A"]
-                  }
-                  style={StyleSheet.absoluteFill}
-                />
-                <View style={{ flex: 1 }}>
-                  <View style={styles.packHead}>
-                    <Text style={[styles.packName, { color: colors.foreground }]}>
-                      {p.name}
-                    </Text>
-                    {p.id === "allin" && (
-                      <Text
-                        style={[
-                          styles.packBadge,
-                          {
-                            color: colors.destructive,
-                            borderColor: colors.destructive,
-                          },
-                        ]}
-                      >
-                        TODO MEZCLADO
-                      </Text>
-                    )}
-                  </View>
-                  <Text style={[styles.packDesc, { color: colors.mutedForeground }]}>
-                    {p.description}
-                  </Text>
-                </View>
-                <Feather
-                  name={active ? "check-square" : "square"}
-                  size={22}
-                  color={active ? colors.primary : colors.mutedForeground}
-                />
-                {active && p.id === "allin" && (
-                  <Feather name="zap" size={16} color={colors.destructive} style={{ marginLeft: 4 }} />
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
-
-      {error && (
-        <View style={[styles.errorBox, { borderColor: colors.destructive }]}>
-          <Text style={{ color: colors.destructive, textAlign: "center" }}>
-            {error}
-          </Text>
-        </View>
-      )}
-
-      <NeonButton
-        label={
-          busy
-            ? "..."
-            : mode === "create"
-              ? "CREAR SALA"
-              : "ENTRAR EN LA SALA"
-        }
-        onPress={mode === "create" ? handleCreate : handleJoin}
-        disabled={busy}
-        variant={mode === "create" ? "primary" : "secondary"}
-        style={{ marginTop: 4 }}
-      />
-
-      {mode === "join" && (
-        <Pressable
-          onPress={handleSpectate}
-          disabled={busy}
-          style={[styles.spectateBtn, { borderColor: colors.border, opacity: busy ? 0.5 : 1 }]}
-        >
-          <Feather name="eye" size={16} color={colors.mutedForeground} />
-          <Text style={[styles.spectateText, { color: colors.mutedForeground }]}>
-            ENTRAR COMO ESPECTADOR
-          </Text>
-        </Pressable>
-      )}
-
+      {/* ── Footer ── */}
       <Text style={[styles.footer, { color: colors.mutedForeground }]}>
-        Sin alcohol, sin riesgos, sin gastos. Solo caos del bueno.
+        CAOS ARCADE · v3.5
       </Text>
     </ScrollView>
   );
 }
 
-function extractErr(e: unknown): string {
-  const err = e as { data?: { error?: string }; message?: string };
-  return err?.data?.error ?? err?.message ?? "Error inesperado";
-}
+// ─── GameCard component ───────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: { paddingHorizontal: 20, gap: 22 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  hero: { gap: 8 },
-  tag: { fontFamily: "Inter_700Bold", fontSize: 12, letterSpacing: 3 },
-  title: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 56,
-    lineHeight: 60,
-    letterSpacing: -1,
-  },
-  subtitle: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    lineHeight: 21,
-    marginTop: 4,
-  },
-  tabs: { flexDirection: "row", gap: 8 },
-  tab: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 2,
-  },
-  tabText: { fontFamily: "Inter_700Bold", fontSize: 13 },
-  section: { gap: 8 },
-  label: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 11,
-    letterSpacing: 1.5,
-  },
-  sublabel: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    letterSpacing: 1,
-    marginTop: 6,
-    marginBottom: 4,
-  },
-  stepperRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 4,
-  },
-  stepBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepBtnText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 22,
-    lineHeight: 26,
-    textAlign: "center",
-  },
-  stepInput: {
-    flex: 1,
-    height: 42,
-    borderWidth: 2,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    fontFamily: "Inter_700Bold",
-    fontSize: 18,
-    textAlign: "center",
-  },
-  presetChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  presetChipText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 12,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontFamily: "Inter_500Medium",
-    fontSize: 16,
-  },
-  codeInput: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 28,
-    letterSpacing: 8,
-    textAlign: "center",
-    borderWidth: 2,
-  },
-  tagRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  tagChip: {
-    flex: 1,
-    minWidth: 90,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: "center",
-  },
-  tagChipText: { fontFamily: "Inter_700Bold", fontSize: 12 },
-  avatarRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  avatarChip: {
-    width: 48,
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 12,
-    borderWidth: 2,
-  },
-  avatarEmoji: { fontSize: 28, lineHeight: 32, textAlign: "center" },
-  roleChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  roleEmoji: { fontSize: 16 },
-  spectateBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    marginTop: 4,
-  },
-  spectateText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 12,
-    letterSpacing: 1.5,
-  },
-  packCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 2,
-    overflow: "hidden",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 12,
-    marginBottom: 8,
-  },
-  packHead: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-  packName: { fontFamily: "Inter_700Bold", fontSize: 16 },
-  packBadge: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 9,
-    letterSpacing: 1,
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  packDesc: { fontFamily: "Inter_400Regular", fontSize: 13, marginTop: 4 },
-  errorBox: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-  },
-  footer: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    textAlign: "center",
-    marginTop: 8,
-    fontStyle: "italic",
-  },
-});
-
-function NotificationsButton() {
+function GameCard({ mode, onPress }: { mode: GameMode; onPress: () => void }) {
   const colors = useColors();
-  const [perm, setPerm] = useState<string>(() => {
-    if (Platform.OS !== "web" || typeof window === "undefined") return "unsupported";
-    if (!("Notification" in window)) return "unsupported";
-    return Notification.permission;
-  });
-  if (Platform.OS !== "web" || perm === "unsupported") return null;
+  const isActive = mode.active;
 
-  async function ask() {
-    if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
-      try { await navigator.serviceWorker.register("/sw.js"); } catch {}
-    }
-    try {
-      const result = await Notification.requestPermission();
-      setPerm(result);
-    } catch {}
-  }
-
-  if (perm === "granted") {
-    return (
-      <View
-        style={{
-          flexDirection: "row", alignItems: "center", justifyContent: "center",
-          gap: 8, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10,
-          borderWidth: 1, borderColor: colors.primary, alignSelf: "center", marginTop: 8,
-        }}
-      >
-        <Feather name="bell" size={14} color={colors.primary} />
-        <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 12 }}>
-          Notificaciones activas
-        </Text>
-      </View>
-    );
-  }
-  if (perm === "denied") {
-    return (
-      <Text style={{
-        color: colors.mutedForeground, fontSize: 11, textAlign: "center",
-        marginTop: 8, fontStyle: "italic",
-      }}>
-        Notificaciones bloqueadas. Actívalas desde los ajustes del navegador.
-      </Text>
-    );
-  }
   return (
     <Pressable
-      onPress={ask}
-      style={{
-        flexDirection: "row", alignItems: "center", justifyContent: "center",
-        gap: 8, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10,
-        borderWidth: 2, borderColor: colors.primary,
-        backgroundColor: colors.primary + "22", alignSelf: "center", marginTop: 8,
-      }}
+      onPress={onPress}
+      disabled={!isActive}
+      style={({ pressed }) => [
+        styles.card,
+        {
+          borderColor: isActive ? mode.glowColor : colors.border,
+          opacity: isActive ? (pressed ? 0.85 : 1) : 0.45,
+        },
+      ]}
     >
-      <Feather name="bell" size={16} color={colors.primary} />
-      <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 13 }}>
-        ACTIVAR NOTIFICACIONES
-      </Text>
+      {/* glow gradient */}
+      <LinearGradient
+        colors={
+          isActive
+            ? [`${mode.glowColor}18`, "#15042A"]
+            : ["#15042A", "#15042A"]
+        }
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+
+      {/* neon top-border accent */}
+      {isActive && (
+        <View
+          style={[
+            styles.cardAccent,
+            { backgroundColor: mode.glowColor },
+          ]}
+        />
+      )}
+
+      <Text style={styles.cardEmoji}>{mode.emoji}</Text>
+
+      <View style={styles.cardBody}>
+        <Text
+          style={[
+            styles.cardTitle,
+            { color: isActive ? colors.foreground : colors.mutedForeground },
+          ]}
+        >
+          {mode.title}
+        </Text>
+        <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
+          {mode.subtitle}
+        </Text>
+      </View>
+
+      <View
+        style={[
+          styles.cardTag,
+          {
+            backgroundColor: isActive ? mode.glowColor + "22" : "transparent",
+            borderColor: isActive ? mode.glowColor : colors.border,
+          },
+        ]}
+      >
+        <Text
+          style={[
+            styles.cardTagText,
+            { color: isActive ? mode.glowColor : colors.mutedForeground },
+          ]}
+        >
+          {mode.tag}
+        </Text>
+      </View>
     </Pressable>
   );
 }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  container: { paddingHorizontal: 20, gap: 28 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+
+  // Hero
+  hero: { gap: 6, alignItems: "center" },
+  eyebrow: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    letterSpacing: 3,
+  },
+  heroTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 58,
+    lineHeight: 62,
+    letterSpacing: -1,
+    textAlign: "center",
+  },
+  heroSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    letterSpacing: 0.5,
+    marginTop: 4,
+  },
+
+  // Grid
+  grid: { gap: 14 },
+
+  // Card
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 18,
+    borderRadius: 16,
+    borderWidth: 2,
+    overflow: "hidden",
+    position: "relative",
+  },
+  cardAccent: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+  },
+  cardEmoji: {
+    fontSize: 36,
+    lineHeight: 42,
+    textAlign: "center",
+    width: 44,
+  },
+  cardBody: { flex: 1, gap: 3 },
+  cardTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+  },
+  cardSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  cardTag: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignSelf: "center",
+  },
+  cardTagText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    letterSpacing: 1.2,
+  },
+
+  // Footer
+  footer: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    letterSpacing: 2,
+    textAlign: "center",
+    marginTop: 8,
+  },
+});

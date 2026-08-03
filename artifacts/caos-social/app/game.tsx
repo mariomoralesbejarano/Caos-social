@@ -474,12 +474,12 @@ export default function GameScreen() {
               paddingVertical: 6,
               borderRadius: 8,
               borderWidth: 1,
-              borderColor: colors.destructive,
+              borderColor: colors.border,
             }}
           >
-            <Text style={{ fontSize: 14 }}>🚪</Text>
-            <Text style={{ color: colors.destructive, fontFamily: "Inter_700Bold", fontSize: 11 }}>
-              SALIR
+            <Text style={{ fontSize: 13 }}>🏠</Text>
+            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_700Bold", fontSize: 11 }}>
+              MENÚ
             </Text>
           </Pressable>
         </View>

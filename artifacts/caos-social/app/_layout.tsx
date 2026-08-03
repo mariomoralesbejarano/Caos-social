@@ -39,6 +39,7 @@ function RootLayoutNav() {
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="caos" options={{ headerShown: false }} />
       <Stack.Screen name="players" options={{ title: "Sala" }} />
       <Stack.Screen name="game" options={{ headerShown: false }} />
       <Stack.Screen name="ranking" options={{ title: "Ranking" }} />

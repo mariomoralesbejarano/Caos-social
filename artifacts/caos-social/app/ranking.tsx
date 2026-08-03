@@ -4,10 +4,12 @@ import {
   useEndGame,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,10 +25,16 @@ export default function RankingScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === "web";
-  const { room, session, isLoading } = useRoom();
+  const { room, session, isLoading, setSession } = useRoom();
   const qc = useQueryClient();
+  const router = useRouter();
   const endMut = useEndGame();
   const [err, setErr] = useState<string | null>(null);
+
+  async function handleGoHub() {
+    await setSession(null);
+    router.replace("/");
+  }
 
   const sorted = useMemo(
     () => (room ? [...room.players].sort((a, b) => b.score - a.score) : []),
@@ -177,6 +185,20 @@ export default function RankingScreen() {
           ))}
         </View>
       )}
+
+      {/* ── Hub back button ── */}
+      <Pressable
+        onPress={handleGoHub}
+        style={[
+          styles.hubBtn,
+          { borderColor: colors.border },
+        ]}
+      >
+        <Text style={{ fontSize: 16 }}>🏠</Text>
+        <Text style={[styles.hubBtnText, { color: colors.mutedForeground }]}>
+          Volver al Menú Principal
+        </Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -242,5 +264,20 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 13,
     marginVertical: 2,
+  },
+  hubBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 12,
+  },
+  hubBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    letterSpacing: 0.5,
   },
 });

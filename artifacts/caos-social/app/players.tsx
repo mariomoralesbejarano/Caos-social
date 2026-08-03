@@ -411,12 +411,12 @@ export default function LobbyScreen() {
             paddingVertical: 6,
             borderRadius: 8,
             borderWidth: 1,
-            borderColor: colors.destructive,
+            borderColor: colors.border,
           }}
         >
-          <Feather name="log-out" size={14} color={colors.destructive} />
-          <Text style={{ color: colors.destructive, fontFamily: "Inter_700Bold", fontSize: 12 }}>
-            SALIR
+          <Text style={{ fontSize: 13 }}>🏠</Text>
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_700Bold", fontSize: 12 }}>
+            MENÚ
           </Text>
         </Pressable>
       </View>
