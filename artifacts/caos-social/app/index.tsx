@@ -43,9 +43,10 @@ const GAME_MODES: GameMode[] = [
     id: "baraja",
     emoji: "🎴",
     title: "Baraja Española",
-    subtitle: "Mus, Briscas, Tute y más clásicos",
-    tag: "PRONTO",
-    active: false,
+    subtitle: "10 juegos: Tute, Chinchón, 7½, Burro y más",
+    tag: "VER JUEGOS",
+    active: true,
+    route: "/baraja",
     glowColor: "#B026FF",
   },
   {

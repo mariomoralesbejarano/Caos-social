@@ -16,6 +16,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { FloatingMusicToggle } from "@/components/MusicToggle";
+import { FloatingSpotifyWidget } from "@/components/SpotifyWidget";
 import { CaosSplash } from "@/components/SplashScreen";
 import { RoomProvider } from "@/contexts/RoomContext";
 import { initNativePush } from "@/lib/nativePush";
@@ -40,6 +41,7 @@ function RootLayoutNav() {
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="caos" options={{ headerShown: false }} />
+      <Stack.Screen name="baraja" options={{ headerShown: false }} />
       <Stack.Screen name="players" options={{ title: "Sala" }} />
       <Stack.Screen name="game" options={{ headerShown: false }} />
       <Stack.Screen name="ranking" options={{ title: "Ranking" }} />
@@ -83,6 +85,7 @@ export default function RootLayout() {
                 <StatusBar style="light" />
                 <RootLayoutNav />
                 <FloatingMusicToggle />
+                <FloatingSpotifyWidget />
                 {!splashDone && <CaosSplash onDone={() => setSplashDone(true)} />}
               </KeyboardProvider>
             </GestureHandlerRootView>
