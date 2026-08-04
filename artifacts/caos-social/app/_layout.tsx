@@ -45,6 +45,9 @@ function RootLayoutNav() {
       <Stack.Screen name="players" options={{ title: "Sala" }} />
       <Stack.Screen name="game" options={{ headerShown: false }} />
       <Stack.Screen name="ranking" options={{ title: "Ranking" }} />
+      <Stack.Screen name="baraja-room" options={{ headerShown: false }} />
+      <Stack.Screen name="baraja-apuestas" options={{ headerShown: false }} />
+      <Stack.Screen name="baraja-mentiroso" options={{ headerShown: false }} />
     </Stack>
   );
 }

@@ -4,7 +4,7 @@
  * The JUGAR button creates a multiplayer room synced with Supabase.
  */
 
-import { useCreateRoom, useJoinRoom } from "@workspace/api-client-react";
+import { useCreateBarajaRoom, useJoinBarajaRoom } from "@workspace/api-client-react";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -21,8 +21,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useRoom } from "@/contexts/RoomContext";
 import { useColors } from "@/hooks/useColors";
+import { saveBarajaSession } from "@/lib/barajaSession";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1048,8 +1048,6 @@ export default function BarajaScreen() {
   const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === "web";
   const router = useRouter();
-  const { setSession } = useRoom();
-
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [joiningGame, setJoiningGame] = useState<Game | null>(null);
   const [lobbyMode, setLobbyMode] = useState<"create" | "join">("create");
@@ -1058,32 +1056,29 @@ export default function BarajaScreen() {
   const [avatar, setAvatar] = useState(AVATARS[0]);
   const [lobbyError, setLobbyError] = useState<string | null>(null);
 
-  const createMut = useCreateRoom();
-  const joinMut = useJoinRoom();
+  const createMut = useCreateBarajaRoom();
+  const joinMut = useJoinBarajaRoom();
   const busy = createMut.isPending || joinMut.isPending;
 
   async function handleCreate() {
     setLobbyError(null);
     if (!playerName.trim()) { setLobbyError("Pon tu nombre"); return; }
+    if (!joiningGame) return;
     try {
       const res = await createMut.mutateAsync({
-        data: {
-          name: playerName.trim(),
-          packs: ["banco"],
-          tags: [],
-          avatar,
-          pointLimit: 0,
-          gameTimerMs: 0,
-        },
+        gameId: joiningGame.id,
+        gameTitle: joiningGame.title,
+        name: playerName.trim(),
+        avatar,
       });
-      await setSession({
-        roomCode: res.room.code,
+      await saveBarajaSession({
+        roomCode: res.code,
         playerId: res.playerId,
         name: playerName.trim(),
         avatar,
       });
       setJoiningGame(null);
-      router.replace("/players");
+      router.replace("/baraja-room" as never);
     } catch (e) {
       setLobbyError(extractErr(e));
     }
@@ -1098,16 +1093,17 @@ export default function BarajaScreen() {
     try {
       const res = await joinMut.mutateAsync({
         code: roomCode.trim().toUpperCase(),
-        data: { name: playerName.trim(), tags: [], avatar },
+        name: playerName.trim(),
+        avatar,
       });
-      await setSession({
-        roomCode: res.room.code,
+      await saveBarajaSession({
+        roomCode: res.code,
         playerId: res.playerId,
         name: playerName.trim(),
         avatar,
       });
       setJoiningGame(null);
-      router.replace(res.room.status === "active" ? "/game" : "/players");
+      router.replace("/baraja-room" as never);
     } catch (e) {
       setLobbyError(extractErr(e));
     }

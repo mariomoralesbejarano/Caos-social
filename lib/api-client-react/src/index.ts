@@ -63,6 +63,50 @@ export { existsRoom };
 export { createTelegramTopic, notifyCardThrown, getTelegramTopicUrl } from "./telegram";
 export type { TelegramCardEvent } from "./telegram";
 
+// ── Baraja Española multiplayer engine ────────────────────────────────────────
+export type {
+  BarajaRoomState,
+  BarajaRoom,
+  BarajaNaipe,
+  BarajaGameId,
+  BarajaPlayerPublic,
+  ApuestasState,
+  ApuestasRound,
+  ApuestasTrickCard,
+  MentirosoState,
+  MentirosoPlay,
+  BGameResult,
+  Palo,
+} from "./barajaTypes";
+export { PALOS, VALORES } from "./barajaTypes";
+export {
+  createDeck,
+  getBarajaCard,
+  generateBarajaCode,
+  serializeBarajaRoom,
+  createBarajaRoom,
+  applyBarajaJoin,
+  applyBarajaStartGame,
+  applyApuestasBet,
+  applyApuestasPlayCard,
+  applyMentirosoPlay,
+  applyMentirosoCallMentira,
+  cardLabel,
+  valorLabel,
+} from "./barajaGame";
+export {
+  useGetBarajaRoom,
+  useCreateBarajaRoom,
+  useJoinBarajaRoom,
+  useStartBarajaGame,
+  useLeaveBarajaRoom,
+  usePlaceApuestasBet,
+  usePlayApuestasCard,
+  usePlayMentiroso,
+  useCallMentira,
+  getBarajaRoomQueryKey,
+} from "./barajaHooks";
+
 export function useSpectatorJoin() {
   return useMutation({
     mutationFn: async ({ code }: { code: string }) => {

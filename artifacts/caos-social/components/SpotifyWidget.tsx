@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 
-const PLAYLIST_ID = "37i9dQZF1DXcBWIGoYBM5M"; // Spotify "Fiesta en casa" playlist
+const PLAYLIST_ID = "37i9dQZF1DXaXB8fQg7xof"; // Spotify "Éxitos España" official playlist
 const EMBED_URL = `https://open.spotify.com/embed/playlist/${PLAYLIST_ID}?utm_source=generator&theme=0`;
 const OPEN_URL = `https://open.spotify.com/playlist/${PLAYLIST_ID}`;
 const DEEP_LINK = `spotify:playlist:${PLAYLIST_ID}`;

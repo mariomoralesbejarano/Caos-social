@@ -15,6 +15,7 @@ const url =
   "postgresql://postgres.wmmxnplssfwycnsdtqqm:mariohugomb.02@aws-0-eu-west-1.pooler.supabase.com:6543/postgres";
 
 const SQL = `
+-- ── caos_rooms ──────────────────────────────────────────────────────────────
 create table if not exists public.caos_rooms (
   code text primary key,
   state jsonb not null,
@@ -54,6 +55,43 @@ create policy caos_rooms_update on public.caos_rooms for update using (true) wit
 create policy caos_rooms_delete on public.caos_rooms for delete using (true);
 `;
 
+const SQL2 = `
+-- ── baraja_rooms ─────────────────────────────────────────────────────────────
+create table if not exists public.baraja_rooms (
+  code text primary key,
+  state jsonb not null,
+  version integer not null default 1,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists baraja_rooms_updated_idx on public.baraja_rooms (updated_at);
+
+alter table public.baraja_rooms replica identity full;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and tablename = 'baraja_rooms'
+  ) then
+    execute 'alter publication supabase_realtime add table public.baraja_rooms';
+  end if;
+end $$;
+
+alter table public.baraja_rooms enable row level security;
+
+drop policy if exists baraja_rooms_select on public.baraja_rooms;
+drop policy if exists baraja_rooms_insert on public.baraja_rooms;
+drop policy if exists baraja_rooms_update on public.baraja_rooms;
+drop policy if exists baraja_rooms_delete on public.baraja_rooms;
+
+create policy baraja_rooms_select on public.baraja_rooms for select using (true);
+create policy baraja_rooms_insert on public.baraja_rooms for insert with check (true);
+create policy baraja_rooms_update on public.baraja_rooms for update using (true) with check (true);
+create policy baraja_rooms_delete on public.baraja_rooms for delete using (true);
+`;
+
 const client = new pg.Client({
   connectionString: url,
   ssl: { rejectUnauthorized: false },
@@ -64,6 +102,11 @@ try {
   await client.query(SQL);
   const { rows } = await client.query("select count(*)::int as n from public.caos_rooms");
   console.log(`OK. caos_rooms lista. ${rows[0].n} salas existentes.`);
+
+  await client.query(SQL2);
+  const { rows: r2 } = await client.query("select count(*)::int as n from public.baraja_rooms");
+  console.log(`OK. baraja_rooms lista. ${r2[0].n} salas existentes.`);
+
   await client.end();
 } catch (e) {
   console.error("Error:", e.message);
