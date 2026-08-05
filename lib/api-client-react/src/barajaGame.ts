@@ -3,6 +3,7 @@
 
 import type {
   ApuestasRound,
+  ApuestasRoundResult,
   ApuestasState,
   BarajaGameId,
   BarajaNaipe,
@@ -67,7 +68,7 @@ function cardRank(valor: number): number {
 // ─── Labels ───────────────────────────────────────────────────────────────────
 
 const PALO_EMOJI: Record<Palo, string> = {
-  oros: "🟡", copas: "🔴", espadas: "⚔️", bastos: "🌿",
+  oros: "🟡", copas: "🍷", espadas: "⚔️", bastos: "🪵",
 };
 
 const VALOR_LABEL: Record<number, string> = {
@@ -243,7 +244,7 @@ function initApuestas(room: BarajaRoom): ApuestasState {
   const lives: Record<string, number> = {};
   for (const p of room.players) {
     scores[p.id] = 0;
-    lives[p.id] = 3;
+    lives[p.id] = 5;
   }
   // Dealer starts at index 0; mano (left of dealer) starts first
   const dealerIdx = 0;
@@ -258,6 +259,7 @@ function initApuestas(room: BarajaRoom): ApuestasState {
     lives,
     playerOrder,
     dealerIdx,
+    lastRoundResults: [],
     gameStartedAt: Date.now(),
   };
 }
@@ -397,7 +399,16 @@ export function applyApuestasPlayCard(
 
     // Round over?
     if (r.tricksDone >= r.cardsDealt) {
-      scoreApuestasRound(gs, room.players);
+      const roundResults = scoreApuestasRound(gs, room.players);
+      gs.lastRoundResults = roundResults;
+      for (const result of roundResults) {
+        const name = room.players.find((p) => p.id === result.playerId)?.name ?? result.playerId;
+        room.log.push(
+          result.difference === 0
+            ? `✅ ${name}: ${result.predicted} apostadas / ${result.actual} ganadas · acierto exacto · 0 vidas`
+            : `❌ ${name}: ${result.predicted} apostadas / ${result.actual} ganadas · −${result.difference} vidas`,
+        );
+      }
       room.log.push("📊 Fin de ronda");
 
       const allOut = gs.playerOrder.every((pid) => (gs.lives[pid] ?? 0) <= 0);
@@ -459,26 +470,33 @@ function resolveTrick(trick: { playerId: string; cardId: string }[]): string {
   return trick[winIdx].playerId;
 }
 
-function scoreApuestasRound(gs: ApuestasState, players: BarajaPlayer[]): void {
+function scoreApuestasRound(
+  gs: ApuestasState,
+  players: BarajaPlayer[],
+): ApuestasRoundResult[] {
   const r = gs.currentRound;
+  const results: ApuestasRoundResult[] = [];
   for (const pid of gs.playerOrder) {
     const predicted = r.bets[pid] ?? 0;
     const actual = r.bazasWon[pid] ?? 0;
-    const name = players.find((p) => p.id === pid)?.name ?? pid;
-    if (predicted === actual) {
-      const gain = 10 + actual;
-      gs.scores[pid] = (gs.scores[pid] ?? 0) + gain;
-      // No life lost
-    } else {
-      gs.scores[pid] = (gs.scores[pid] ?? 0) + actual;
-      gs.lives[pid] = (gs.lives[pid] ?? 3) - 1;
-      const diff = Math.abs(predicted - actual);
-      // If all lives gone, log it
-      if ((gs.lives[pid] ?? 0) <= 0) {
-        // caller will log this via room.log after scoring
-      }
-    }
+    const difference = Math.abs(predicted - actual);
+    const livesBefore = gs.lives[pid] ?? 5;
+    const livesAfter = Math.max(0, livesBefore - difference);
+
+    // Las Apuestas uses one strict resource: exact hits cost nothing;
+    // every missed trick costs exactly the absolute prediction error.
+    gs.lives[pid] = livesAfter;
+    gs.scores[pid] = livesAfter;
+    results.push({
+      playerId: pid,
+      predicted,
+      actual,
+      difference,
+      livesBefore,
+      livesAfter,
+    });
   }
+  return results;
 }
 
 // ─── EL MENTIROSO ─────────────────────────────────────────────────────────────

@@ -53,6 +53,15 @@ export interface ApuestasRound {
   foreheadCards: Record<string, string>;
 }
 
+export interface ApuestasRoundResult {
+  playerId: string;
+  predicted: number;
+  actual: number;
+  difference: number;
+  livesBefore: number;
+  livesAfter: number;
+}
+
 export interface ApuestasState {
   type: "apuestas";
   phase: "betting" | "playing" | "scoring" | "ended";
@@ -65,6 +74,8 @@ export interface ApuestasState {
   playerOrder: string[];
   /** Index into playerOrder of the current dealer; rotates left each round. */
   dealerIdx: number;
+  /** Results from the most recently completed round, shown in the scoreboard. */
+  lastRoundResults: ApuestasRoundResult[];
   gameStartedAt: number;
 }
 

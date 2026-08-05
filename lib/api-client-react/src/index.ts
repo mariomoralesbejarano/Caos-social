@@ -72,6 +72,7 @@ export type {
   BarajaPlayerPublic,
   ApuestasState,
   ApuestasRound,
+  ApuestasRoundResult,
   ApuestasTrickCard,
   MentirosoState,
   MentirosoPlay,

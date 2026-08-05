@@ -27,5 +27,9 @@ description: Architecture and gotchas for the Baraja Española multiplayer syste
 ## tsconfig quirk
 `artifacts/caos-social/tsconfig.json` must exclude `capacitor.config.ts` — @capacitor/cli types don't resolve in the monorepo but the package itself works at runtime via Capacitor's build tooling.
 
-## mockup-sandbox pre-existing errors
-`artifacts/mockup-sandbox` has React 19 ref-type TS errors in `ui/calendar.tsx` and `ui/spinner.tsx` — pre-existing, unrelated to baraja work. Do not fix unless specifically asked.
+## Build compatibility
+`artifacts/mockup-sandbox` uses fallback `PORT` and `BASE_PATH` values during production builds, and its React 19 ref boundaries are explicitly cast/omitted where dependencies resolve duplicate React type packages.
+
+**Why:** Workspace-wide `pnpm build` must work both in the managed workflow and in a clean shell without development-only environment variables.
+
+**How to apply:** Keep build configuration self-contained; avoid requiring workflow-only env vars at Vite config evaluation time.

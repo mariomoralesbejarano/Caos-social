@@ -36,8 +36,8 @@ export const PALO_NAME: Record<Palo, string> = {
 };
 
 export const VALOR_SHORT: Record<number, string> = {
-  1: "A", 2: "2", 3: "3", 4: "4", 5: "5",
-  6: "6", 7: "7", 10: "S", 11: "C", 12: "R",
+  1: "1", 2: "2", 3: "3", 4: "4", 5: "5",
+  6: "6", 7: "7", 10: "10", 11: "11", 12: "12",
 };
 export const VALOR_LONG: Record<number, string> = {
   1: "As", 2: "2", 3: "3", 4: "4", 5: "5",
@@ -51,6 +51,7 @@ export const VALOR_PLURAL: Record<number, string> = {
 // ─── Rank strength display (for help text) ────────────────────────────────────
 // As > 3 > Rey > Caballo > Sota > 7 > 6 > 5 > 4 > 2
 export const RANK_ORDER = [1, 3, 12, 11, 10, 7, 6, 5, 4, 2];
+export const VALID_CARD_VALUES = [1, 2, 3, 4, 5, 6, 7, 10, 11, 12] as const;
 
 // ─── Size presets ─────────────────────────────────────────────────────────────
 type CardSize = "sm" | "md" | "lg";
@@ -90,9 +91,15 @@ export function SpanishCard({
   highlight = false,
   onPress,
 }: SpanishCardProps) {
+  // The Spanish deck has no 8 or 9. Do not render an invalid card even if a
+  // stale or malformed room payload reaches the component.
+  if (!VALID_CARD_VALUES.includes(valor as (typeof VALID_CARD_VALUES)[number])) {
+    return null;
+  }
+
   const s = SIZES[size];
   const color  = PALO_COLOR[palo];
-  const bgColor = faceDown ? "#1e1e2e" : PALO_BG[palo];
+  const bgColor = faceDown ? "#1e1e2e" : "#FFFDF5";
   const short  = VALOR_SHORT[valor] ?? String(valor);
   const sym    = PALO_SYMBOL[palo];
   const isFigure = valor >= 10;
@@ -104,7 +111,7 @@ export function SpanishCard({
     ? "#A855F7"      // purple for trick winner
     : faceDown
     ? "#374151"      // dark back
-    : color + "99";
+    : "#B8A98B";
 
   const elevation = selected ? 8 : 3;
 
@@ -123,11 +130,11 @@ export function SpanishCard({
           borderWidth: selected || highlight ? 2.5 : 1.5,
           opacity: disabled && !selected ? 0.5 : pressed ? 0.8 : 1,
           transform: [{ scale: selected ? 1.07 : 1 }],
-          shadowColor: selected ? "#F59E0B" : highlight ? "#A855F7" : "#000",
-          shadowOpacity: selected ? 0.6 : highlight ? 0.5 : 0.15,
-          shadowRadius: selected ? 8 : 4,
-          shadowOffset: { width: 0, height: selected ? 4 : 2 },
-          elevation,
+           shadowColor: selected ? "#F59E0B" : highlight ? "#A855F7" : "#000",
+           shadowOpacity: selected ? 0.6 : highlight ? 0.5 : 0.28,
+           shadowRadius: selected ? 8 : 5,
+           shadowOffset: { width: 0, height: selected ? 4 : 3 },
+           elevation: selected ? 8 : 5,
         },
       ]}
     >
@@ -214,6 +221,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
+    shadowColor: "#000",
   },
   faceDown: {
     ...StyleSheet.absoluteFillObject,
@@ -247,6 +255,7 @@ const styles = StyleSheet.create({
   },
   centerSymText: {
     lineHeight: undefined,
+    textAlign: "center",
   },
   figureCenter: {
     alignItems: "center",
@@ -255,5 +264,6 @@ const styles = StyleSheet.create({
   figureLabel: {
     fontFamily: "Inter_700Bold",
     textAlign: "center",
+    color: "#171717",
   },
 });

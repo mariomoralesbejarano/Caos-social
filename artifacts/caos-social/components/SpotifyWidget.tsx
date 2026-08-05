@@ -1,7 +1,7 @@
 /**
  * SpotifyWidget — Floating persistent Spotify player.
  *
- * Web  : embeds an official Spotify iframe playlist player in a modal.
+ * Web  : embeds an official Spotify playlist in a cyberpunk card.
  * Native: opens the Spotify app via deep-link (no SDK needed).
  *
  * Positioned top-left so it doesn't collide with FloatingMusicToggle (top-right).
@@ -23,7 +23,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 
 const PLAYLIST_ID = "37i9dQZF1DXaXB8fQg7xof"; // Spotify "Éxitos España" official playlist
-const EMBED_URL = `https://open.spotify.com/embed/playlist/${PLAYLIST_ID}?utm_source=generator&theme=0`;
+const EMBED_URL = `https://open.spotify.com/embed/playlist/${PLAYLIST_ID}`;
 const OPEN_URL = `https://open.spotify.com/playlist/${PLAYLIST_ID}`;
 const DEEP_LINK = `spotify:playlist:${PLAYLIST_ID}`;
 
@@ -155,16 +155,13 @@ export function SpotifyWidget() {
 
                   {/* Cyberpunk open-in-app button */}
                   <Pressable
-                    onPress={async () => {
-                      const canDeep = await Linking.canOpenURL(DEEP_LINK);
-                      Linking.openURL(canDeep ? DEEP_LINK : OPEN_URL);
-                    }}
+                     onPress={() => Linking.openURL(OPEN_URL)}
                     style={({ pressed }) => [
                       styles.openAppBtn,
                       { opacity: pressed ? 0.75 : 1 },
                     ]}
                   >
-                    <Text style={styles.openAppText}>📲  ABRIR EN LA APP DE SPOTIFY</Text>
+                     <Text style={styles.openAppText}>📲 Abrir Éxitos España en Spotify</Text>
                   </Pressable>
 
                   <Text
@@ -221,7 +218,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: "#00000088",
+    backgroundColor: "#050510ee",
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
@@ -233,6 +230,11 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     padding: 18,
     gap: 14,
+    shadowColor: "#39FF14",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    elevation: 12,
   },
   panelHeader: {
     flexDirection: "row",
@@ -254,6 +256,9 @@ const styles = StyleSheet.create({
   iframeWrap: {
     borderRadius: 14,
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#1DB95466",
+    backgroundColor: "#090914",
   },
   hint: {
     fontFamily: "Inter_400Regular",
