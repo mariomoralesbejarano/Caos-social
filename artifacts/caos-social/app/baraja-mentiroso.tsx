@@ -21,61 +21,15 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { SpanishCard, VALOR_PLURAL } from "@/components/SpanishCard";
+import type { Palo } from "@/components/SpanishCard";
 import { useColors } from "@/hooks/useColors";
 import {
-  BarajaSession,
   clearBarajaSession,
   loadBarajaSession,
 } from "@/lib/barajaSession";
-import type { BarajaNaipe, MentirosoState } from "@workspace/api-client-react";
-
-const PALO_EMOJI: Record<string, string> = {
-  oros: "🟡", copas: "🔴", espadas: "⚔️", bastos: "🌿",
-};
-const VALOR_LABEL: Record<number, string> = {
-  1: "A", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6", 7: "7",
-  10: "J", 11: "C", 12: "R",
-};
-const VALOR_NAME: Record<number, string> = {
-  1: "Ases", 2: "Doses", 3: "Treses", 4: "Cuatros", 5: "Cincos",
-  6: "Seises", 7: "Sietes", 10: "Sotas", 11: "Caballos", 12: "Reyes",
-};
-
-function CardTile({
-  naipe,
-  selected,
-  disabled,
-  onPress,
-}: {
-  naipe: BarajaNaipe;
-  selected?: boolean;
-  disabled?: boolean;
-  onPress?: () => void;
-}) {
-  const colors = useColors();
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [
-        styles.cardTile,
-        {
-          borderColor: selected ? colors.primary : colors.border,
-          backgroundColor: selected ? colors.primary + "22" : colors.card,
-          opacity: disabled ? 0.5 : pressed ? 0.75 : 1,
-          transform: [{ scale: selected ? 1.08 : 1 }],
-        },
-      ]}
-    >
-      <Text style={[styles.cardPalo, { color: selected ? colors.primary : colors.secondary }]}>
-        {PALO_EMOJI[naipe.palo]}
-      </Text>
-      <Text style={[styles.cardValor, { color: selected ? colors.primary : colors.foreground }]}>
-        {VALOR_LABEL[naipe.valor]}
-      </Text>
-    </Pressable>
-  );
-}
+import type { BarajaSession } from "@/lib/barajaSession";
+import type { MentirosoState } from "@workspace/api-client-react";
 
 export default function MentirosoScreen() {
   const colors = useColors();
@@ -121,6 +75,9 @@ export default function MentirosoScreen() {
 
   function playerName(id: string) {
     return room?.players.find((p) => p.id === id)?.name ?? id;
+  }
+  function playerAvatar(id: string) {
+    return room?.players.find((p) => p.id === id)?.avatar ?? "?";
   }
 
   async function handlePlay() {
@@ -180,7 +137,7 @@ export default function MentirosoScreen() {
     return (
       <ScrollView
         style={{ flex: 1, backgroundColor: colors.background }}
-        contentContainerStyle={[styles.container, { paddingTop: (Platform.OS === "web" ? 67 : insets.top) + 20 }]}
+        contentContainerStyle={[styles.container, { paddingTop: (Platform.OS === "web" ? 67 : insets.top) + 20, paddingBottom: 48 }]}
       >
         <Text style={[styles.bigTitle, { color: colors.primary }]}>🏆 FIN DEL JUEGO</Text>
         {winner && (
@@ -188,7 +145,7 @@ export default function MentirosoScreen() {
             <Text style={styles.winnerAvatar}>{winner.avatar}</Text>
             <Text style={[styles.winnerName, { color: colors.primary }]}>{winner.name}</Text>
             <Text style={[styles.winnerSub, { color: colors.mutedForeground }]}>
-              ¡Primer jugador sin cartas!
+              ¡Primero sin cartas!
             </Text>
           </View>
         )}
@@ -209,6 +166,7 @@ export default function MentirosoScreen() {
 
   const currentTurnName = playerName(gs.playerOrder[gs.currentIdx]);
   const lastPlay = gs.lastPlay;
+  const declaredLabel = VALOR_PLURAL[gs.declaredValue] ?? String(gs.declaredValue);
 
   return (
     <ScrollView
@@ -223,12 +181,8 @@ export default function MentirosoScreen() {
         <View style={{ flex: 1 }}>
           <Text style={[styles.gameTitle, { color: colors.foreground }]}>👺 EL MENTIROSO</Text>
           <View style={styles.declaredRow}>
-            <Text style={[styles.declaredLabel, { color: colors.mutedForeground }]}>
-              Declarar:
-            </Text>
-            <Text style={[styles.declaredValue, { color: colors.secondary }]}>
-              {VALOR_NAME[gs.declaredValue]}
-            </Text>
+            <Text style={[styles.declaredLabel, { color: colors.mutedForeground }]}>Declarar ahora: </Text>
+            <Text style={[styles.declaredValue, { color: colors.secondary }]}>{declaredLabel}</Text>
           </View>
         </View>
         <Pressable onPress={handleLeave} style={[styles.smBtn, { borderColor: colors.border }]}>
@@ -236,18 +190,20 @@ export default function MentirosoScreen() {
         </Pressable>
       </View>
 
-      {/* ── Players hand counts ── */}
+      {/* ── Players: avatars + hand counts ── */}
       <View style={[styles.playersRow, { borderColor: colors.border, backgroundColor: colors.card }]}>
         {room.players.map((p) => {
           const isActive = gs.playerOrder[gs.currentIdx] === p.id;
           return (
-            <View key={p.id} style={[styles.playerChip, isActive && { backgroundColor: colors.secondary + "22" }]}>
+            <View key={p.id} style={[
+              styles.playerChip,
+              isActive && { backgroundColor: colors.secondary + "22", borderRadius: 10 },
+            ]}>
               <Text style={styles.chipAvatar}>{p.avatar}</Text>
               <Text
-                style={[
-                  styles.chipName,
-                  { color: isActive ? colors.secondary : p.id === myId ? colors.primary : colors.foreground },
-                ]}
+                style={[styles.chipName, {
+                  color: isActive ? colors.secondary : p.id === myId ? colors.primary : colors.foreground,
+                }]}
                 numberOfLines={1}
               >
                 {p.name}{p.id === myId ? " (tú)" : ""}
@@ -255,26 +211,28 @@ export default function MentirosoScreen() {
               <Text style={[styles.chipCount, { color: colors.mutedForeground }]}>
                 {p.handCount} 🃏
               </Text>
-              {isActive && <Text style={styles.activeArrow}>◀</Text>}
+              {isActive && (
+                <Text style={{ fontSize: 10, color: colors.secondary }}>◀</Text>
+              )}
             </View>
           );
         })}
       </View>
 
-      {/* ── Pile & last declaration ── */}
+      {/* ── Pile and last declaration ── */}
       <View style={[styles.pileCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
         <View style={styles.pileRow}>
           <View style={styles.pileSide}>
             <Text style={[styles.pileNumber, { color: colors.primary }]}>{gs.pile.length}</Text>
-            <Text style={[styles.pileLabel, { color: colors.mutedForeground }]}>cartas en mesa</Text>
+            <Text style={[styles.pileLabel, { color: colors.mutedForeground }]}>en mesa</Text>
           </View>
           {lastPlay ? (
             <View style={styles.lastPlaySide}>
               <Text style={[styles.lastPlayName, { color: colors.foreground }]}>
-                {playerName(lastPlay.playerId)} dijo:
+                {playerAvatar(lastPlay.playerId)} {playerName(lastPlay.playerId)} dijo:
               </Text>
               <Text style={[styles.lastPlayValue, { color: colors.secondary }]}>
-                {lastPlay.count} {VALOR_NAME[lastPlay.declaredValue]}
+                {lastPlay.count} {VALOR_PLURAL[lastPlay.declaredValue] ?? String(lastPlay.declaredValue)}
               </Text>
             </View>
           ) : (
@@ -292,12 +250,12 @@ export default function MentirosoScreen() {
       }]}>
         <Text style={[styles.turnText, { color: isMyTurn ? colors.primary : colors.mutedForeground }]}>
           {isMyTurn
-            ? `🎯 TU TURNO — selecciona cartas y juega`
+            ? `🎯 TU TURNO — selecciona cartas y pulsa JUGAR`
             : `⏳ Turno de ${currentTurnName}…`}
         </Text>
       </View>
 
-      {/* ── ¡MENTIRA! button (when others played and it's not my turn) ── */}
+      {/* ── ¡MENTIRA! button ── */}
       {canCallMentira && (
         <Pressable
           onPress={handleMentira}
@@ -305,23 +263,23 @@ export default function MentirosoScreen() {
           style={({ pressed }) => [
             styles.mentiraBtn,
             {
-              borderColor: colors.destructive,
-              backgroundColor: colors.destructive + (pressed ? "44" : "22"),
-              shadowColor: colors.destructive,
+              borderColor: "#EF4444",
+              backgroundColor: `#EF4444${pressed ? "44" : "22"}`,
+              shadowColor: "#EF4444",
               opacity: mentiraMut.isPending ? 0.6 : 1,
             },
           ]}
         >
           {mentiraMut.isPending ? (
-            <ActivityIndicator color={colors.destructive} />
+            <ActivityIndicator color="#EF4444" />
           ) : (
             <>
-              <Text style={[styles.mentiraBtnMain, { color: colors.destructive }]}>
-                ¡MENTIRA!
-              </Text>
-              <Text style={[styles.mentiraBtnSub, { color: colors.destructive }]}>
-                {lastPlay ? `${playerName(lastPlay.playerId)} puso ${lastPlay.count} carta${lastPlay.count > 1 ? "s" : ""}` : ""}
-              </Text>
+              <Text style={[styles.mentiraBtnMain, { color: "#EF4444" }]}>¡MENTIRA!</Text>
+              {lastPlay && (
+                <Text style={[styles.mentiraBtnSub, { color: "#EF4444" }]}>
+                  {playerName(lastPlay.playerId)} puso {lastPlay.count} carta{lastPlay.count > 1 ? "s" : ""}
+                </Text>
+              )}
             </>
           )}
         </Pressable>
@@ -334,7 +292,7 @@ export default function MentirosoScreen() {
       }]}>
         <Text style={[styles.handTitle, { color: isMyTurn ? colors.primary : colors.foreground }]}>
           {isMyTurn
-            ? `Selecciona cartas a jugar (${selected.size}/4 seleccionadas)`
+            ? `Toca las cartas a jugar (${selected.size}/4 sel.)`
             : `Tu mano — ${room.myHand.length} carta${room.myHand.length !== 1 ? "s" : ""}`}
         </Text>
         {room.myHand.length === 0 ? (
@@ -344,12 +302,14 @@ export default function MentirosoScreen() {
         ) : (
           <View style={styles.handRow}>
             {room.myHand.map((c) => (
-              <CardTile
+              <SpanishCard
                 key={c.id}
-                naipe={c}
+                palo={c.palo as Palo}
+                valor={c.valor}
+                size="sm"
                 selected={selected.has(c.id)}
                 disabled={!isMyTurn}
-                onPress={() => toggleCard(c.id)}
+                onPress={isMyTurn ? () => toggleCard(c.id) : undefined}
               />
             ))}
           </View>
@@ -362,10 +322,8 @@ export default function MentirosoScreen() {
           {selected.size > 0 && (
             <View style={[styles.playPreview, { borderColor: colors.secondary + "55", backgroundColor: colors.secondary + "11" }]}>
               <Text style={[styles.playPreviewText, { color: colors.secondary }]}>
-                Jugarás {selected.size} carta{selected.size > 1 ? "s" : ""} como{" "}
-                <Text style={{ fontFamily: "Inter_700Bold" }}>
-                  {VALOR_NAME[gs.declaredValue]}
-                </Text>
+                Jugarás {selected.size} carta{selected.size > 1 ? "s" : ""} declarando{" "}
+                <Text style={{ fontFamily: "Inter_700Bold" }}>{declaredLabel}</Text>
               </Text>
             </View>
           )}
@@ -409,7 +367,7 @@ export default function MentirosoScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { paddingHorizontal: 16, gap: 14 },
+  container: { paddingHorizontal: 16, gap: 12 },
   center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 16, padding: 24 },
   smBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1 },
   bigBtn: { paddingVertical: 15, borderRadius: 12, borderWidth: 2, alignItems: "center" },
@@ -417,67 +375,49 @@ const styles = StyleSheet.create({
 
   headerRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   gameTitle: { fontFamily: "Inter_700Bold", fontSize: 22 },
-  declaredRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
+  declaredRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
   declaredLabel: { fontFamily: "Inter_500Medium", fontSize: 13 },
-  declaredValue: { fontFamily: "Inter_700Bold", fontSize: 20 },
+  declaredValue: { fontFamily: "Inter_700Bold", fontSize: 22 },
 
   playersRow: {
-    flexDirection: "row", flexWrap: "wrap", gap: 8,
-    borderRadius: 12, borderWidth: 1, padding: 12,
+    flexDirection: "row", flexWrap: "wrap", gap: 6,
+    borderRadius: 12, borderWidth: 1, padding: 10,
   },
-  playerChip: { alignItems: "center", gap: 2, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 10, minWidth: 60 },
+  playerChip: { alignItems: "center", gap: 2, paddingHorizontal: 8, paddingVertical: 6, minWidth: 56 },
   chipAvatar: { fontSize: 22 },
   chipName: { fontFamily: "Inter_500Medium", fontSize: 10, textAlign: "center" },
   chipCount: { fontFamily: "Inter_400Regular", fontSize: 11 },
-  activeArrow: { fontSize: 10, color: "#B026FF" },
 
   pileCard: { borderRadius: 12, borderWidth: 1, padding: 14 },
   pileRow: { flexDirection: "row", alignItems: "center", gap: 20 },
   pileSide: { alignItems: "center", minWidth: 60 },
-  pileNumber: { fontFamily: "Inter_700Bold", fontSize: 40, lineHeight: 48 },
+  pileNumber: { fontFamily: "Inter_700Bold", fontSize: 44, lineHeight: 52 },
   pileLabel: { fontFamily: "Inter_400Regular", fontSize: 11 },
   lastPlaySide: { flex: 1, gap: 4 },
-  lastPlayName: { fontFamily: "Inter_500Medium", fontSize: 12 },
-  lastPlayValue: { fontFamily: "Inter_700Bold", fontSize: 22 },
+  lastPlayName: { fontFamily: "Inter_500Medium", fontSize: 13 },
+  lastPlayValue: { fontFamily: "Inter_700Bold", fontSize: 24 },
   noPlay: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 12, fontStyle: "italic" },
 
   turnBanner: { borderRadius: 12, borderWidth: 2, padding: 14 },
   turnText: { fontFamily: "Inter_700Bold", fontSize: 14, textAlign: "center" },
 
   mentiraBtn: {
-    paddingVertical: 20,
-    borderRadius: 16,
-    borderWidth: 3,
-    alignItems: "center",
-    gap: 4,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 12,
+    paddingVertical: 22, borderRadius: 16, borderWidth: 3,
+    alignItems: "center", gap: 4,
+    shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 12,
   },
-  mentiraBtnMain: { fontFamily: "Inter_700Bold", fontSize: 30, letterSpacing: 2 },
+  mentiraBtnMain: { fontFamily: "Inter_700Bold", fontSize: 32, letterSpacing: 2 },
   mentiraBtnSub: { fontFamily: "Inter_400Regular", fontSize: 12 },
 
   handCard: { borderRadius: 12, borderWidth: 2, padding: 14, gap: 12 },
   handTitle: { fontFamily: "Inter_700Bold", fontSize: 13 },
   handRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  cardTile: {
-    width: 52, height: 72,
-    borderRadius: 8, borderWidth: 2,
-    alignItems: "center", justifyContent: "center", gap: 4,
-  },
-  cardPalo: { fontSize: 18 },
-  cardValor: { fontFamily: "Inter_700Bold", fontSize: 15 },
 
   playPreview: { borderRadius: 10, borderWidth: 1, padding: 10, alignItems: "center" },
   playPreviewText: { fontFamily: "Inter_500Medium", fontSize: 13 },
   playBtn: {
-    paddingVertical: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    alignItems: "center",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 8,
+    paddingVertical: 16, borderRadius: 12, borderWidth: 2, alignItems: "center",
+    shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 8,
   },
   playBtnText: { fontFamily: "Inter_700Bold", fontSize: 16, letterSpacing: 1.5 },
 
@@ -485,10 +425,7 @@ const styles = StyleSheet.create({
   logEntry: { fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 17 },
 
   bigTitle: { fontFamily: "Inter_700Bold", fontSize: 28, textAlign: "center", marginBottom: 8 },
-  winnerCard: {
-    borderRadius: 16, borderWidth: 2, padding: 24,
-    alignItems: "center", gap: 8,
-  },
+  winnerCard: { borderRadius: 16, borderWidth: 2, padding: 24, alignItems: "center", gap: 8 },
   winnerAvatar: { fontSize: 56, lineHeight: 64 },
   winnerName: { fontFamily: "Inter_700Bold", fontSize: 28 },
   winnerSub: { fontFamily: "Inter_400Regular", fontSize: 13 },

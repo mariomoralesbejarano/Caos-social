@@ -245,7 +245,9 @@ function initApuestas(room: BarajaRoom): ApuestasState {
     scores[p.id] = 0;
     lives[p.id] = 3;
   }
-  const currentRound = buildApuestasRound(room.players, playerOrder, 5, 0);
+  // Dealer starts at index 0; mano (left of dealer) starts first
+  const dealerIdx = 0;
+  const currentRound = buildApuestasRound(room.players, playerOrder, 5, dealerIdx);
   return {
     type: "apuestas",
     phase: "betting",
@@ -255,15 +257,21 @@ function initApuestas(room: BarajaRoom): ApuestasState {
     scores,
     lives,
     playerOrder,
+    dealerIdx,
     gameStartedAt: Date.now(),
   };
 }
 
+/**
+ * Build a new round.
+ * dealerIdx = index in playerOrder of the current dealer (postre).
+ * mano (first to bet and lead first trick) = (dealerIdx + 1) % n.
+ */
 function buildApuestasRound(
   players: BarajaPlayer[],
   playerOrder: string[],
   roundNum: number,
-  leaderOffset: number,
+  dealerIdx: number,
 ): ApuestasRound {
   const deck = shuffle(createDeck().map((c) => c.id));
   let ptr = 0;
@@ -274,10 +282,6 @@ function buildApuestasRound(
     ptr += roundNum;
   }
 
-  // The card after all hands reveals trump
-  const trumpCard = getBarajaCard(deck[ptr]);
-  const trump: Palo = trumpCard?.palo ?? "oros";
-
   // Round 1: forehead cards
   const foreheadCards: Record<string, string> = {};
   if (roundNum === 1) {
@@ -287,16 +291,25 @@ function buildApuestasRound(
     }
   }
 
+  const n = playerOrder.length;
+  const manoIdx = (dealerIdx + 1) % n;
+
+  // Betting order: starts from mano, dealer (postre) is last
+  const bettingOrder = [
+    ...playerOrder.slice(manoIdx),
+    ...playerOrder.slice(0, manoIdx),
+  ];
+
+  // First trick leader = mano
+  const trickLeader = playerOrder[manoIdx];
+
   const bazasWon: Record<string, number> = {};
   for (const pid of playerOrder) bazasWon[pid] = 0;
-
-  const trickLeader = playerOrder[leaderOffset % playerOrder.length];
 
   return {
     roundNum,
     cardsDealt: roundNum,
-    trump,
-    bettingOrder: [...playerOrder],
+    bettingOrder,
     bettingIdx: 0,
     bets: {},
     betsDone: false,
@@ -373,9 +386,10 @@ export function applyApuestasPlayCard(
 
   // Trick complete?
   if (r.currentTrick.length === gs.playerOrder.length) {
-    const winnerId = resolveTrick(r.currentTrick, r.trump);
+    const winnerId = resolveTrick(r.currentTrick);
     r.bazasWon[winnerId] = (r.bazasWon[winnerId] ?? 0) + 1;
     r.tricksDone += 1;
+    // Winner of trick leads the next one
     r.trickLeader = winnerId;
     const wName = room.players.find((p) => p.id === winnerId)?.name ?? winnerId;
     room.log.push(`${wName} gana la baza`);
@@ -393,15 +407,19 @@ export function applyApuestasPlayCard(
         room.log.push("🏆 Fin del juego");
       } else {
         gs.roundNum -= 1;
+        // Rotate dealer to the left
+        const newDealerIdx = (gs.dealerIdx + 1) % gs.playerOrder.length;
+        gs.dealerIdx = newDealerIdx;
         gs.currentRound = buildApuestasRound(
           room.players,
           gs.playerOrder,
           gs.roundNum,
-          gs.totalRounds - gs.roundNum,
+          newDealerIdx,
         );
         gs.phase = "betting";
+        const newDealer = room.players.find((p) => p.id === gs.playerOrder[newDealerIdx]);
         room.log.push(
-          `🃏 Ronda ${gs.roundNum} · ${gs.roundNum} carta${gs.roundNum > 1 ? "s" : ""}`,
+          `🃏 Ronda ${gs.roundNum} · ${gs.roundNum} carta${gs.roundNum > 1 ? "s" : ""} · Reparte: ${newDealer?.name ?? ""}`,
         );
       }
     }
@@ -419,32 +437,23 @@ function getTrickOrder(r: ApuestasRound): string[] {
   ];
 }
 
-function resolveTrick(
-  trick: { playerId: string; cardId: string }[],
-  trump: Palo,
-): string {
-  const ledSuit = getBarajaCard(trick[0].cardId)?.palo;
+/**
+ * Resolve a trick with pure rank-based rules (no suit following, no trump).
+ * Highest rank wins (As > 3 > Rey > Caballo > Sota > 7 > 6 > 5 > 4 > 2).
+ * Tiebreak: first card played wins (lower index in trick array).
+ */
+function resolveTrick(trick: { playerId: string; cardId: string }[]): string {
   let winIdx = 0;
   let winRank = -1;
-  let winIsTrump = false;
 
   for (let i = 0; i < trick.length; i++) {
     const card = getBarajaCard(trick[i].cardId);
     if (!card) continue;
-    const isTrump = card.palo === trump;
     const rank = cardRank(card.valor);
-
-    if (i === 0) {
+    // Strictly greater only: on tie, the first player played wins (winIdx unchanged)
+    if (rank > winRank) {
+      winIdx = i;
       winRank = rank;
-      winIsTrump = isTrump;
-      continue;
-    }
-    if (isTrump && !winIsTrump) {
-      winIdx = i; winRank = rank; winIsTrump = true;
-    } else if (isTrump && winIsTrump && rank > winRank) {
-      winIdx = i; winRank = rank;
-    } else if (!isTrump && !winIsTrump && card.palo === ledSuit && rank > winRank) {
-      winIdx = i; winRank = rank;
     }
   }
   return trick[winIdx].playerId;

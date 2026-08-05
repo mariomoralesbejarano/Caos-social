@@ -126,7 +126,7 @@ export function SpotifyWidget() {
                           { color: colors.foreground },
                         ]}
                       >
-                        Fiesta · Spotify
+                        Éxitos España · Spotify
                       </Text>
                     </View>
                     <Pressable

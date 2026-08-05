@@ -40,13 +40,13 @@ export interface ApuestasTrickCard {
 export interface ApuestasRound {
   roundNum: number;         // 5 downto 1
   cardsDealt: number;       // == roundNum
-  trump: Palo;
-  bettingOrder: string[];   // player IDs in order
+  /** bettingOrder[0] = mano (left of dealer); dealer is last */
+  bettingOrder: string[];
   bettingIdx: number;       // index of next bettor
   bets: Record<string, number>;
   betsDone: boolean;
   currentTrick: ApuestasTrickCard[];
-  trickLeader: string;      // who leads current trick
+  trickLeader: string;      // who leads current trick (mano for first trick, winner thereafter)
   bazasWon: Record<string, number>;
   tricksDone: number;
   /** Round 1 only: playerId → cardId, visible to everyone EXCEPT the owner */
@@ -61,7 +61,10 @@ export interface ApuestasState {
   currentRound: ApuestasRound;
   scores: Record<string, number>;
   lives: Record<string, number>;
+  /** Shuffled once at game start; never changes. */
   playerOrder: string[];
+  /** Index into playerOrder of the current dealer; rotates left each round. */
+  dealerIdx: number;
   gameStartedAt: number;
 }
 
