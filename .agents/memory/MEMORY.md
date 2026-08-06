@@ -1,3 +1,4 @@
 - [Supabase schema](supabase-schema.md) — tabla caos_rooms ya creada; store.ts usa CAS por version; setup: node scripts/setup-supabase.mjs
 - [Lib build](lib-build.md) — api-client-react necesita pnpm install propio; tsconfig.json raíz solo debe referenciar lib/api-client-react (db y api-zod no tienen tsconfig)
 - [Baraja engine](baraja-engine.md) — baraja_rooms table live; pure logic in barajaGame.ts; hooks in barajaHooks.ts; session in barajaSession.ts; tsconfig excludes capacitor.config.ts
+- [GitHub push](github-push.md) — si el remoto HTTPS rechaza el CLI, publicar mediante la conexión GitHub administrada del workspace
