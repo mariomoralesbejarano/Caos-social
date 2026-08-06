@@ -6,21 +6,20 @@ import {
 } from "@workspace/api-client-react";
 import type { ParchisState } from "@workspace/api-client-react";
 import { useRouter } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
-  Easing,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import Svg, { Circle, G, Path, Rect, Text as SvgText } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BoardRoomLobby from "@/components/BoardRoomLobby";
+import DiceRoller from "@/components/DiceRoller";
 import { useColors } from "@/hooks/useColors";
 import { clearBarajaSession, loadBarajaSession, type BarajaSession } from "@/lib/barajaSession";
 
@@ -56,19 +55,6 @@ export default function ParchisScreen() {
   const gs = room?.gameState?.type === "parchis" ? room.gameState as ParchisState : null;
   const myId = session?.playerId ?? "";
   const isMyTurn = !!gs && gs.playerOrder[gs.currentIdx] === myId;
-  const diceScale = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (gs?.lastDice === null || gs?.lastDice === undefined) return;
-    diceScale.setValue(0.55);
-    Animated.timing(diceScale, {
-      toValue: 1,
-      duration: 360,
-      easing: Easing.out(Easing.back(1.4)),
-      useNativeDriver: Platform.OS !== "web",
-    }).start();
-  }, [gs?.lastDice, diceScale]);
-
   useEffect(() => {
     if (session && room?.status === "lobby") router.replace("/baraja-room" as never);
   }, [room?.status, router, session]);
@@ -139,11 +125,8 @@ export default function ParchisScreen() {
           <Text style={[styles.turn, { color: isMyTurn ? "#FFB800" : colors.mutedForeground }]}>
             {isMyTurn ? "TU TURNO" : `Turno de ${currentName ?? "otro jugador"}`}
           </Text>
-          <Animated.Text style={[styles.dice, { color: colors.foreground, transform: [{ scale: diceScale }] }]}>
-            {gs.lastDice ?? "—"}
-          </Animated.Text>
           <Text style={[styles.help, { color: colors.mutedForeground }]}>
-            {gs.dice === null ? "Tira el dado para continuar" : "Elige una ficha para mover"}
+            {gs.dice === null ? "Necesitas un 5 (o 6) para sacar una ficha de casa" : "Elige una ficha para mover"}
           </Text>
         </View>
 
@@ -170,13 +153,12 @@ export default function ParchisScreen() {
         </View>
 
         {error && <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text>}
-        <Pressable
-          onPress={roll}
+        <DiceRoller
+          values={gs.lastDice === null ? null : [gs.lastDice]}
+          onRoll={roll}
           disabled={!isMyTurn || gs.dice !== null || rollMut.isPending || gs.phase === "ended"}
-          style={[styles.rollButton, { backgroundColor: "#FFB800", opacity: !isMyTurn || gs.dice !== null ? 0.45 : 1 }]}
-        >
-          {rollMut.isPending ? <ActivityIndicator color="#12051D" /> : <Text style={styles.rollText}>TIRAR DADO</Text>}
-        </Pressable>
+          accent="#FFB800"
+        />
         {gs.phase === "ended" && (
           <Text style={[styles.winner, { color: "#39FF14" }]}>
             Ganador: {room.players.find((player) => player.id === gs.winnerId)?.name ?? "Jugador"}
@@ -189,31 +171,71 @@ export default function ParchisScreen() {
 }
 
 function ParchisBoard({ state }: { state: ParchisState }) {
-  const slots = useMemo(() => Array.from({ length: 52 }, (_, index) => index), []);
-  const occupied = new Map<number, string[]>();
+  const occupied = new Map<number, Array<{ color: string; playerId: string }>>();
   for (const playerId of state.playerOrder) {
     for (const piece of state.pieces[playerId] ?? []) {
       if (piece < 1 || piece >= 68) continue;
       const track = (piece + ({ rojo: 0, amarillo: 13, verde: 26, azul: 39 }[state.colors[playerId]]) % 52) % 52;
-      occupied.set(track, [...(occupied.get(track) ?? []), state.colors[playerId]]);
+      occupied.set(track, [...(occupied.get(track) ?? []), { color: state.colors[playerId], playerId }]);
     }
   }
+  const track = [
+    [6, 0], [7, 0], [8, 0], [9, 0], [10, 0], [10, 1], [10, 2], [10, 3], [10, 4], [10, 5],
+    [11, 5], [12, 5], [13, 5], [14, 5], [14, 6], [14, 7], [14, 8], [14, 9], [14, 10], [13, 10],
+    [12, 10], [11, 10], [10, 10], [10, 11], [10, 12], [10, 13], [10, 14], [9, 14], [8, 14], [7, 14],
+    [6, 14], [6, 13], [6, 12], [6, 11], [6, 10], [5, 10], [4, 10], [3, 10], [2, 10], [1, 10],
+    [0, 10], [0, 9], [0, 8], [0, 7], [0, 6], [1, 6], [2, 6], [3, 6], [4, 6], [5, 6],
+    [6, 6], [7, 6], [8, 6], [9, 6],
+  ];
+  const homes = [
+    { x: 1, y: 1, color: COLOR_META.rojo, label: "ROJO", playerId: state.playerOrder.find((id) => state.colors[id] === "rojo") },
+    { x: 9, y: 1, color: COLOR_META.amarillo, label: "AMARILLO", playerId: state.playerOrder.find((id) => state.colors[id] === "amarillo") },
+    { x: 1, y: 9, color: COLOR_META.azul, label: "AZUL", playerId: state.playerOrder.find((id) => state.colors[id] === "azul") },
+    { x: 9, y: 9, color: COLOR_META.verde, label: "VERDE", playerId: state.playerOrder.find((id) => state.colors[id] === "verde") },
+  ];
+  const homePieces = (playerId?: string) => (playerId ? state.pieces[playerId] ?? [] : []);
+  const cell = 20;
   return (
     <View style={styles.board}>
-      <View style={styles.boardCenter}>
-        <Text style={styles.centerMark}>META</Text>
-        <Text style={styles.centerSub}>20 al comer · 10 al llegar</Text>
-      </View>
-      <View style={styles.track}>
-        {slots.map((slot) => (
-          <View key={slot} style={styles.trackSlot}>
-            <Text style={styles.slotNumber}>{slot + 1}</Text>
-            {occupied.get(slot)?.map((color, index) => (
-              <Text key={`${color}-${index}`} style={{ color: COLOR_META[color as keyof typeof COLOR_META], fontSize: 15 }}>●</Text>
+      <Svg width="100%" height={360} viewBox="0 0 300 300">
+        <Rect x="2" y="2" width="296" height="296" rx="12" fill="#170B2A" stroke="#5C2F86" strokeWidth="3" />
+        <Rect x="0" y="0" width="100" height="100" fill={COLOR_META.rojo} opacity="0.9" />
+        <Rect x="200" y="0" width="100" height="100" fill={COLOR_META.amarillo} opacity="0.9" />
+        <Rect x="0" y="200" width="100" height="100" fill={COLOR_META.azul} opacity="0.9" />
+        <Rect x="200" y="200" width="100" height="100" fill={COLOR_META.verde} opacity="0.9" />
+        <Rect x="100" y="0" width="100" height="300" fill="#F5F2E9" opacity="0.94" />
+        <Rect x="0" y="100" width="300" height="100" fill="#F5F2E9" opacity="0.94" />
+        {track.map(([x, y], index) => {
+          const safe = [0, 8, 13, 21, 26, 34, 39, 47].includes(index);
+          const pieces = occupied.get(index) ?? [];
+          return (
+            <G key={`track-${index}`}>
+              <Rect x={x * cell} y={y * cell} width={cell} height={cell} fill={safe ? "#FFE09A" : "#FFFFFF"} stroke="#B8AFC1" strokeWidth="0.8" />
+              {safe && <Circle cx={x * cell + 10} cy={y * cell + 10} r="4" fill="#FFB800" opacity="0.75" />}
+              {pieces.map((piece, pieceIndex) => (
+                <Circle key={`${piece.playerId}-${pieceIndex}`} cx={x * cell + 6 + (pieceIndex % 2) * 8} cy={y * cell + 7 + Math.floor(pieceIndex / 2) * 8} r="4.2" fill={COLOR_META[piece.color as keyof typeof COLOR_META]} stroke="#1A1126" strokeWidth="1" />
+              ))}
+            </G>
+          );
+        })}
+        <Path d="M100 100H200V120H180V140H160V160H140V180H120V200H100Z" fill={COLOR_META.rojo} opacity="0.7" />
+        <Path d="M200 100V200H180V180H160V160H140V140H120V120H100V100Z" fill={COLOR_META.amarillo} opacity="0.7" />
+        <Path d="M200 200H100V180H120V160H140V140H160V120H180V100H200Z" fill={COLOR_META.verde} opacity="0.7" />
+        <Path d="M100 200V100H120V120H140V140H160V160H180V180H200V200Z" fill={COLOR_META.azul} opacity="0.7" />
+        <Rect x="100" y="100" width="100" height="100" fill="#241334" stroke="#FFB800" strokeWidth="2" />
+        <SvgText x="150" y="146" textAnchor="middle" fill="#FFB800" fontSize="13" fontWeight="700">META</SvgText>
+        <SvgText x="150" y="162" textAnchor="middle" fill="#F5D7FF" fontSize="6" fontWeight="600">20 · 10</SvgText>
+        {homes.map((home) => (
+          <G key={home.label}>
+            <Rect x={home.x * cell} y={home.y * cell} width="100" height="100" rx="15" fill={home.color} opacity="0.22" stroke={home.color} strokeWidth="2" />
+            {[0, 1, 2, 3].map((index) => (
+              <Circle key={index} cx={home.x * cell + 28 + (index % 2) * 44} cy={home.y * cell + 30 + Math.floor(index / 2) * 42} r="12" fill="#21102E" stroke={home.color} strokeWidth="3" opacity={(homePieces(home.playerId)[index] ?? -1) < 0 ? 0.95 : 0.55} />
             ))}
-          </View>
+            <SvgText x={home.x * cell + 50} y={home.y * cell + 94} textAnchor="middle" fill={home.color} fontSize="8" fontWeight="700">{home.label}</SvgText>
+          </G>
         ))}
-      </View>
+      </Svg>
+      <Text style={styles.boardCaption}>CRUZ CLÁSICA · CASILLAS DORADAS = SEGURO · SALIDA CON 5 O 6</Text>
     </View>
   );
 }
@@ -250,13 +272,11 @@ const styles = StyleSheet.create({
   slotNumber: { color: "#BBA9CE", fontFamily: "Inter_600SemiBold", fontSize: 8 },
   status: { borderWidth: 1, borderRadius: 14, padding: 14, alignItems: "center", gap: 4 },
   turn: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 1.5 },
-  dice: { fontFamily: "Inter_700Bold", fontSize: 35 },
   help: { fontFamily: "Inter_400Regular", fontSize: 11 },
   piecesRow: { flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 8 },
   pieceButton: { minWidth: 82, borderWidth: 1, borderRadius: 10, padding: 9, alignItems: "center", gap: 3 },
   pieceLabel: { fontFamily: "Inter_600SemiBold", fontSize: 10 },
-  rollButton: { borderRadius: 10, paddingVertical: 15, alignItems: "center" },
-  rollText: { color: "#12051D", fontFamily: "Inter_700Bold", letterSpacing: 1 },
+  boardCaption: { color: "#C8B9D6", fontFamily: "Inter_600SemiBold", fontSize: 8, textAlign: "center", letterSpacing: 0.4 },
   error: { fontFamily: "Inter_600SemiBold", fontSize: 12, textAlign: "center" },
   winner: { fontFamily: "Inter_700Bold", fontSize: 15, textAlign: "center" },
   log: { borderWidth: 1, borderRadius: 13, padding: 13, gap: 5 },

@@ -8,18 +8,17 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
-  Easing,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import Svg, { Circle, G, Line, Path, Rect, Text as SvgText } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BoardRoomLobby from "@/components/BoardRoomLobby";
+import DiceRoller from "@/components/DiceRoller";
 import { useColors } from "@/hooks/useColors";
 import { clearBarajaSession, loadBarajaSession, type BarajaSession } from "@/lib/barajaSession";
 
@@ -49,19 +48,6 @@ export default function OcaScreen() {
   const gs = room?.gameState?.type === "oca" ? room.gameState as OcaState : null;
   const myId = session?.playerId ?? "";
   const isMyTurn = !!gs && gs.playerOrder[gs.currentIdx] === myId;
-  const diceRotation = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (!gs?.lastDice) return;
-    diceRotation.setValue(0);
-    Animated.timing(diceRotation, {
-      toValue: 1,
-      duration: 420,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: Platform.OS !== "web",
-    }).start();
-  }, [gs?.lastDice, diceRotation]);
-
   useEffect(() => {
     if (session && room?.status === "lobby") router.replace("/baraja-room" as never);
   }, [room?.status, router, session]);
@@ -121,20 +107,6 @@ export default function OcaScreen() {
           <Text style={[styles.turn, { color: isMyTurn ? "#45A3FF" : colors.mutedForeground }]}>
             {isMyTurn ? "TU TURNO" : `Turno de ${currentName ?? "otro jugador"}`}
           </Text>
-          <Animated.Text
-            style={[
-              styles.dice,
-              {
-                color: colors.foreground,
-                transform: [
-                  { scale: diceRotation.interpolate({ inputRange: [0, 1], outputRange: [0.65, 1] }) },
-                  { rotate: diceRotation.interpolate({ inputRange: [0, 1], outputRange: ["-12deg", "0deg"] }) },
-                ],
-              },
-            ]}
-          >
-            {gs.lastDice ? `${gs.lastDice[0]} + ${gs.lastDice[1]}` : "—"}
-          </Animated.Text>
           <Text style={[styles.help, { color: colors.mutedForeground }]}>
             {gs.lastMove ?? "Tira los dados para avanzar"}
           </Text>
@@ -169,13 +141,14 @@ export default function OcaScreen() {
         </View>
 
         {error && <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text>}
-        <Pressable
-          onPress={roll}
+        <DiceRoller
+          values={gs.lastDice}
+          count={2}
+          onRoll={roll}
           disabled={!isMyTurn || rollMut.isPending || gs.phase === "ended"}
-          style={[styles.rollButton, { backgroundColor: "#45A3FF", opacity: !isMyTurn || gs.phase === "ended" ? 0.45 : 1 }]}
-        >
-          {rollMut.isPending ? <ActivityIndicator color="#071426" /> : <Text style={styles.rollText}>TIRAR DADOS</Text>}
-        </Pressable>
+          accent="#45A3FF"
+          label="TIRAR DADOS"
+        />
         {gs.phase === "ended" && (
           <Text style={[styles.winner, { color: "#39FF14" }]}>
             Ganador: {room.players.find((player) => player.id === gs.winnerId)?.name ?? "Jugador"}
@@ -194,41 +167,64 @@ export default function OcaScreen() {
 
 function OcaBoard({ state }: { state: OcaState }) {
   const cells = useMemo(() => Array.from({ length: 63 }, (_, index) => index + 1), []);
-  const specialLabels: Record<number, string> = {
-    5: "OCA", 6: "P", 14: "OCA", 19: "POS", 23: "OCA", 31: "POZ",
-    32: "OCA", 41: "OCA", 42: "LAB", 50: "OCA", 56: "CAR", 59: "OCA", 63: "META",
+  const specialKinds: Record<number, "goose" | "bridge" | "inn" | "well" | "maze" | "jail" | "death"> = {
+    5: "goose", 6: "bridge", 9: "goose", 12: "bridge", 14: "goose", 19: "inn",
+    23: "goose", 27: "goose", 31: "well", 32: "goose", 36: "goose", 41: "goose",
+    42: "maze", 45: "goose", 50: "goose", 54: "goose", 56: "jail", 58: "death", 59: "goose",
   };
   return (
     <View style={styles.board}>
-      <View style={styles.spiral}>
+      <Svg width="100%" height={560} viewBox="0 0 560 560">
+        <Rect x="3" y="3" width="554" height="554" rx="26" fill="#081B2D" stroke="#275C91" strokeWidth="3" />
+        <Circle cx="280" cy="280" r="38" fill="#123A5C" stroke="#45A3FF" strokeWidth="2" />
+        <SvgText x="280" y="277" textAnchor="middle" fill="#D8E8F8" fontSize="13" fontWeight="700">LA OCA</SvgText>
+        <SvgText x="280" y="294" textAnchor="middle" fill="#A9D4F8" fontSize="8" fontWeight="600">63 CASILLAS</SvgText>
         {cells.map((cell) => {
+          const { x, y } = ocaSpiralPosition(cell);
+          const kind = specialKinds[cell];
           const playersHere = state.playerOrder.filter((id) => state.positions[id] === cell);
-          const special = specialLabels[cell];
+          const cellColor = cell === 63 ? "#39FF14" : kind ? "#45A3FF" : "#3975A9";
           return (
-            <View
-              key={cell}
-              style={[
-                styles.cell,
-                spiralPosition(cell),
-                special && styles.specialCell,
-                cell === 63 && styles.finishCell,
-              ]}
-            >
-              <Text style={styles.cellNumber}>{cell}</Text>
-              {special && <Text style={styles.specialText}>{special}</Text>}
-              <View style={styles.tokens}>
-                {playersHere.map((playerId) => {
-                  const index = state.playerOrder.indexOf(playerId);
-                  return <Text key={playerId} style={{ color: PLAYER_COLORS[index % PLAYER_COLORS.length], fontSize: 13 }}>●</Text>;
-                })}
-              </View>
-            </View>
+            <G key={cell}>
+              <Circle cx={x} cy={y} r="15" fill={cell === 63 ? "#144B37" : kind ? "#173B5D" : "#102C49"} stroke={cellColor} strokeWidth={kind || cell === 63 ? 2 : 1} />
+              <SvgText x={x} y={kind ? y - 5 : y + 4} textAnchor="middle" fill="#E6F2FF" fontSize={kind ? "8" : "10"} fontWeight="700">{cell}</SvgText>
+              {kind && <SpecialIcon kind={kind} x={x} y={y + 7} />}
+              {playersHere.map((playerId, index) => (
+                <Circle key={playerId} cx={x - 9 + (index % 3) * 9} cy={y + 12 + Math.floor(index / 3) * 8} r="3.5" fill={PLAYER_COLORS[state.playerOrder.indexOf(playerId) % PLAYER_COLORS.length]} stroke="#061321" strokeWidth="1" />
+              ))}
+            </G>
           );
         })}
-      </View>
+        <Path d={spiralPath()} fill="none" stroke="#75BFFF" strokeWidth="1.2" opacity="0.24" />
+      </Svg>
       <Text style={styles.boardLegend}>OCA → OCA · PUENTE → PUENTE · POSADA · CÁRCEL · POZO · LABERINTO · CALAVERA</Text>
     </View>
   );
+}
+
+function ocaSpiralPosition(cell: number) {
+  const progress = (cell - 1) / 62;
+  const angle = progress * Math.PI * 4.2 - Math.PI / 2;
+  const radius = 28 + progress * 224;
+  return { x: 280 + Math.cos(angle) * radius, y: 280 + Math.sin(angle) * radius };
+}
+
+function spiralPath() {
+  return Array.from({ length: 63 }, (_, index) => {
+    const point = ocaSpiralPosition(index + 1);
+    return `${index === 0 ? "M" : "L"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+  }).join(" ");
+}
+
+function SpecialIcon({ kind, x, y }: { kind: "goose" | "bridge" | "inn" | "well" | "maze" | "jail" | "death"; x: number; y: number }) {
+  const stroke = "#BFE4FF";
+  if (kind === "goose") return <G><Path d={`M${x - 5} ${y + 8}c-4-7 2-12 5-7 1-7 7-8 7-2 0 4-3 6-6 6`} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" /><Circle cx={x + 5} cy={y - 2} r="1.2" fill={stroke} /></G>;
+  if (kind === "bridge") return <G><Path d={`M${x - 10} ${y + 6}Q${x} ${y - 8} ${x + 10} ${y + 6}`} fill="none" stroke={stroke} strokeWidth="2" /><Line x1={x - 8} y1={y + 5} x2={x - 8} y2={y - 2} stroke={stroke} strokeWidth="1" /><Line x1={x + 8} y1={y + 5} x2={x + 8} y2={y - 2} stroke={stroke} strokeWidth="1" /></G>;
+  if (kind === "inn") return <G><Path d={`M${x - 10} ${y - 3}L${x} ${y - 11}L${x + 10} ${y - 3}Z`} fill="#FFB800" /><Rect x={x - 7} y={y - 3} width="14" height="11" fill="none" stroke={stroke} strokeWidth="1.5" /></G>;
+  if (kind === "well") return <G><Circle cx={x} cy={y + 2} r="9" fill="none" stroke={stroke} strokeWidth="2" /><Line x1={x - 8} y1={y - 7} x2={x + 8} y2={y - 7} stroke={stroke} strokeWidth="1.5" /></G>;
+  if (kind === "maze") return <Path d={`M${x - 9} ${y - 8}h18v16H${x - 4}v-4h8v-8H${x - 5}v8h-4Z`} fill="none" stroke={stroke} strokeWidth="1.5" />;
+  if (kind === "jail") return <G><Rect x={x - 9} y={y - 9} width="18" height="18" fill="none" stroke={stroke} strokeWidth="1.5" />{[-5, 0, 5].map((offset) => <Line key={offset} x1={x + offset} y1={y - 8} x2={x + offset} y2={y + 8} stroke={stroke} strokeWidth="1" />)}</G>;
+  return <G><Circle cx={x} cy={y} r="9" fill="#172235" stroke="#DCE8F5" strokeWidth="1.5" /><Circle cx={x - 3} cy={y - 2} r="1.5" fill="#DCE8F5" /><Circle cx={x + 3} cy={y - 2} r="1.5" fill="#DCE8F5" /><Path d={`M${x - 4} ${y + 4}h8`} stroke="#DCE8F5" strokeWidth="1.5" /></G>;
 }
 
 function LoadingScreen({ color }: { color: string }) {
@@ -244,17 +240,9 @@ const styles = StyleSheet.create({
   title: { fontFamily: "Inter_700Bold", fontSize: 27, marginTop: 4 },
   smallButton: { borderWidth: 1, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10 },
   board: { borderRadius: 20, borderWidth: 2, borderColor: "#275C91", backgroundColor: "#102947", padding: 12, gap: 12 },
-  spiral: { height: 520, position: "relative", alignSelf: "center", width: "100%", maxWidth: 600 },
-  cell: { width: 48, height: 43, borderRadius: 8, borderWidth: 1, borderColor: "#3975A9", backgroundColor: "#17385B", alignItems: "center", justifyContent: "center" },
-  specialCell: { backgroundColor: "#244D71", borderColor: "#45A3FF" },
-  finishCell: { backgroundColor: "#144B37", borderColor: "#39FF14" },
-  cellNumber: { color: "#D8E8F8", fontFamily: "Inter_700Bold", fontSize: 10 },
-  specialText: { color: "#A9D4F8", fontFamily: "Inter_700Bold", fontSize: 7, marginTop: 1 },
-  tokens: { flexDirection: "row", height: 13, alignItems: "center" },
   boardLegend: { color: "#A9C6E2", fontFamily: "Inter_600SemiBold", fontSize: 8, lineHeight: 13, textAlign: "center" },
   status: { borderWidth: 1, borderRadius: 14, padding: 14, alignItems: "center", gap: 4 },
   turn: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 1.5 },
-  dice: { fontFamily: "Inter_700Bold", fontSize: 32 },
   help: { fontFamily: "Inter_400Regular", fontSize: 11, textAlign: "center" },
   playersCard: { gap: 7 },
   playerRow: { minHeight: 45, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 8 },

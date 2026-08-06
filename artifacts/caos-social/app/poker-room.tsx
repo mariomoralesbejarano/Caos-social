@@ -19,7 +19,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,6 +26,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { clearBarajaSession, loadBarajaSession } from "@/lib/barajaSession";
 import type { BarajaSession } from "@/lib/barajaSession";
 import { useColors } from "@/hooks/useColors";
+import BetSlider from "@/components/BetSlider";
 
 const SUIT_SYMBOL: Record<PokerSuit, string> = {
   spades: "♠",
@@ -80,7 +80,7 @@ export default function PokerRoomScreen() {
   const [session, setSession] = useState<BarajaSession | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [raiseTo, setRaiseTo] = useState("60");
+  const [raiseTo, setRaiseTo] = useState(0);
 
   useEffect(() => {
     loadBarajaSession().then((value) => {
@@ -106,13 +106,18 @@ export default function PokerRoomScreen() {
   const myStreetBet = gs?.streetBets[myId] ?? 0;
   const toCall = Math.max(0, (gs?.currentBet ?? 0) - myStreetBet);
   const minRaiseTarget = (gs?.currentBet ?? 0) + (gs?.minRaise ?? 0);
+  const maxRaiseTarget = gs ? (gs.streetBets[myId] ?? 0) + (gs.stacks[myId] ?? 0) : 0;
+  const sliderMin = Math.min(minRaiseTarget, maxRaiseTarget);
   const currentPlayer = room?.players.find((player) => player.id === gs?.playerOrder[gs?.currentIdx]);
   const dealerId = gs?.playerOrder[gs.dealerIdx];
   const blindIds = new Set([gs?.smallBlindId, gs?.bigBlindId]);
 
   useEffect(() => {
-    if (gs) setRaiseTo(String(Math.max(minRaiseTarget, gs.currentBet + gs.bigBlind)));
-  }, [gs?.street, gs?.currentBet, gs?.minRaise]);
+    if (gs) {
+      const maxTarget = (gs.streetBets[myId] ?? 0) + (gs.stacks[myId] ?? 0);
+      setRaiseTo(Math.min(maxTarget, Math.max((gs.currentBet ?? 0) + gs.minRaise, (gs.currentBet ?? 0) + gs.bigBlind)));
+    }
+  }, [gs?.street, gs?.currentBet, gs?.minRaise, gs?.stacks, gs?.streetBets, myId]);
 
   const boardCards = useMemo(
     () => (gs?.board ?? []).map((id) => parsePokerCard(id)),
@@ -290,22 +295,22 @@ export default function PokerRoomScreen() {
               <ActionButton label={`IGUALAR ${toCall}`} icon="→" disabled={!isMyTurn || toCall === 0} color="#4CC9F0" onPress={() => perform("call")} />
               <ActionButton label="RETIRARSE" icon="×" disabled={!isMyTurn} color="#F05D75" onPress={() => perform("fold")} />
             </View>
-            <View style={styles.raiseRow}>
-              <TextInput
-                value={raiseTo}
-                onChangeText={setRaiseTo}
-                keyboardType="numeric"
-                editable={isMyTurn}
-                style={[styles.raiseInput, { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }]}
-                placeholder={`mín. ${minRaiseTarget}`}
-                placeholderTextColor={colors.mutedForeground}
+            <View style={styles.raisePanel}>
+              <Text style={[styles.raiseLabel, { color: colors.mutedForeground }]}>IMPORTE DE LA SUBIDA</Text>
+              <BetSlider
+                min={sliderMin}
+                max={Math.max(sliderMin, maxRaiseTarget)}
+                value={Math.max(sliderMin, Math.min(maxRaiseTarget, raiseTo || sliderMin))}
+                onChange={setRaiseTo}
+                disabled={!isMyTurn || maxRaiseTarget <= gs.currentBet}
+                accent={colors.secondary}
               />
               <Pressable
-                disabled={!isMyTurn}
-                onPress={() => perform("raise", Number(raiseTo))}
+                disabled={!isMyTurn || maxRaiseTarget <= gs.currentBet}
+                onPress={() => perform("raise", raiseTo || sliderMin)}
                 style={[styles.raiseBtn, { backgroundColor: isMyTurn ? colors.secondary + "33" : colors.border + "44", borderColor: colors.secondary, opacity: isMyTurn ? 1 : 0.45 }]}
               >
-                <Text style={{ color: colors.secondary, fontFamily: "Inter_700Bold" }}>SUBIR A {raiseTo || minRaiseTarget}</Text>
+                <Text style={{ color: colors.secondary, fontFamily: "Inter_700Bold" }}>SUBIR A {raiseTo || sliderMin}</Text>
               </Pressable>
             </View>
           </View>
@@ -421,8 +426,8 @@ const styles = StyleSheet.create({
   turnTitle: { fontFamily: "Inter_700Bold", fontSize: 15, textAlign: "center" },
   actionRow: { flexDirection: "row", gap: 8 },
   actionBtn: { flex: 1, minHeight: 64, borderRadius: 9, borderWidth: 1, alignItems: "center", justifyContent: "center", gap: 3, paddingHorizontal: 3 },
-  raiseRow: { flexDirection: "row", gap: 8 },
-  raiseInput: { width: 100, borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, fontFamily: "Inter_600SemiBold", fontSize: 14, textAlign: "center" },
+  raisePanel: { gap: 9 },
+  raiseLabel: { fontFamily: "Inter_700Bold", fontSize: 10, letterSpacing: 1 },
   raiseBtn: { flex: 1, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   errorText: { fontFamily: "Inter_600SemiBold", fontSize: 12, textAlign: "center" },
   showdownCard: { borderRadius: 14, borderWidth: 2, padding: 15, gap: 8 },

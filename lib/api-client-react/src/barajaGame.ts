@@ -113,7 +113,7 @@ function canMoveParchis(
 ): boolean {
   const piece = gs.pieces[playerId]?.[pieceIndex];
   if (piece === undefined) return false;
-  if (piece === -1 && dice !== 5) return false;
+  if (piece === -1 && dice !== 5 && dice !== 6) return false;
   const target = piece === -1 ? 1 : piece + dice;
   if (target > 68) return false;
   if (target >= 68) return target === 68;
