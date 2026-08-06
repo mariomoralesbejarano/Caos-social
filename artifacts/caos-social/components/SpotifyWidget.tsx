@@ -22,9 +22,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 
-const PLAYLIST_ID = "37i9dQZF1DXaXB8fQg7xof"; // Spotify "Éxitos España" official playlist
-const EMBED_URL = `https://open.spotify.com/embed/playlist/${PLAYLIST_ID}`;
-const OPEN_URL = `https://open.spotify.com/playlist/${PLAYLIST_ID}`;
+const PLAYLIST_ID = "37i9dQZEVXbJwoKy8qKpHG";
+const EMBED_URL = "https://open.spotify.com/embed/playlist/37i9dQZEVXbJwoKy8qKpHG";
+const OPEN_URL = "https://open.spotify.com/playlist/37i9dQZEVXbJwoKy8qKpHG";
 const DEEP_LINK = `spotify:playlist:${PLAYLIST_ID}`;
 
 // ─── Web-only iframe rendered via React.createElement (avoids TS type error) ──

@@ -95,6 +95,8 @@ export interface MentirosoState {
   playerOrder: string[];
   currentIdx: number;
   declaredValue: number;  // current value players must declare
+  /** False until the opening player chooses the first value freely. */
+  firstPlayDone?: boolean;
   pile: string[];          // cards on table (face down)
   lastPlay: MentirosoPlay | null;
   winner: string | null;
@@ -115,6 +117,8 @@ export interface BarajaRoom {
   gameTitle: string;
   status: "lobby" | "active" | "ended";
   ownerId: string;
+  /** Starting lives for Las Apuestas; old rooms default to 5. */
+  livesPerPlayer?: 3 | 5;
   players: BarajaPlayer[];
   drawPile: string[];
   gameState: BarajaGameState | null;
@@ -130,6 +134,7 @@ export interface BarajaRoomState {
   gameTitle: string;
   status: "lobby" | "active" | "ended";
   ownerId: string;
+  livesPerPlayer?: 3 | 5;
   players: BarajaPlayerPublic[];
   myHand: BarajaNaipe[];
   gameState: BarajaGameState | null;

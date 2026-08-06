@@ -137,6 +137,7 @@ export function serializeBarajaRoom(
     gameTitle: room.gameTitle,
     status: room.status,
     ownerId: room.ownerId,
+    livesPerPlayer: room.livesPerPlayer,
     players,
     myHand,
     gameState: serializedGs ?? null,
@@ -154,6 +155,7 @@ export function createBarajaRoom(opts: {
   playerId: string;
   name: string;
   avatar: string;
+  livesPerPlayer?: 3 | 5;
 }): BarajaRoom {
   return {
     code: opts.code.toUpperCase(),
@@ -161,6 +163,7 @@ export function createBarajaRoom(opts: {
     gameTitle: opts.gameTitle,
     status: "lobby",
     ownerId: opts.playerId,
+    livesPerPlayer: opts.livesPerPlayer ?? 5,
     players: [
       {
         id: opts.playerId,
@@ -244,7 +247,7 @@ function initApuestas(room: BarajaRoom): ApuestasState {
   const lives: Record<string, number> = {};
   for (const p of room.players) {
     scores[p.id] = 0;
-    lives[p.id] = 5;
+    lives[p.id] = room.livesPerPlayer ?? 5;
   }
   // Dealer starts at index 0; mano (left of dealer) starts first
   const dealerIdx = 0;
@@ -406,7 +409,7 @@ export function applyApuestasPlayCard(
         room.log.push(
           result.difference === 0
             ? `✅ ${name}: ${result.predicted} apostadas / ${result.actual} ganadas · acierto exacto · 0 vidas`
-            : `❌ ${name}: ${result.predicted} apostadas / ${result.actual} ganadas · −${result.difference} vidas`,
+            : `❌ ${name}: ${result.predicted} apostadas / ${result.actual} ganadas · −1 vida`,
         );
       }
       room.log.push("📊 Fin de ronda");
@@ -481,7 +484,7 @@ function scoreApuestasRound(
     const actual = r.bazasWon[pid] ?? 0;
     const difference = Math.abs(predicted - actual);
     const livesBefore = gs.lives[pid] ?? 5;
-    const livesAfter = Math.max(0, livesBefore - difference);
+    const livesAfter = Math.max(0, livesBefore - (difference === 0 ? 0 : 1));
 
     // Las Apuestas uses one strict resource: exact hits cost nothing;
     // every missed trick costs exactly the absolute prediction error.
@@ -523,6 +526,7 @@ function initMentiroso(room: BarajaRoom): MentirosoState {
     playerOrder,
     currentIdx: 0,
     declaredValue: 1,
+    firstPlayDone: false,
     pile: [],
     lastPlay: null,
     winner: null,
@@ -536,6 +540,7 @@ export function applyMentirosoPlay(
   room: BarajaRoom,
   playerId: string,
   cardIds: string[],
+  declaredValue?: number,
 ): BGameResult<{ room: BarajaRoom }> {
   const gs = room.gameState as MentirosoState | null;
   if (!gs || gs.type !== "mentiroso") return { error: "Estado incorrecto" };
@@ -544,6 +549,14 @@ export function applyMentirosoPlay(
     return { error: "No es tu turno" };
   if (cardIds.length < 1 || cardIds.length > 4)
     return { error: "Debes jugar entre 1 y 4 cartas" };
+  const isFirstPlay = gs.firstPlayDone !== true && gs.lastPlay === null && gs.pile.length === 0;
+  const playValue = isFirstPlay ? declaredValue : gs.declaredValue;
+  if (playValue === undefined || !VALORES.includes(playValue)) {
+    return { error: "El primer jugador debe elegir qué valor declara" };
+  }
+  if (!isFirstPlay && declaredValue !== undefined && declaredValue !== gs.declaredValue) {
+    return { error: `Debes declarar ${valorLabel(gs.declaredValue)}` };
+  }
 
   const player = room.players.find((p) => p.id === playerId)!;
   for (const cid of cardIds) {
@@ -552,18 +565,21 @@ export function applyMentirosoPlay(
 
   player.hand = player.hand.filter((id) => !cardIds.includes(id));
   gs.pile.push(...cardIds);
+  gs.firstPlayDone = true;
 
   gs.lastPlay = {
     playerId,
     count: cardIds.length,
-    declaredValue: gs.declaredValue,
+    declaredValue: playValue,
     cardIds: [...cardIds],
     timestamp: Date.now(),
   };
 
   room.log.push(
-    `${player.name} pone ${cardIds.length} carta${cardIds.length > 1 ? "s" : ""} (declara: ${valorLabel(gs.declaredValue)})`,
+    `${player.name} pone ${cardIds.length} carta${cardIds.length > 1 ? "s" : ""} (declara: ${valorLabel(playValue)})`,
   );
+
+  autoDiscardPoker(player, gs, room);
 
   // Advance to next player (skip empty-handed ones)
   gs.currentIdx = (gs.currentIdx + 1) % gs.playerOrder.length;
@@ -592,6 +608,27 @@ export function applyMentirosoPlay(
   return { room };
 }
 
+function autoDiscardPoker(
+  player: BarajaPlayer,
+  gs: MentirosoState,
+  room: BarajaRoom,
+): void {
+  let discarded = true;
+  while (discarded) {
+    discarded = false;
+    for (const valor of VALORES) {
+      const poker = player.hand.filter((id) => getBarajaCard(id)?.valor === valor);
+      if (poker.length === 4) {
+        player.hand = player.hand.filter((id) => !poker.includes(id));
+        gs.pile.push(...poker);
+        room.log.push(`${player.name} descarta automáticamente un póker de ${valorLabel(valor)}`);
+        discarded = true;
+        break;
+      }
+    }
+  }
+}
+
 // ── Call bluff ────────────────────────────────────────────────────────────────
 
 export function applyMentirosoCallMentira(
@@ -618,11 +655,13 @@ export function applyMentirosoCallMentira(
   const pileSize = gs.pile.length;
   if (isMentira) {
     mentiroso.hand.push(...gs.pile);
+    autoDiscardPoker(mentiroso, gs, room);
     room.log.push(
       `¡MENTIRA! ${caller.name} acertó → ${mentiroso.name} recoge ${pileSize} carta${pileSize > 1 ? "s" : ""}`,
     );
   } else {
     caller.hand.push(...gs.pile);
+    autoDiscardPoker(caller, gs, room);
     room.log.push(
       `¡MENTIRA! ${caller.name} se equivocó → recoge ${pileSize} carta${pileSize > 1 ? "s" : ""}`,
     );

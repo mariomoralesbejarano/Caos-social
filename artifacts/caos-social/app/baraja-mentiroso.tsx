@@ -30,6 +30,7 @@ import {
 } from "@/lib/barajaSession";
 import type { BarajaSession } from "@/lib/barajaSession";
 import type { MentirosoState } from "@workspace/api-client-react";
+import { VALORES } from "@workspace/api-client-react";
 
 export default function MentirosoScreen() {
   const colors = useColors();
@@ -40,6 +41,7 @@ export default function MentirosoScreen() {
   const [hydrated, setHydrated] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [actionError, setActionError] = useState<string | null>(null);
+  const [openingValue, setOpeningValue] = useState(1);
 
   useEffect(() => {
     loadBarajaSession().then((s) => { setSession(s); setHydrated(true); });
@@ -59,6 +61,7 @@ export default function MentirosoScreen() {
 
   const myId = session?.playerId ?? "";
   const isMyTurn = gs ? gs.playerOrder[gs.currentIdx] === myId : false;
+  const isFirstPlay = gs?.firstPlayDone !== true;
   const canCallMentira =
     gs?.lastPlay !== null &&
     gs?.lastPlay !== undefined &&
@@ -88,6 +91,7 @@ export default function MentirosoScreen() {
         code: room.code,
         playerId: session.playerId,
         cardIds: [...selected],
+        declaredValue: isFirstPlay ? openingValue : undefined,
       });
       setSelected(new Set());
     } catch (e) {
@@ -166,7 +170,8 @@ export default function MentirosoScreen() {
 
   const currentTurnName = playerName(gs.playerOrder[gs.currentIdx]);
   const lastPlay = gs.lastPlay;
-  const declaredLabel = VALOR_PLURAL[gs.declaredValue] ?? String(gs.declaredValue);
+  const declaredNow = isFirstPlay ? openingValue : gs.declaredValue;
+  const declaredLabel = VALOR_PLURAL[declaredNow] ?? String(declaredNow);
 
   return (
     <ScrollView
@@ -319,6 +324,32 @@ export default function MentirosoScreen() {
       {/* ── Play button ── */}
       {isMyTurn && (
         <View style={{ gap: 8 }}>
+          {isFirstPlay && (
+            <View style={[styles.openingPicker, { borderColor: colors.secondary + "66", backgroundColor: colors.secondary + "10" }]}>
+              <Text style={[styles.openingPickerLabel, { color: colors.foreground }]}>
+                Elige el valor de la primera declaración
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.valueChoiceRow}>
+                {VALORES.map((value) => (
+                  <Pressable
+                    key={value}
+                    onPress={() => setOpeningValue(value)}
+                    style={[
+                      styles.valueChoice,
+                      {
+                        borderColor: openingValue === value ? colors.secondary : colors.border,
+                        backgroundColor: openingValue === value ? colors.secondary + "33" : colors.card,
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: openingValue === value ? colors.secondary : colors.foreground, fontFamily: "Inter_700Bold", fontSize: 13 }}>
+                      {value}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
           {selected.size > 0 && (
             <View style={[styles.playPreview, { borderColor: colors.secondary + "55", backgroundColor: colors.secondary + "11" }]}>
               <Text style={[styles.playPreviewText, { color: colors.secondary }]}>
@@ -378,6 +409,10 @@ const styles = StyleSheet.create({
   declaredRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
   declaredLabel: { fontFamily: "Inter_500Medium", fontSize: 13 },
   declaredValue: { fontFamily: "Inter_700Bold", fontSize: 22 },
+  openingPicker: { borderRadius: 10, borderWidth: 1, padding: 10, gap: 8 },
+  openingPickerLabel: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  valueChoiceRow: { gap: 6, paddingRight: 4 },
+  valueChoice: { width: 38, height: 34, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
 
   playersRow: {
     flexDirection: "row", flexWrap: "wrap", gap: 6,

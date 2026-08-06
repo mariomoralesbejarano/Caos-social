@@ -33,12 +33,9 @@ import type {
   ApuestasState,
 } from "@workspace/api-client-react";
 
-const INITIAL_LIVES = 5;
-
 // ─── Rank legend pill ─────────────────────────────────────────────────────────
-// As > 3 > Rey > Caballo > Sota > 7 > 6 > 5 > 4 > 2
 const RANK_LABELS: Record<number, string> = {
-  1: "As", 3: "3", 12: "Rey", 11: "Caballo", 10: "Sota", 7: "7", 6: "6", 5: "5", 4: "4", 2: "2",
+  1: "1", 3: "3", 12: "12", 11: "11", 10: "10", 7: "7", 6: "6", 5: "5", 4: "4", 2: "2",
 };
 
 export default function ApuestasScreen() {
@@ -169,11 +166,11 @@ export default function ApuestasScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.rankName, { color: colors.foreground }]}>{p.name}</Text>
               <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: "Inter_400Regular" }}>
-                {"❤️".repeat(Math.max(0, gs.lives[p.id] ?? 0))}{"🖤".repeat(Math.max(0, INITIAL_LIVES - (gs.lives[p.id] ?? 0)))}
+                {"❤️".repeat(Math.max(0, gs.lives[p.id] ?? 0))}
               </Text>
             </View>
             <Text style={[styles.rankScore, { color: colors.primary }]}>
-              {gs.lives[p.id] ?? 0}/{INITIAL_LIVES} vidas
+              {gs.lives[p.id] ?? 0}/{room.livesPerPlayer ?? 5} vidas
             </Text>
           </View>
         ))}
@@ -253,9 +250,6 @@ export default function ApuestasScreen() {
             const currentWon = r?.bazasWon[p.id] ?? 0;
             const displayedBet = currentBet ?? lastResult?.predicted;
             const displayedWon = currentBet !== undefined ? currentWon : lastResult?.actual;
-            const displayedDifference = currentBet !== undefined
-              ? Math.abs(currentBet - currentWon)
-              : lastResult?.difference;
             return (
               <View key={p.id} style={styles.scoreItem}>
                 <Text style={styles.scoreAvatar}>{p.avatar}</Text>
@@ -268,27 +262,16 @@ export default function ApuestasScreen() {
                   {isMano ? " ⭐" : ""}
                 </Text>
                 <Text style={[styles.scoreVal, { color: colors.primary }]}>
-                  {gs.lives[p.id] ?? 0}/{INITIAL_LIVES} ♥
+                  {gs.lives[p.id] ?? 0}/{room.livesPerPlayer ?? 5} ♥
                 </Text>
                 <Text style={styles.scoreLives}>
-                  {"❤️".repeat(Math.max(0, gs.lives[p.id] ?? 0))}
-                  {"🖤".repeat(Math.max(0, INITIAL_LIVES - (gs.lives[p.id] ?? 0)))}
+                {"❤️".repeat(Math.max(0, gs.lives[p.id] ?? 0))}
                 </Text>
-                <Text style={[styles.scoreFormula, { color: colors.mutedForeground }]}>
-                  {displayedBet === undefined
-                    ? "Apostadas — · Ganadas 0"
-                    : `Apostadas ${displayedBet} · Ganadas ${displayedWon ?? 0}`}
-                </Text>
-                {displayedDifference !== undefined && (
-                  <Text style={[
-                    styles.scoreFormula,
-                    { color: displayedDifference === 0 ? colors.primary : colors.destructive },
-                  ]}>
-                    {displayedDifference === 0
-                      ? "✓ 0 vidas"
-                      : `−${displayedDifference} vidas`}
-                  </Text>
-                )}
+              <Text style={[styles.scoreFormula, { color: colors.mutedForeground }]}>
+                {displayedBet === undefined
+                  ? "Apostadas — · Ganadas 0"
+                  : `Apostadas ${displayedBet} · Ganadas ${displayedWon ?? 0}`}
+              </Text>
               </View>
             );
           })}
@@ -440,34 +423,6 @@ export default function ApuestasScreen() {
             </View>
           </View>
 
-          {/* Bets vs bazas won this round */}
-          <View style={[styles.bazasCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {room.players.map((p) => {
-              const bet = r?.bets[p.id] ?? "?";
-              const won = r?.bazasWon[p.id] ?? 0;
-              const isExact = bet !== "?" && won === (bet as number);
-              const difference = bet === "?" ? null : Math.abs((bet as number) - won);
-              return (
-                <View key={p.id} style={styles.bazaItem}>
-                  <Text style={styles.trickAvatar}>{p.avatar}</Text>
-                  <Text style={[styles.bazaName, { color: p.id === myId ? colors.primary : colors.foreground }]} numberOfLines={1}>
-                    {p.name}
-                  </Text>
-                  <Text style={[styles.bazaCount, {
-                    color: isExact ? colors.primary : colors.destructive,
-                  }]}>
-                    {won}/{bet}
-                  </Text>
-                  {difference !== null && (
-                    <Text style={[styles.bazaPenalty, { color: isExact ? colors.primary : colors.destructive }]}>
-                      {isExact ? "✓ 0" : `−${difference} ♥`}
-                    </Text>
-                  )}
-                </View>
-              );
-            })}
-          </View>
-
           {/* Forehead cards (round 1 special) */}
           {isForehead && Object.keys(r?.foreheadCards ?? {}).length > 0 && (
             <View style={[styles.phaseCard, { borderColor: colors.destructive, backgroundColor: colors.card }]}>
@@ -614,12 +569,6 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   trickPlayerName: { fontFamily: "Inter_400Regular", fontSize: 10, textAlign: "center", maxWidth: 64 },
-
-  bazasCard: { flexDirection: "row", flexWrap: "wrap", gap: 8, borderRadius: 10, borderWidth: 1, padding: 10 },
-  bazaItem: { flexDirection: "row", alignItems: "center", gap: 6, minWidth: 100 },
-  bazaName: { fontFamily: "Inter_500Medium", fontSize: 11, flex: 1 },
-  bazaCount: { fontFamily: "Inter_700Bold", fontSize: 15 },
-  bazaPenalty: { fontFamily: "Inter_700Bold", fontSize: 10 },
 
   foreheadGrid: { flexDirection: "row", flexWrap: "wrap", gap: 14, justifyContent: "center" },
   foreheadItem: { alignItems: "center", gap: 4 },

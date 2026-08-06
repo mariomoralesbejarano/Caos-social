@@ -113,11 +113,13 @@ export function useCreateBarajaRoom() {
       gameTitle,
       name,
       avatar,
+      livesPerPlayer,
     }: {
       gameId: string;
       gameTitle: string;
       name: string;
       avatar: string;
+      livesPerPlayer?: 3 | 5;
     }) => {
       void gcBarajaRooms();
       let code = generateBarajaCode();
@@ -127,7 +129,15 @@ export function useCreateBarajaRoom() {
         attempts++;
       }
       const playerId = Math.random().toString(36).slice(2, 10);
-      const room = createBarajaRoom({ code, gameId, gameTitle, playerId, name, avatar });
+      const room = createBarajaRoom({
+        code,
+        gameId,
+        gameTitle,
+        playerId,
+        name,
+        avatar,
+        livesPerPlayer,
+      });
       await insertBarajaRoom(room);
       return { code: room.code, playerId };
     },
@@ -237,13 +247,15 @@ export function usePlayMentiroso() {
       code,
       playerId,
       cardIds,
+      declaredValue,
     }: {
       code: string;
       playerId: string;
       cardIds: string[];
+      declaredValue?: number;
     }) => {
       const result = await mutateBarajaRoom(code, (room) =>
-        applyMentirosoPlay(room, playerId, cardIds),
+        applyMentirosoPlay(room, playerId, cardIds, declaredValue),
       );
       if ("error" in (result as object))
         throw new Error((result as { error: string }).error);
