@@ -197,7 +197,7 @@ function ParchisBoard({ state }: { state: ParchisState }) {
   const cell = 20;
   return (
     <View style={styles.board}>
-      <Svg width="100%" height={360} viewBox="0 0 300 300">
+      <Svg width="100%" height={330} viewBox="0 0 300 300">
         <Rect x="2" y="2" width="296" height="296" rx="12" fill="#170B2A" stroke="#5C2F86" strokeWidth="3" />
         <Rect x="0" y="0" width="100" height="100" fill={COLOR_META.rojo} opacity="0.9" />
         <Rect x="200" y="0" width="100" height="100" fill={COLOR_META.amarillo} opacity="0.9" />
@@ -213,7 +213,7 @@ function ParchisBoard({ state }: { state: ParchisState }) {
               <Rect x={x * cell} y={y * cell} width={cell} height={cell} fill={safe ? "#FFE09A" : "#FFFFFF"} stroke="#B8AFC1" strokeWidth="0.8" />
               {safe && <Circle cx={x * cell + 10} cy={y * cell + 10} r="4" fill="#FFB800" opacity="0.75" />}
               {pieces.map((piece, pieceIndex) => (
-                <Circle key={`${piece.playerId}-${pieceIndex}`} cx={x * cell + 6 + (pieceIndex % 2) * 8} cy={y * cell + 7 + Math.floor(pieceIndex / 2) * 8} r="4.2" fill={COLOR_META[piece.color as keyof typeof COLOR_META]} stroke="#1A1126" strokeWidth="1" />
+                <Circle key={`${piece.playerId}-${pieceIndex}`} cx={x * cell + 6 + (pieceIndex % 2) * 7} cy={y * cell + 6 + Math.floor(pieceIndex / 2) * 7} r="3.2" fill={COLOR_META[piece.color as keyof typeof COLOR_META]} stroke="#1A1126" strokeWidth="0.8" />
               ))}
             </G>
           );
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
   kicker: { fontFamily: "Inter_700Bold", fontSize: 10, letterSpacing: 2 },
   title: { fontFamily: "Inter_700Bold", fontSize: 27, marginTop: 4 },
   smallButton: { borderWidth: 1, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10 },
-  board: { minHeight: 360, borderRadius: 22, borderWidth: 2, borderColor: "#5C2F86", backgroundColor: "#25103D", padding: 12, justifyContent: "center", overflow: "hidden" },
+  board: { minHeight: 340, borderRadius: 22, borderWidth: 2, borderColor: "#5C2F86", backgroundColor: "#25103D", padding: 8, justifyContent: "center", overflow: "hidden" },
   boardCenter: { position: "absolute", alignSelf: "center", alignItems: "center", justifyContent: "center", width: 128, height: 128, borderRadius: 64, borderWidth: 2, borderColor: "#FFB800", backgroundColor: "#1A0A2B", zIndex: 2 },
   centerMark: { color: "#FFB800", fontFamily: "Inter_700Bold", fontSize: 17, letterSpacing: 2 },
   centerSub: { color: "#C8B9D6", fontFamily: "Inter_400Regular", fontSize: 9, textAlign: "center", marginTop: 4 },

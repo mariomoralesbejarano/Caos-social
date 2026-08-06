@@ -174,7 +174,7 @@ function OcaBoard({ state }: { state: OcaState }) {
   };
   return (
     <View style={styles.board}>
-      <Svg width="100%" height={560} viewBox="0 0 560 560">
+      <Svg width="100%" height={500} viewBox="0 0 560 560">
         <Rect x="3" y="3" width="554" height="554" rx="26" fill="#081B2D" stroke="#275C91" strokeWidth="3" />
         <Circle cx="280" cy="280" r="38" fill="#123A5C" stroke="#45A3FF" strokeWidth="2" />
         <SvgText x="280" y="277" textAnchor="middle" fill="#D8E8F8" fontSize="13" fontWeight="700">LA OCA</SvgText>
@@ -186,9 +186,9 @@ function OcaBoard({ state }: { state: OcaState }) {
           const cellColor = cell === 63 ? "#39FF14" : kind ? "#45A3FF" : "#3975A9";
           return (
             <G key={cell}>
-              <Circle cx={x} cy={y} r="15" fill={cell === 63 ? "#144B37" : kind ? "#173B5D" : "#102C49"} stroke={cellColor} strokeWidth={kind || cell === 63 ? 2 : 1} />
-              <SvgText x={x} y={kind ? y - 5 : y + 4} textAnchor="middle" fill="#E6F2FF" fontSize={kind ? "8" : "10"} fontWeight="700">{cell}</SvgText>
-              {kind && <SpecialIcon kind={kind} x={x} y={y + 7} />}
+              <Circle cx={x} cy={y} r={cell <= 20 ? 18 : 16} fill={cell === 63 ? "#144B37" : kind ? "#173B5D" : "#102C49"} stroke={cellColor} strokeWidth={kind || cell === 63 ? 2 : 1} />
+              <SvgText x={x} y={kind ? y - 6 : y + 4} textAnchor="middle" fill="#E6F2FF" fontSize={cell <= 20 ? "11" : kind ? "8" : "10"} fontWeight="700">{cell}</SvgText>
+              {kind && <SpecialIcon kind={kind} x={x} y={y + 9} />}
               {playersHere.map((playerId, index) => (
                 <Circle key={playerId} cx={x - 9 + (index % 3) * 9} cy={y + 12 + Math.floor(index / 3) * 8} r="3.5" fill={PLAYER_COLORS[state.playerOrder.indexOf(playerId) % PLAYER_COLORS.length]} stroke="#061321" strokeWidth="1" />
               ))}
@@ -205,7 +205,7 @@ function OcaBoard({ state }: { state: OcaState }) {
 function ocaSpiralPosition(cell: number) {
   const progress = (cell - 1) / 62;
   const angle = progress * Math.PI * 4.2 - Math.PI / 2;
-  const radius = 28 + progress * 224;
+  const radius = 32 + progress * 214;
   return { x: 280 + Math.cos(angle) * radius, y: 280 + Math.sin(angle) * radius };
 }
 

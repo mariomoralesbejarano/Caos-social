@@ -14,11 +14,13 @@ import {
   applyOcaRoll,
   applyParchisMove,
   applyParchisRoll,
+  applyTraditionalPlay,
   createBarajaRoom,
   generateBarajaCode,
   serializeBarajaRoom,
 } from "./barajaGame";
 import { applyPokerAction, applyPokerNextHand } from "./pokerGame";
+import { applyBlackjackAction, applyBlackjackNextRound } from "./blackjackGame";
 import {
   BARAJA_TABLE,
   existsBarajaRoom,
@@ -361,6 +363,55 @@ export function useOcaRoll() {
   return useMutation({
     mutationFn: async ({ code, playerId }: { code: string; playerId: string }) => {
       const result = await mutateBarajaRoom(code, (room) => applyOcaRoll(room, playerId));
+      if ("error" in (result as object)) throw new Error((result as { error: string }).error);
+    },
+  });
+}
+
+export function useBlackjackAction() {
+  return useMutation({
+    mutationFn: async ({
+      code,
+      playerId,
+      action,
+    }: {
+      code: string;
+      playerId: string;
+      action: "hit" | "stand" | "double" | "split";
+    }) => {
+      const result = await mutateBarajaRoom(code, (room) =>
+        applyBlackjackAction(room, playerId, action),
+      );
+      if ("error" in (result as object)) throw new Error((result as { error: string }).error);
+    },
+  });
+}
+
+export function useBlackjackNextRound() {
+  return useMutation({
+    mutationFn: async ({ code, playerId }: { code: string; playerId: string }) => {
+      const result = await mutateBarajaRoom(code, (room) =>
+        applyBlackjackNextRound(room, playerId),
+      );
+      if ("error" in (result as object)) throw new Error((result as { error: string }).error);
+    },
+  });
+}
+
+export function useTraditionalPlay() {
+  return useMutation({
+    mutationFn: async ({
+      code,
+      playerId,
+      cardId,
+    }: {
+      code: string;
+      playerId: string;
+      cardId: string;
+    }) => {
+      const result = await mutateBarajaRoom(code, (room) =>
+        applyTraditionalPlay(room, playerId, cardId),
+      );
       if ("error" in (result as object)) throw new Error((result as { error: string }).error);
     },
   });

@@ -83,6 +83,11 @@ export type {
   ParchisColor,
   ParchisState,
   OcaState,
+  BlackjackState,
+  BlackjackHand,
+  BlackjackHandStatus,
+  TraditionalState,
+  TraditionalGameId,
   PokerAction,
   PokerActionKind,
   PokerHandResult,
@@ -118,6 +123,13 @@ export {
   applyPokerNextHand,
 } from "./pokerGame";
 export {
+  createBlackjackDeck,
+  blackjackScore,
+  initBlackjack,
+  applyBlackjackAction,
+  applyBlackjackNextRound,
+} from "./blackjackGame";
+export {
   useGetBarajaRoom,
   useCreateBarajaRoom,
   useJoinBarajaRoom,
@@ -132,6 +144,9 @@ export {
   useParchisRoll,
   useParchisMove,
   useOcaRoll,
+  useBlackjackAction,
+  useBlackjackNextRound,
+  useTraditionalPlay,
   getBarajaRoomQueryKey,
 } from "./barajaHooks";
 

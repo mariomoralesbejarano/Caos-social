@@ -18,10 +18,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import { saveBarajaSession } from "@/lib/barajaSession";
+import BetSlider from "@/components/BetSlider";
 
 const AVATARS = ["🦄", "🐙", "🦊", "🐲", "🦋", "🐸", "🦝", "🐼"];
 
-export type BoardLobbyKind = "poker" | "parchis" | "oca";
+export type BoardLobbyKind = "poker" | "blackjack" | "parchis" | "oca";
 
 interface BoardRoomLobbyProps {
   kind: BoardLobbyKind;
@@ -59,6 +60,7 @@ export default function BoardRoomLobby({
   const joinMut = useJoinBarajaRoom();
   const busy = createMut.isPending || joinMut.isPending;
   const isPoker = kind === "poker";
+  const isBlackjack = kind === "blackjack";
 
   async function createRoom() {
     setError(null);
@@ -78,7 +80,7 @@ export default function BoardRoomLobby({
         avatar,
         tableConfig: {
           maxPlayers: roomMaxPlayers,
-          ...(isPoker
+          ...(isPoker || isBlackjack
             ? { startingStack, smallBlind, bigBlind }
             : {}),
         },
@@ -214,32 +216,49 @@ export default function BoardRoomLobby({
               accent={accent}
               colors={colors}
             />
-            {isPoker && (
+            {(isPoker || isBlackjack) && (
               <>
-                <OptionRow
-                  label="Stack inicial por jugador"
-                  value={startingStack}
-                  options={[100, 500, 1000, 2500]}
-                  onChange={setStartingStack}
-                  accent={accent}
-                  colors={colors}
-                />
-                <OptionRow
-                  label="Ciega pequeña"
-                  value={smallBlind}
-                  options={[5, 10, 25, 50]}
-                  onChange={setSmallBlind}
-                  accent={accent}
-                  colors={colors}
-                />
-                <OptionRow
-                  label="Ciega grande"
-                  value={bigBlind}
-                  options={[10, 20, 50, 100]}
-                  onChange={setBigBlind}
-                  accent={accent}
-                  colors={colors}
-                />
+                <View style={styles.sliderBlock}>
+                  <Text style={[styles.label, { color: colors.mutedForeground }]}>
+                    Stack inicial por jugador
+                  </Text>
+                  <BetSlider
+                    min={100}
+                    max={5000}
+                    value={startingStack}
+                    onChange={(value) => setStartingStack(Math.round(value / 50) * 50)}
+                    accent={accent}
+                  />
+                </View>
+                <View style={styles.sliderBlock}>
+                  <Text style={[styles.label, { color: colors.mutedForeground }]}>
+                    {isBlackjack ? "Apuesta inicial" : "Ciegas"}
+                  </Text>
+                  <BetSlider
+                    min={5}
+                    max={Math.max(10, Math.floor(startingStack / 2))}
+                    value={isBlackjack ? bigBlind : smallBlind}
+                    onChange={(value) => {
+                      const next = Math.max(5, Math.round(value / 5) * 5);
+                      if (isBlackjack) setBigBlind(next);
+                      else {
+                        setSmallBlind(next);
+                        setBigBlind(Math.max(next * 2, bigBlind));
+                      }
+                    }}
+                    accent={accent}
+                  />
+                </View>
+                {isPoker && (
+                  <OptionRow
+                    label="Ciega grande"
+                    value={bigBlind}
+                    options={[10, 20, 50, 100]}
+                    onChange={setBigBlind}
+                    accent={accent}
+                    colors={colors}
+                  />
+                )}
               </>
             )}
           </>
@@ -323,6 +342,7 @@ const styles = StyleSheet.create({
   option: { gap: 6 },
   optionRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   optionButton: { minWidth: 58, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9, alignItems: "center" },
+  sliderBlock: { gap: 4, paddingTop: 3 },
   error: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
   cta: { borderRadius: 10, alignItems: "center", paddingVertical: 14, marginTop: 4 },
   ctaText: { color: "#12051D", fontFamily: "Inter_700Bold", letterSpacing: 1 },

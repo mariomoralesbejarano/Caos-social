@@ -50,6 +50,16 @@ const GAME_MODES: GameMode[] = [
     glowColor: "#B026FF",
   },
   {
+    id: "blackjack",
+    emoji: "♣️",
+    title: "Blackjack 21",
+    subtitle: "Juega contra el dealer: hit, stand, double y split",
+    tag: "JUGAR",
+    active: true,
+    route: "/blackjack",
+    glowColor: "#39FF14",
+  },
+  {
     id: "poker",
     emoji: "♠️",
     title: "Poker",

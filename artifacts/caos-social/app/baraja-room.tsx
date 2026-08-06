@@ -73,6 +73,14 @@ export default function BarajaRoomScreen() {
         router.replace("/parchis" as never);
       } else if (gameId === "oca") {
         router.replace("/oca" as never);
+      } else if (gameId === "blackjack") {
+        router.replace("/blackjack" as never);
+      } else if ([
+        "culo", "mico", "pesca", "cuatrola", "tute", "7ymedio", "chinchon",
+        "burro", "escoba", "brisca", "remigio", "chanchullo", "golfo",
+        "cauca", "rueda", "cinquillo", "pocha", "relojito",
+      ].includes(gameId)) {
+        router.replace("/traditional" as never);
       } else {
         // Generic fallback: go to rules/waiting view
         router.replace("/baraja" as never);

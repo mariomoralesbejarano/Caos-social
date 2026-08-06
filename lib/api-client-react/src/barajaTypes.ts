@@ -107,6 +107,70 @@ export interface OcaState {
   winnerId: string | null;
 }
 
+// ── Blackjack 21 ──────────────────────────────────────────────────────────────
+
+export type BlackjackHandStatus = "playing" | "stood" | "bust" | "blackjack" | "won" | "lost" | "push";
+
+export interface BlackjackHand {
+  cards: string[];
+  bet: number;
+  status: BlackjackHandStatus;
+  doubled: boolean;
+  split: boolean;
+  payout: number;
+}
+
+export interface BlackjackState {
+  type: "blackjack";
+  phase: "playing" | "dealer" | "ended";
+  playerOrder: string[];
+  currentIdx: number;
+  dealerHand: string[];
+  hands: Record<string, BlackjackHand[]>;
+  stacks: Record<string, number>;
+  deck: string[];
+  deckPos: number;
+  winnerIds: string[];
+  lastMove: string | null;
+  roundNumber: number;
+}
+
+// ── Traditional Spanish card tables ──────────────────────────────────────────
+
+export type TraditionalGameId =
+  | "culo"
+  | "mico"
+  | "pesca"
+  | "cuatrola"
+  | "tute"
+  | "7ymedio"
+  | "chinchon"
+  | "burro"
+  | "escoba"
+  | "brisca"
+  | "remigio"
+  | "chanchullo"
+  | "golfo"
+  | "cauca"
+  | "rueda"
+  | "cinquillo"
+  | "pocha"
+  | "relojito";
+
+export interface TraditionalState {
+  type: "traditional";
+  variant: TraditionalGameId;
+  phase: "playing" | "ended";
+  playerOrder: string[];
+  currentIdx: number;
+  hands: Record<string, string[]>;
+  drawPile: string[];
+  discardPile: string[];
+  playedCards: string[];
+  winnerId: string | null;
+  lastMove: string | null;
+}
+
 // ── Player stored in room (hand is private) ───────────────────────────────────
 export interface BarajaPlayer {
   id: string;
@@ -207,7 +271,9 @@ export type BarajaGameState =
   | MentirosoState
   | PokerState
   | ParchisState
-  | OcaState;
+  | OcaState
+  | BlackjackState
+  | TraditionalState;
 export type BGameResult<T = { room: BarajaRoom }> =
   | T
   | { error: string };
@@ -252,6 +318,7 @@ export interface BarajaRoomState {
   players: BarajaPlayerPublic[];
   myHand: BarajaNaipe[];
   myPokerHand: PokerCard[];
+  myBlackjackHands: BlackjackHand[];
   gameState: BarajaGameState | null;
   log: string[];
   version: number;

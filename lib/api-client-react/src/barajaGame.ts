@@ -12,6 +12,7 @@ import type {
   BarajaRoom,
   BarajaRoomState,
   BGameResult,
+  BlackjackState,
   MentirosoState,
   OcaState,
   ParchisColor,
@@ -19,14 +20,23 @@ import type {
   PokerCard,
   PokerState,
   Palo,
+  TraditionalGameId,
+  TraditionalState,
 } from "./barajaTypes";
 import { PALOS, VALORES } from "./barajaTypes";
 import { getPokerCard, initPoker } from "./pokerGame";
+import { initBlackjack } from "./blackjackGame";
 
 const PARCHIS_COLORS: ParchisColor[] = ["rojo", "amarillo", "verde", "azul"];
 const OCA_COLORS = ["rojo", "amarillo", "verde", "azul", "morado", "naranja"];
 const PARCHIS_SAFE_TRACKS = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
 const OCA_POSITIONS = [5, 9, 14, 18, 23, 27, 32, 36, 41, 45, 50, 54, 59];
+
+const TRADITIONAL_VARIANTS = new Set<TraditionalGameId>([
+  "culo", "mico", "pesca", "cuatrola", "tute", "7ymedio", "chinchon",
+  "burro", "escoba", "brisca", "remigio", "chanchullo", "golfo", "cauca",
+  "rueda", "cinquillo", "pocha", "relojito",
+]);
 
 function initParchis(room: BarajaRoom): ParchisState {
   const playerOrder = room.players.map((player) => player.id);
@@ -75,6 +85,95 @@ function initOca(room: BarajaRoom): OcaState {
     lastMove: null,
     winnerId: null,
   };
+}
+
+function initTraditional(room: BarajaRoom, variant: TraditionalGameId): TraditionalState {
+  const deck = createDeck().map((card) => card.id);
+  for (let index = deck.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [deck[index], deck[randomIndex]] = [deck[randomIndex], deck[index]];
+  }
+  const playerOrder = room.players.map((player) => player.id);
+  const hands: Record<string, string[]> = {};
+  const cardsPerPlayer = ["remigio", "pesca", "tute", "cuatrola"].includes(variant) ? 7 : 5;
+  for (const id of playerOrder) hands[id] = [];
+  for (let round = 0; round < cardsPerPlayer; round += 1) {
+    for (const id of playerOrder) {
+      const card = deck.shift();
+      if (card) hands[id].push(card);
+    }
+  }
+  return {
+    type: "traditional",
+    variant,
+    phase: "playing",
+    playerOrder,
+    currentIdx: 0,
+    hands,
+    drawPile: deck,
+    discardPile: [],
+    playedCards: [],
+    winnerId: null,
+    lastMove: null,
+  };
+}
+
+function traditionalCard(id: string): BarajaNaipe | undefined {
+  return getBarajaCard(id) ?? undefined;
+}
+
+function canPlayTraditional(state: TraditionalState, cardId: string): boolean {
+  const card = traditionalCard(cardId);
+  if (!card) return false;
+  if (state.variant !== "cinquillo" || state.playedCards.length === 0) return true;
+  const sameSuit = state.playedCards
+    .map(traditionalCard)
+    .filter((item): item is BarajaNaipe => !!item && item.palo === card.palo);
+  if (card.valor === 5) return true;
+  return sameSuit.some((played) => Math.abs(played.valor - card.valor) === 1);
+}
+
+export function applyTraditionalPlay(
+  room: BarajaRoom,
+  playerId: string,
+  cardId: string,
+): BGameResult<{ room: BarajaRoom }> {
+  const state = room.gameState as TraditionalState | null;
+  if (!state || state.type !== "traditional") return { error: "Estado de juego incorrecto" };
+  if (state.phase !== "playing") return { error: "La partida ha terminado" };
+  if (state.playerOrder[state.currentIdx] !== playerId) return { error: "No es tu turno" };
+  const hand = state.hands[playerId] ?? [];
+  if (!hand.includes(cardId)) return { error: "Esa carta no está en tu mano" };
+  if (!canPlayTraditional(state, cardId)) {
+    return { error: "En Cinquillo debes empezar con un 5 o continuar una escalera" };
+  }
+  state.hands[playerId] = hand.filter((id) => id !== cardId);
+  state.playedCards.push(cardId);
+  state.discardPile.push(cardId);
+  const playerName = room.players.find((player) => player.id === playerId)?.name ?? "Jugador";
+  state.lastMove = `${playerName} jugó ${cardLabel(cardId)}`;
+  if (state.hands[playerId].length === 0) {
+    state.phase = "ended";
+    state.winnerId = playerId;
+  } else {
+    state.currentIdx = nextPlayer(state.currentIdx, state.playerOrder.length);
+    while (
+      state.playerOrder.length > 1 &&
+      (state.hands[state.playerOrder[state.currentIdx]]?.length ?? 0) === 0
+    ) {
+      state.currentIdx = nextPlayer(state.currentIdx, state.playerOrder.length);
+    }
+    if (
+      state.drawPile.length &&
+      ["brisca", "pesca", "cuatrola", "tute", "pocha", "remigio"].includes(state.variant)
+    ) {
+      const nextId = state.playerOrder[state.currentIdx];
+      state.hands[nextId].push(state.drawPile.shift()!);
+    }
+  }
+  room.version += 1;
+  room.log.push(state.lastMove);
+  return { room };
 }
 
 function nextPlayer(currentIdx: number, length: number): number {
@@ -153,12 +252,8 @@ export function applyParchisRoll(
   gs.lastMove = `${room.players.find((p) => p.id === playerId)?.name ?? "Jugador"} sacó un ${value}`;
   if (!gs.canMove) {
     gs.dice = null;
-    if (value === 6 && gs.consecutiveSixes < 3) {
-      gs.consecutiveSixes = gs.consecutiveSixes;
-    } else {
-      gs.currentIdx = nextPlayer(gs.currentIdx, gs.playerOrder.length);
-      gs.consecutiveSixes = 0;
-    }
+    gs.currentIdx = nextPlayer(gs.currentIdx, gs.playerOrder.length);
+    gs.consecutiveSixes = 0;
   }
   room.version += 1;
   room.log.push(gs.lastMove);
@@ -373,6 +468,10 @@ export function serializeBarajaRoom(
 
   const myHand: BarajaNaipe[] = isForehead
     ? [] // player cannot see their own card
+    : gs?.type === "traditional"
+      ? (gs.hands[playerId] ?? [])
+        .map((id) => getBarajaCard(id))
+        .filter((c): c is BarajaNaipe => !!c)
     : (me?.hand ?? [])
         .map((id) => getBarajaCard(id))
         .filter((c): c is BarajaNaipe => !!c);
@@ -383,6 +482,8 @@ export function serializeBarajaRoom(
           .map((id) => getPokerCard(id))
           .filter((card): card is PokerCard => !!card)
       : [];
+  const myBlackjackHands =
+    gs?.type === "blackjack" ? (gs.hands[playerId] ?? []) : [];
 
   // Mask private game data before sending the state to a player.
   let serializedGs = gs;
@@ -401,6 +502,27 @@ export function serializeBarajaRoom(
     pokerClone.deck = [];
     serializedGs = pokerClone;
   }
+  if (gs?.type === "blackjack") {
+    const blackjackClone: BlackjackState = JSON.parse(JSON.stringify(gs));
+    blackjackClone.deck = [];
+    if (blackjackClone.phase === "playing" && blackjackClone.dealerHand.length > 1) {
+      blackjackClone.dealerHand = ["hidden", blackjackClone.dealerHand[1]];
+    }
+    for (const [id, hands] of Object.entries(blackjackClone.hands)) {
+      if (id !== playerId) {
+        blackjackClone.hands[id] = hands.map((hand) => ({ ...hand, cards: [] }));
+      }
+    }
+    serializedGs = blackjackClone;
+  }
+  if (gs?.type === "traditional") {
+    const traditionalClone: TraditionalState = JSON.parse(JSON.stringify(gs));
+    traditionalClone.drawPile = [];
+    for (const [id, hand] of Object.entries(traditionalClone.hands)) {
+      if (id !== playerId) traditionalClone.hands[id] = hand.map(() => "hidden");
+    }
+    serializedGs = traditionalClone;
+  }
 
   const players: BarajaPlayerPublic[] = room.players.map((p) => ({
     id: p.id,
@@ -408,6 +530,10 @@ export function serializeBarajaRoom(
     avatar: p.avatar,
     handCount: gs?.type === "poker"
       ? (gs.hands[p.id]?.length ?? 0)
+      : gs?.type === "blackjack"
+        ? (gs.hands[p.id]?.reduce((count, hand) => count + hand.cards.length, 0) ?? 0)
+        : gs?.type === "traditional"
+          ? (gs.hands[p.id]?.length ?? 0)
       : p.hand.length,
     connected: p.connected,
   }));
@@ -423,6 +549,7 @@ export function serializeBarajaRoom(
     players,
     myHand,
     myPokerHand,
+    myBlackjackHands,
     gameState: serializedGs ?? null,
     log: room.log.slice(-30), // last 30 events
     version: room.version,
@@ -523,6 +650,10 @@ export function applyBarajaStartGame(
     room.gameState = initParchis(room);
   } else if (room.gameId === "oca") {
     room.gameState = initOca(room);
+  } else if (room.gameId === "blackjack") {
+    room.gameState = initBlackjack(room);
+  } else if (TRADITIONAL_VARIANTS.has(room.gameId as TraditionalGameId)) {
+    room.gameState = initTraditional(room, room.gameId as TraditionalGameId);
   }
 
   room.status = "active";
