@@ -11,6 +11,66 @@ export interface BarajaNaipe {
   valor: number;
 }
 
+// ── Texas Hold'em ────────────────────────────────────────────────────────────
+
+export type PokerSuit = "spades" | "hearts" | "diamonds" | "clubs";
+export type PokerRank = "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "J" | "Q" | "K" | "A";
+
+export interface PokerCard {
+  id: string;
+  suit: PokerSuit;
+  rank: PokerRank;
+}
+
+export type PokerStreet = "preflop" | "flop" | "turn" | "river" | "showdown";
+export type PokerActionKind = "fold" | "check" | "call" | "raise";
+
+export interface PokerAction {
+  playerId: string;
+  action: PokerActionKind;
+  amount: number;
+  timestamp: number;
+}
+
+export interface PokerHandResult {
+  playerId: string;
+  category: string;
+  categoryRank: number;
+  tiebreaker: number[];
+  cards: string[];
+}
+
+export interface PokerState {
+  type: "poker";
+  phase: "playing" | "showdown" | "ended";
+  street: PokerStreet;
+  dealerIdx: number;
+  playerOrder: string[];
+  smallBlind: number;
+  bigBlind: number;
+  smallBlindId: string;
+  bigBlindId: string;
+  currentIdx: number;
+  board: string[];
+  pot: number;
+  currentBet: number;
+  minRaise: number;
+  stacks: Record<string, number>;
+  folded: string[];
+  streetBets: Record<string, number>;
+  contributions: Record<string, number>;
+  acted: string[];
+  actions: PokerAction[];
+  winnerIds: string[];
+  handResults: PokerHandResult[];
+  showdownHands: Record<string, string[]>;
+  payouts: Record<string, number>;
+  hands: Record<string, string[]>;
+  deck: string[];
+  deckPos: number;
+  roundNumber: number;
+}
+
 // ── Player stored in room (hand is private) ───────────────────────────────────
 export interface BarajaPlayer {
   id: string;
@@ -106,7 +166,7 @@ export interface MentirosoState {
 // ── Generic Baraja Room ───────────────────────────────────────────────────────
 
 export type BarajaGameId = string;
-export type BarajaGameState = ApuestasState | MentirosoState;
+export type BarajaGameState = ApuestasState | MentirosoState | PokerState;
 export type BGameResult<T = { room: BarajaRoom }> =
   | T
   | { error: string };
@@ -137,6 +197,7 @@ export interface BarajaRoomState {
   livesPerPlayer?: 3 | 5;
   players: BarajaPlayerPublic[];
   myHand: BarajaNaipe[];
+  myPokerHand: PokerCard[];
   gameState: BarajaGameState | null;
   log: string[];
   version: number;

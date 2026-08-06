@@ -76,6 +76,13 @@ export type {
   ApuestasTrickCard,
   MentirosoState,
   MentirosoPlay,
+  PokerCard,
+  PokerSuit,
+  PokerRank,
+  PokerState,
+  PokerAction,
+  PokerActionKind,
+  PokerHandResult,
   BGameResult,
   Palo,
 } from "./barajaTypes";
@@ -96,6 +103,15 @@ export {
   valorLabel,
 } from "./barajaGame";
 export {
+  createPokerDeck,
+  getPokerCard,
+  initPoker,
+  evaluatePokerHand,
+  evaluateBestPokerHand,
+  applyPokerAction,
+  applyPokerNextHand,
+} from "./pokerGame";
+export {
   useGetBarajaRoom,
   useCreateBarajaRoom,
   useJoinBarajaRoom,
@@ -105,6 +121,8 @@ export {
   usePlayApuestasCard,
   usePlayMentiroso,
   useCallMentira,
+  usePokerAction,
+  usePokerNextHand,
   getBarajaRoomQueryKey,
 } from "./barajaHooks";
 

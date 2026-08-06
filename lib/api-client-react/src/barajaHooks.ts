@@ -15,6 +15,7 @@ import {
   generateBarajaCode,
   serializeBarajaRoom,
 } from "./barajaGame";
+import { applyPokerAction, applyPokerNextHand } from "./pokerGame";
 import {
   BARAJA_TABLE,
   existsBarajaRoom,
@@ -274,6 +275,42 @@ export function useCallMentira() {
     }) => {
       const result = await mutateBarajaRoom(code, (room) =>
         applyMentirosoCallMentira(room, callerId),
+      );
+      if ("error" in (result as object))
+        throw new Error((result as { error: string }).error);
+    },
+  });
+}
+
+// ─── Texas Hold'em ───────────────────────────────────────────────────────────
+
+export function usePokerAction() {
+  return useMutation({
+    mutationFn: async ({
+      code,
+      playerId,
+      action,
+      amount,
+    }: {
+      code: string;
+      playerId: string;
+      action: "fold" | "check" | "call" | "raise";
+      amount?: number;
+    }) => {
+      const result = await mutateBarajaRoom(code, (room) =>
+        applyPokerAction(room, playerId, action, amount),
+      );
+      if ("error" in (result as object))
+        throw new Error((result as { error: string }).error);
+    },
+  });
+}
+
+export function usePokerNextHand() {
+  return useMutation({
+    mutationFn: async ({ code, playerId }: { code: string; playerId: string }) => {
+      const result = await mutateBarajaRoom(code, (room) =>
+        applyPokerNextHand(room, playerId),
       );
       if ("error" in (result as object))
         throw new Error((result as { error: string }).error);

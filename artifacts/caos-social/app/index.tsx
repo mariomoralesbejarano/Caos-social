@@ -54,8 +54,9 @@ const GAME_MODES: GameMode[] = [
     emoji: "♠️",
     title: "Poker",
     subtitle: "Texas Hold'em online con amigos",
-    tag: "PRONTO",
-    active: false,
+    tag: "JUGAR",
+    active: true,
+    route: "/baraja",
     glowColor: "#B026FF",
   },
   {

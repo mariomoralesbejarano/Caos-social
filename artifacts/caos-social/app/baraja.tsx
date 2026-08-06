@@ -142,6 +142,51 @@ const GAMES: Game[] = [
     ],
   },
   {
+    id: "poker",
+    emoji: "♠️",
+    title: "Póker · Texas Hold'em",
+    tagline: "Lee la mesa, apuesta tus fichas y gana el bote",
+    players: "2-8",
+    duration: "20-60 min",
+    difficulty: "Difícil",
+    sections: [
+      {
+        icon: "🎯",
+        heading: "Objetivo",
+        bullets: [
+          "Ganar fichas formando la mejor mano de cinco cartas o haciendo que todos los rivales se retiren.",
+          "Cada jugador recibe dos cartas privadas y comparte cinco cartas comunitarias.",
+        ],
+      },
+      {
+        icon: "🂡",
+        heading: "Reparto y ciegas",
+        bullets: [
+          "Se usa una baraja francesa completa de 52 cartas.",
+          "El Dealer rota después de cada mano. A su izquierda se coloca la Ciega Pequeña y después la Ciega Grande.",
+          "Cada jugador comienza con 1.000 fichas y recibe dos cartas ocultas.",
+        ],
+      },
+      {
+        icon: "🔄",
+        heading: "Rondas de apuestas",
+        bullets: [
+          "Pre-flop: apuestas con tus dos cartas privadas.",
+          "Flop: se descubren tres cartas; Turn añade una y River descubre la quinta.",
+          "En tu turno puedes Pasar, Igualar, Subir o Retirarte.",
+        ],
+      },
+      {
+        icon: "🏆",
+        heading: "Showdown",
+        bullets: [
+          "Se evalúa la mejor combinación posible de cinco cartas: carta alta, pareja, doble pareja, trío, escalera, color, full, póker, escalera de color o escalera real.",
+          "El bote se entrega automáticamente al ganador. Si hay empate, se divide entre los ganadores.",
+        ],
+      },
+    ],
+  },
+  {
     id: "culo",
     emoji: "👑",
     title: "El Culo / El Rey",

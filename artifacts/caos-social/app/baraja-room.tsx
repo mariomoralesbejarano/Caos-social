@@ -67,6 +67,8 @@ export default function BarajaRoomScreen() {
         router.replace("/baraja-apuestas" as never);
       } else if (gameId === "mentiroso") {
         router.replace("/baraja-mentiroso" as never);
+      } else if (gameId === "poker") {
+        router.replace("/poker-room" as never);
       } else {
         // Generic fallback: go to rules/waiting view
         router.replace("/baraja" as never);

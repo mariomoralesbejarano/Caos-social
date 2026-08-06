@@ -13,9 +13,12 @@ import type {
   BarajaRoomState,
   BGameResult,
   MentirosoState,
+  PokerCard,
+  PokerState,
   Palo,
 } from "./barajaTypes";
 import { PALOS, VALORES } from "./barajaTypes";
+import { getPokerCard, initPoker } from "./pokerGame";
 
 // ─── Deck helpers ─────────────────────────────────────────────────────────────
 
@@ -111,7 +114,14 @@ export function serializeBarajaRoom(
         .map((id) => getBarajaCard(id))
         .filter((c): c is BarajaNaipe => !!c);
 
-  // Mask own forehead card from game state
+  const myPokerHand: PokerCard[] =
+    gs?.type === "poker"
+      ? (gs.hands[playerId] ?? [])
+          .map((id) => getPokerCard(id))
+          .filter((card): card is PokerCard => !!card)
+      : [];
+
+  // Mask private game data before sending the state to a player.
   let serializedGs = gs;
   if (
     isForehead &&
@@ -122,12 +132,20 @@ export function serializeBarajaRoom(
     delete gsClone.currentRound.foreheadCards[playerId];
     serializedGs = gsClone;
   }
+  if (gs?.type === "poker") {
+    const pokerClone: PokerState = JSON.parse(JSON.stringify(gs));
+    pokerClone.hands = {};
+    pokerClone.deck = [];
+    serializedGs = pokerClone;
+  }
 
   const players: BarajaPlayerPublic[] = room.players.map((p) => ({
     id: p.id,
     name: p.name,
     avatar: p.avatar,
-    handCount: p.hand.length,
+    handCount: gs?.type === "poker"
+      ? (gs.hands[p.id]?.length ?? 0)
+      : p.hand.length,
     connected: p.connected,
   }));
 
@@ -140,6 +158,7 @@ export function serializeBarajaRoom(
     livesPerPlayer: room.livesPerPlayer,
     players,
     myHand,
+    myPokerHand,
     gameState: serializedGs ?? null,
     log: room.log.slice(-30), // last 30 events
     version: room.version,
@@ -231,6 +250,8 @@ export function applyBarajaStartGame(
     room.gameState = initApuestas(room);
   } else if (room.gameId === "mentiroso") {
     room.gameState = initMentiroso(room);
+  } else if (room.gameId === "poker") {
+    room.gameState = initPoker(room);
   }
 
   room.status = "active";
