@@ -24,6 +24,14 @@ description: Architecture and gotchas for the Baraja Española multiplayer syste
 
 **How to apply:** Any new game variant follows the same store+hooks pattern. Add gameId to `BarajaGameId`, add state type, add pure `init*/apply*` fns in barajaGame.ts, add hooks in barajaHooks.ts, add screen.
 
+## Private table states
+- Blackjack keeps dealer hole cards and opponents' hand cards server-side; `serializeBarajaRoom` only exposes the current player's hands and reveals the dealer after settlement.
+- Traditional Spanish-card variants share a private-hand state and a common playable table screen; variant-specific behavior should be added in the pure engine before adding UI branches.
+
+**Why:** Realtime room updates are broadcast to every participant, so privacy must be enforced at serialization rather than trusted to each screen.
+
+**How to apply:** Any new hidden-information game must add an explicit public serialization rule and keep deck/private cards out of the broadcast payload.
+
 ## tsconfig quirk
 `artifacts/caos-social/tsconfig.json` must exclude `capacitor.config.ts` — @capacitor/cli types don't resolve in the monorepo but the package itself works at runtime via Capacitor's build tooling.
 
