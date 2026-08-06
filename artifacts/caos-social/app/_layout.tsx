@@ -49,6 +49,9 @@ function RootLayoutNav() {
       <Stack.Screen name="baraja-apuestas" options={{ headerShown: false }} />
       <Stack.Screen name="baraja-mentiroso" options={{ headerShown: false }} />
       <Stack.Screen name="poker-room" options={{ headerShown: false }} />
+      <Stack.Screen name="poker-game" options={{ headerShown: false }} />
+      <Stack.Screen name="parchis" options={{ headerShown: false }} />
+      <Stack.Screen name="oca" options={{ headerShown: false }} />
     </Stack>
   );
 }

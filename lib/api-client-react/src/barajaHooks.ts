@@ -11,6 +11,9 @@ import {
   applyBarajaStartGame,
   applyMentirosoCallMentira,
   applyMentirosoPlay,
+  applyOcaRoll,
+  applyParchisMove,
+  applyParchisRoll,
   createBarajaRoom,
   generateBarajaCode,
   serializeBarajaRoom,
@@ -115,12 +118,19 @@ export function useCreateBarajaRoom() {
       name,
       avatar,
       livesPerPlayer,
+      tableConfig,
     }: {
       gameId: string;
       gameTitle: string;
       name: string;
       avatar: string;
       livesPerPlayer?: 3 | 5;
+      tableConfig?: {
+        startingStack?: number;
+        smallBlind?: number;
+        bigBlind?: number;
+        maxPlayers?: number;
+      };
     }) => {
       void gcBarajaRooms();
       let code = generateBarajaCode();
@@ -138,6 +148,7 @@ export function useCreateBarajaRoom() {
         name,
         avatar,
         livesPerPlayer,
+        tableConfig,
       });
       await insertBarajaRoom(room);
       return { code: room.code, playerId };
@@ -314,6 +325,43 @@ export function usePokerNextHand() {
       );
       if ("error" in (result as object))
         throw new Error((result as { error: string }).error);
+    },
+  });
+}
+
+export function useParchisRoll() {
+  return useMutation({
+    mutationFn: async ({ code, playerId }: { code: string; playerId: string }) => {
+      const result = await mutateBarajaRoom(code, (room) => applyParchisRoll(room, playerId));
+      if ("error" in (result as object)) throw new Error((result as { error: string }).error);
+    },
+  });
+}
+
+export function useParchisMove() {
+  return useMutation({
+    mutationFn: async ({
+      code,
+      playerId,
+      pieceIndex,
+    }: {
+      code: string;
+      playerId: string;
+      pieceIndex: number;
+    }) => {
+      const result = await mutateBarajaRoom(code, (room) =>
+        applyParchisMove(room, playerId, pieceIndex),
+      );
+      if ("error" in (result as object)) throw new Error((result as { error: string }).error);
+    },
+  });
+}
+
+export function useOcaRoll() {
+  return useMutation({
+    mutationFn: async ({ code, playerId }: { code: string; playerId: string }) => {
+      const result = await mutateBarajaRoom(code, (room) => applyOcaRoll(room, playerId));
+      if ("error" in (result as object)) throw new Error((result as { error: string }).error);
     },
   });
 }

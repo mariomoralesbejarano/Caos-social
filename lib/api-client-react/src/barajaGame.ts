@@ -13,12 +13,275 @@ import type {
   BarajaRoomState,
   BGameResult,
   MentirosoState,
+  OcaState,
+  ParchisColor,
+  ParchisState,
   PokerCard,
   PokerState,
   Palo,
 } from "./barajaTypes";
 import { PALOS, VALORES } from "./barajaTypes";
 import { getPokerCard, initPoker } from "./pokerGame";
+
+const PARCHIS_COLORS: ParchisColor[] = ["rojo", "amarillo", "verde", "azul"];
+const OCA_COLORS = ["rojo", "amarillo", "verde", "azul", "morado", "naranja"];
+const PARCHIS_SAFE_TRACKS = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
+const OCA_POSITIONS = [5, 9, 14, 18, 23, 27, 32, 36, 41, 45, 50, 54, 59];
+
+function initParchis(room: BarajaRoom): ParchisState {
+  const playerOrder = room.players.map((player) => player.id);
+  const colors: Record<string, ParchisColor> = {};
+  const pieces: Record<string, number[]> = {};
+  playerOrder.forEach((id, index) => {
+    colors[id] = PARCHIS_COLORS[index];
+    pieces[id] = [-1, -1, -1, -1];
+  });
+  return {
+    type: "parchis",
+    phase: "playing",
+    playerOrder,
+    colors,
+    currentIdx: 0,
+    dice: null,
+    lastDice: null,
+    canMove: false,
+    pieces,
+    consecutiveSixes: 0,
+    lastMove: null,
+    winnerId: null,
+  };
+}
+
+function initOca(room: BarajaRoom): OcaState {
+  const playerOrder = room.players.map((player) => player.id);
+  const colors: Record<string, string> = {};
+  const positions: Record<string, number> = {};
+  const turnsToSkip: Record<string, number> = {};
+  playerOrder.forEach((id, index) => {
+    colors[id] = OCA_COLORS[index];
+    positions[id] = 0;
+    turnsToSkip[id] = 0;
+  });
+  return {
+    type: "oca",
+    phase: "playing",
+    playerOrder,
+    colors,
+    currentIdx: 0,
+    positions,
+    dice: null,
+    lastDice: null,
+    turnsToSkip,
+    lastMove: null,
+    winnerId: null,
+  };
+}
+
+function nextPlayer(currentIdx: number, length: number): number {
+  return (currentIdx + 1) % length;
+}
+
+function parchisTrackPosition(color: ParchisColor, progress: number): number {
+  const offsets: Record<ParchisColor, number> = {
+    rojo: 0, amarillo: 13, verde: 26, azul: 39,
+  };
+  return (offsets[color] + progress) % 52;
+}
+
+function parchisOccupied(
+  gs: ParchisState,
+  ignorePlayerId?: string,
+): Map<number, { playerId: string; count: number }> {
+  const occupied = new Map<number, { playerId: string; count: number }>();
+  for (const playerId of gs.playerOrder) {
+    if (playerId === ignorePlayerId) continue;
+    for (const piece of gs.pieces[playerId] ?? []) {
+      if (piece < 1 || piece >= 68) continue;
+      const track = parchisTrackPosition(gs.colors[playerId], piece);
+      const current = occupied.get(track);
+      occupied.set(track, { playerId, count: (current?.count ?? 0) + 1 });
+    }
+  }
+  return occupied;
+}
+
+function canMoveParchis(
+  gs: ParchisState,
+  playerId: string,
+  pieceIndex: number,
+  dice: number,
+): boolean {
+  const piece = gs.pieces[playerId]?.[pieceIndex];
+  if (piece === undefined) return false;
+  if (piece === -1 && dice !== 5) return false;
+  const target = piece === -1 ? 1 : piece + dice;
+  if (target > 68) return false;
+  if (target >= 68) return target === 68;
+  const occupied = parchisOccupied(gs, playerId);
+  const targetTrack = parchisTrackPosition(gs.colors[playerId], target);
+  const targetOccupant = occupied.get(targetTrack);
+  if (targetOccupant && targetOccupant.count >= 2) return false;
+  const barriers = new Set<number>();
+  const all = parchisOccupied(gs);
+  for (const [track, occupant] of all) {
+    if (occupant.count >= 2) barriers.add(track);
+  }
+  const start = piece === -1 ? 0 : piece;
+  for (let progress = Math.max(1, start + 1); progress < target; progress++) {
+    if (barriers.has(parchisTrackPosition(gs.colors[playerId], progress))) return false;
+  }
+  return true;
+}
+
+export function applyParchisRoll(
+  room: BarajaRoom,
+  playerId: string,
+): BGameResult<{ room: BarajaRoom }> {
+  const gs = room.gameState as ParchisState | null;
+  if (!gs || gs.type !== "parchis") return { error: "Estado de Parchís incorrecto" };
+  if (gs.phase !== "playing") return { error: "La partida ha terminado" };
+  if (gs.playerOrder[gs.currentIdx] !== playerId) return { error: "No es tu turno" };
+  if (gs.dice !== null) return { error: "Ya has tirado el dado" };
+  const value = Math.floor(Math.random() * 6) + 1;
+  gs.dice = value;
+  gs.lastDice = value;
+  const color = gs.colors[playerId];
+  gs.canMove = gs.pieces[playerId].some((_, index) =>
+    canMoveParchis(gs, playerId, index, value),
+  );
+  gs.consecutiveSixes = value === 6 ? gs.consecutiveSixes + 1 : 0;
+  gs.lastMove = `${room.players.find((p) => p.id === playerId)?.name ?? "Jugador"} sacó un ${value}`;
+  if (!gs.canMove) {
+    gs.dice = null;
+    if (value === 6 && gs.consecutiveSixes < 3) {
+      gs.consecutiveSixes = gs.consecutiveSixes;
+    } else {
+      gs.currentIdx = nextPlayer(gs.currentIdx, gs.playerOrder.length);
+      gs.consecutiveSixes = 0;
+    }
+  }
+  room.version += 1;
+  room.log.push(gs.lastMove);
+  return { room };
+}
+
+export function applyParchisMove(
+  room: BarajaRoom,
+  playerId: string,
+  pieceIndex: number,
+): BGameResult<{ room: BarajaRoom }> {
+  const gs = room.gameState as ParchisState | null;
+  if (!gs || gs.type !== "parchis") return { error: "Estado de Parchís incorrecto" };
+  if (gs.playerOrder[gs.currentIdx] !== playerId || gs.dice === null) return { error: "Tira el dado primero" };
+  const pieces = gs.pieces[playerId] ?? [];
+  const piece = pieces[pieceIndex];
+  if (piece === undefined) return { error: "Ficha no válida" };
+  const dice = gs.dice;
+  if (!canMoveParchis(gs, playerId, pieceIndex, dice)) return { error: "Esa ficha no puede moverse" };
+  let next = piece === -1 ? 1 : piece + dice;
+  pieces[pieceIndex] = next;
+  const color = gs.colors[playerId];
+  const track = parchisTrackPosition(color, next);
+  let captured = false;
+  for (const otherId of gs.playerOrder) {
+    if (otherId === playerId) continue;
+    const otherColor = gs.colors[otherId];
+    gs.pieces[otherId] = gs.pieces[otherId].map((otherPiece) => {
+      if (otherPiece < 1 || otherPiece >= 68) return otherPiece;
+      if (
+        parchisTrackPosition(otherColor, otherPiece) !== track ||
+        PARCHIS_SAFE_TRACKS.has(track)
+      ) return otherPiece;
+      captured = true;
+      return -1;
+    });
+  }
+  if (captured && next + 20 <= 68) next += 20;
+  if (captured) pieces[pieceIndex] = next;
+  const reachedGoal = next === 68;
+  if (reachedGoal) {
+    const bonusIndex = pieces.findIndex((position, index) =>
+      index !== pieceIndex && position >= 0 && position < 58 &&
+      canMoveParchis(gs, playerId, index, 10),
+    );
+    if (bonusIndex >= 0) pieces[bonusIndex] += 10;
+  }
+  const won = pieces.every((position) => position >= 68);
+  gs.winnerId = won ? playerId : null;
+  gs.phase = won ? "ended" : "playing";
+  const extraTurn = dice === 6 && gs.consecutiveSixes < 3;
+  gs.dice = null;
+  gs.canMove = false;
+  if (!extraTurn && !won) {
+    gs.currentIdx = nextPlayer(gs.currentIdx, gs.playerOrder.length);
+    gs.consecutiveSixes = 0;
+  }
+  gs.lastMove = `${room.players.find((p) => p.id === playerId)?.name ?? "Jugador"} movió su ficha ${pieceIndex + 1}`;
+  room.version += 1;
+  room.log.push(gs.lastMove);
+  return { room };
+}
+
+function ocaSpecial(position: number): { next?: number; skip?: number; reset?: boolean; extraTurn?: boolean } {
+  const ocaIndex = OCA_POSITIONS.indexOf(position);
+  if (ocaIndex >= 0 && ocaIndex < OCA_POSITIONS.length - 1) {
+    return { next: OCA_POSITIONS[ocaIndex + 1], extraTurn: true };
+  }
+  if (position === 6) return { next: 12, extraTurn: true };
+  if (position === 19) return { skip: 1 };
+  if (position === 31) return { skip: 1 };
+  if (position === 42) return { next: 30 };
+  if (position === 56) return { skip: 2 };
+  if (position === 58) return { reset: true };
+  return {};
+}
+
+function ocaDestination(start: number, steps: number): number {
+  const target = start + steps;
+  return target <= 63 ? target : 63 - (target - 63);
+}
+
+export function applyOcaRoll(
+  room: BarajaRoom,
+  playerId: string,
+): BGameResult<{ room: BarajaRoom }> {
+  const gs = room.gameState as OcaState | null;
+  if (!gs || gs.type !== "oca") return { error: "Estado de La Oca incorrecto" };
+  if (gs.phase !== "playing") return { error: "La partida ha terminado" };
+  if (gs.playerOrder[gs.currentIdx] !== playerId) return { error: "No es tu turno" };
+  if (gs.dice) return { error: "Ya has tirado" };
+  const first = Math.floor(Math.random() * 6) + 1;
+  const second = Math.floor(Math.random() * 6) + 1;
+  gs.dice = [first, second];
+  gs.lastDice = [first, second];
+  const player = room.players.find((p) => p.id === playerId)?.name ?? "Jugador";
+  let extraTurn = false;
+  if ((gs.turnsToSkip[playerId] ?? 0) > 0) {
+    gs.turnsToSkip[playerId] -= 1;
+    gs.lastMove = `${player} pierde turno`;
+  } else {
+    const start = gs.positions[playerId];
+    let position = ocaDestination(start, first + second);
+    const special = ocaSpecial(position);
+    extraTurn = special.extraTurn ?? false;
+    if (special.reset) position = 1;
+    if (special.next) position = Math.min(63, special.next);
+    gs.positions[playerId] = position;
+    if (special.skip) gs.turnsToSkip[playerId] = special.skip;
+    gs.lastMove = `${player} avanzó a la casilla ${position}`;
+    if (position === 63) {
+      gs.phase = "ended";
+      gs.winnerId = playerId;
+    }
+  }
+  gs.dice = null;
+  if (gs.phase !== "ended" && !extraTurn) {
+    gs.currentIdx = nextPlayer(gs.currentIdx, gs.playerOrder.length);
+  }
+  room.version += 1;
+  room.log.push(gs.lastMove);
+  return { room };
+}
 
 // ─── Deck helpers ─────────────────────────────────────────────────────────────
 
@@ -156,6 +419,7 @@ export function serializeBarajaRoom(
     status: room.status,
     ownerId: room.ownerId,
     livesPerPlayer: room.livesPerPlayer,
+    tableConfig: room.tableConfig,
     players,
     myHand,
     myPokerHand,
@@ -175,6 +439,7 @@ export function createBarajaRoom(opts: {
   name: string;
   avatar: string;
   livesPerPlayer?: 3 | 5;
+  tableConfig?: BarajaRoom["tableConfig"];
 }): BarajaRoom {
   return {
     code: opts.code.toUpperCase(),
@@ -183,6 +448,7 @@ export function createBarajaRoom(opts: {
     status: "lobby",
     ownerId: opts.playerId,
     livesPerPlayer: opts.livesPerPlayer ?? 5,
+    tableConfig: opts.tableConfig,
     players: [
       {
         id: opts.playerId,
@@ -209,7 +475,8 @@ export function applyBarajaJoin(
   avatar: string,
 ): BGameResult<{ room: BarajaRoom; playerId: string }> {
   if (room.status !== "lobby") return { error: "La sala ya está en partida" };
-  if (room.players.length >= 8) return { error: "Sala llena (máx 8 jugadores)" };
+  const maxPlayers = room.tableConfig?.maxPlayers ?? 8;
+  if (room.players.length >= maxPlayers) return { error: `Sala llena (máx ${maxPlayers} jugadores)` };
 
   // Rejoin by name
   const existing = room.players.find(
@@ -252,6 +519,10 @@ export function applyBarajaStartGame(
     room.gameState = initMentiroso(room);
   } else if (room.gameId === "poker") {
     room.gameState = initPoker(room);
+  } else if (room.gameId === "parchis") {
+    room.gameState = initParchis(room);
+  } else if (room.gameId === "oca") {
+    room.gameState = initOca(room);
   }
 
   room.status = "active";

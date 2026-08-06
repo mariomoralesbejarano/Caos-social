@@ -71,6 +71,42 @@ export interface PokerState {
   roundNumber: number;
 }
 
+// ── Parchís ───────────────────────────────────────────────────────────────────
+
+export type ParchisColor = "rojo" | "amarillo" | "verde" | "azul";
+export type ParchisPiecePosition = -1 | number;
+
+export interface ParchisState {
+  type: "parchis";
+  phase: "playing" | "ended";
+  playerOrder: string[];
+  colors: Record<string, ParchisColor>;
+  currentIdx: number;
+  dice: number | null;
+  lastDice: number | null;
+  canMove: boolean;
+  pieces: Record<string, number[]>;
+  consecutiveSixes: number;
+  lastMove: string | null;
+  winnerId: string | null;
+}
+
+// ── La Oca ────────────────────────────────────────────────────────────────────
+
+export interface OcaState {
+  type: "oca";
+  phase: "playing" | "ended";
+  playerOrder: string[];
+  colors: Record<string, string>;
+  currentIdx: number;
+  positions: Record<string, number>;
+  dice: [number, number] | null;
+  lastDice: [number, number] | null;
+  turnsToSkip: Record<string, number>;
+  lastMove: string | null;
+  winnerId: string | null;
+}
+
 // ── Player stored in room (hand is private) ───────────────────────────────────
 export interface BarajaPlayer {
   id: string;
@@ -166,7 +202,12 @@ export interface MentirosoState {
 // ── Generic Baraja Room ───────────────────────────────────────────────────────
 
 export type BarajaGameId = string;
-export type BarajaGameState = ApuestasState | MentirosoState | PokerState;
+export type BarajaGameState =
+  | ApuestasState
+  | MentirosoState
+  | PokerState
+  | ParchisState
+  | OcaState;
 export type BGameResult<T = { room: BarajaRoom }> =
   | T
   | { error: string };
@@ -179,6 +220,13 @@ export interface BarajaRoom {
   ownerId: string;
   /** Starting lives for Las Apuestas; old rooms default to 5. */
   livesPerPlayer?: 3 | 5;
+  /** Optional table configuration used by configurable multiplayer games. */
+  tableConfig?: {
+    startingStack?: number;
+    smallBlind?: number;
+    bigBlind?: number;
+    maxPlayers?: number;
+  };
   players: BarajaPlayer[];
   drawPile: string[];
   gameState: BarajaGameState | null;
@@ -195,6 +243,12 @@ export interface BarajaRoomState {
   status: "lobby" | "active" | "ended";
   ownerId: string;
   livesPerPlayer?: 3 | 5;
+  tableConfig?: {
+    startingStack?: number;
+    smallBlind?: number;
+    bigBlind?: number;
+    maxPlayers?: number;
+  };
   players: BarajaPlayerPublic[];
   myHand: BarajaNaipe[];
   myPokerHand: PokerCard[];

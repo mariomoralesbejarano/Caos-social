@@ -69,6 +69,10 @@ export default function BarajaRoomScreen() {
         router.replace("/baraja-mentiroso" as never);
       } else if (gameId === "poker") {
         router.replace("/poker-room" as never);
+      } else if (gameId === "parchis") {
+        router.replace("/parchis" as never);
+      } else if (gameId === "oca") {
+        router.replace("/oca" as never);
       } else {
         // Generic fallback: go to rules/waiting view
         router.replace("/baraja" as never);
@@ -184,7 +188,7 @@ export default function BarajaRoomScreen() {
       {/* ── Players ── */}
       <View style={[styles.section, { borderColor: colors.border, backgroundColor: colors.card }]}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-          👥 Jugadores ({room.players.length}/8)
+          👥 Jugadores ({room.players.length}/{room.tableConfig?.maxPlayers ?? 8})
         </Text>
         {room.players.map((p) => (
           <View

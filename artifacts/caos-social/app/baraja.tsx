@@ -50,7 +50,7 @@ const GAMES: Game[] = [
     id: "apuestas",
     emoji: "🃏",
     title: "Las Apuestas",
-    tagline: "Predice tus bazas, ronda a ronda, hasta el Poker Indio final",
+    tagline: "Predice tus bazas, ronda a ronda, hasta la última carta",
     players: "3-6",
     duration: "30-60 min",
     difficulty: "Difícil",
@@ -84,7 +84,7 @@ const GAMES: Game[] = [
       },
       {
         icon: "👁️",
-        heading: "Ronda especial: 1 carta (Poker Indio)",
+        heading: "Ronda especial: 1 carta en la frente",
         bullets: [
           "Cada jugador coge su única carta y se la pone en la frente sin mirarla, de cara al resto.",
           "Cada jugador apuesta si va a ganar o perder la única baza de la ronda, basándose en lo que ve en las frentes ajenas.",
@@ -137,51 +137,6 @@ const GAMES: Game[] = [
           "Cuando la secuencia llega al Rey, vuelve a empezar desde el As.",
           "Si alguien llega a 0 cartas, gana automáticamente.",
           "Variante: el acusador nombra el valor exacto que cree que son las cartas; si acierta el número exacto, el mentiroso bebe el doble.",
-        ],
-      },
-    ],
-  },
-  {
-    id: "poker",
-    emoji: "♠️",
-    title: "Póker · Texas Hold'em",
-    tagline: "Lee la mesa, apuesta tus fichas y gana el bote",
-    players: "2-8",
-    duration: "20-60 min",
-    difficulty: "Difícil",
-    sections: [
-      {
-        icon: "🎯",
-        heading: "Objetivo",
-        bullets: [
-          "Ganar fichas formando la mejor mano de cinco cartas o haciendo que todos los rivales se retiren.",
-          "Cada jugador recibe dos cartas privadas y comparte cinco cartas comunitarias.",
-        ],
-      },
-      {
-        icon: "🂡",
-        heading: "Reparto y ciegas",
-        bullets: [
-          "Se usa una baraja francesa completa de 52 cartas.",
-          "El Dealer rota después de cada mano. A su izquierda se coloca la Ciega Pequeña y después la Ciega Grande.",
-          "Cada jugador comienza con 1.000 fichas y recibe dos cartas ocultas.",
-        ],
-      },
-      {
-        icon: "🔄",
-        heading: "Rondas de apuestas",
-        bullets: [
-          "Pre-flop: apuestas con tus dos cartas privadas.",
-          "Flop: se descubren tres cartas; Turn añade una y River descubre la quinta.",
-          "En tu turno puedes Pasar, Igualar, Subir o Retirarte.",
-        ],
-      },
-      {
-        icon: "🏆",
-        heading: "Showdown",
-        bullets: [
-          "Se evalúa la mejor combinación posible de cinco cartas: carta alta, pareja, doble pareja, trío, escalera, color, full, póker, escalera de color o escalera real.",
-          "El bote se entrega automáticamente al ganador. Si hay empate, se divide entre los ganadores.",
         ],
       },
     ],
@@ -796,7 +751,7 @@ const GAMES: Game[] = [
     id: "golfo",
     emoji: "👑",
     title: "El Golfo",
-    tagline: "Póker tradicional español de 4 cartas — el más bajo gana",
+    tagline: "Juego tradicional español de 4 cartas — el más bajo gana",
     players: "3-6",
     duration: "20-40 min",
     difficulty: "Medio",

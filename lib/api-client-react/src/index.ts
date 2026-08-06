@@ -80,6 +80,9 @@ export type {
   PokerSuit,
   PokerRank,
   PokerState,
+  ParchisColor,
+  ParchisState,
+  OcaState,
   PokerAction,
   PokerActionKind,
   PokerHandResult,
@@ -99,6 +102,9 @@ export {
   applyApuestasPlayCard,
   applyMentirosoPlay,
   applyMentirosoCallMentira,
+  applyOcaRoll,
+  applyParchisMove,
+  applyParchisRoll,
   cardLabel,
   valorLabel,
 } from "./barajaGame";
@@ -123,6 +129,9 @@ export {
   useCallMentira,
   usePokerAction,
   usePokerNextHand,
+  useParchisRoll,
+  useParchisMove,
+  useOcaRoll,
   getBarajaRoomQueryKey,
 } from "./barajaHooks";
 

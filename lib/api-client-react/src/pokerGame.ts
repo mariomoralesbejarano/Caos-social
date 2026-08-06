@@ -130,6 +130,12 @@ function initializePokerHand(
   dealerIdx: number,
   roundNumber: number,
 ): PokerState {
+  const startingStack = room.tableConfig?.startingStack ?? POKER_STARTING_STACK;
+  const smallBlind = room.tableConfig?.smallBlind ?? POKER_SMALL_BLIND;
+  const bigBlind = room.tableConfig?.bigBlind ?? POKER_BIG_BLIND;
+  if (smallBlind <= 0 || bigBlind <= smallBlind) {
+    throw new Error("Las ciegas no son válidas");
+  }
   const deck = shuffle(createPokerDeck().map((card) => card.id));
   const hands: Record<string, string[]> = {};
   const folded: string[] = [];
@@ -162,8 +168,8 @@ function initializePokerHand(
     street: "preflop",
     dealerIdx,
     playerOrder,
-    smallBlind: POKER_SMALL_BLIND,
-    bigBlind: POKER_BIG_BLIND,
+    smallBlind,
+    bigBlind,
     smallBlindId,
     bigBlindId,
     currentIdx: playerOrder.length === 2
@@ -172,7 +178,7 @@ function initializePokerHand(
     board: [],
     pot: 0,
     currentBet: 0,
-    minRaise: POKER_BIG_BLIND,
+    minRaise: bigBlind,
     stacks: { ...stacks },
     folded,
     streetBets,
@@ -189,8 +195,8 @@ function initializePokerHand(
     roundNumber,
   };
 
-  putChips(gs, smallBlindId, POKER_SMALL_BLIND);
-  putChips(gs, bigBlindId, POKER_BIG_BLIND);
+  putChips(gs, smallBlindId, Math.min(smallBlind, startingStack));
+  putChips(gs, bigBlindId, Math.min(bigBlind, startingStack));
   gs.currentBet = Math.max(gs.streetBets[smallBlindId], gs.streetBets[bigBlindId]);
   addAction(gs, smallBlindId, "call", gs.streetBets[smallBlindId]);
   addAction(gs, bigBlindId, "raise", gs.streetBets[bigBlindId]);
@@ -203,7 +209,8 @@ function initializePokerHand(
 export function initPoker(room: BarajaRoom): PokerState {
   const playerOrder = room.players.map((player) => player.id);
   const stacks: Record<string, number> = {};
-  for (const player of room.players) stacks[player.id] = POKER_STARTING_STACK;
+  const startingStack = room.tableConfig?.startingStack ?? POKER_STARTING_STACK;
+  for (const player of room.players) stacks[player.id] = startingStack;
   return initializePokerHand(room, playerOrder, stacks, 0, 1);
 }
 
