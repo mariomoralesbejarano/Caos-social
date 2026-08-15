@@ -12,8 +12,11 @@ import type {
   BarajaRoom,
   BarajaRoomState,
   BGameResult,
+  ArenaState,
   BlackjackState,
   MentirosoState,
+  MonopolyProperty,
+  MonopolyState,
   OcaState,
   ParchisColor,
   ParchisState,
@@ -84,6 +87,51 @@ function initOca(room: BarajaRoom): OcaState {
     turnsToSkip,
     lastMove: null,
     winnerId: null,
+    partyMode: room.tableConfig?.partyMode ?? false,
+    partyEvent: null,
+  };
+}
+
+const MONOPOLY_PROPERTIES: Array<Omit<MonopolyProperty, "ownerId" | "houseCount">> = [
+  { id: 1, name: "Lavapiés", price: 60, rent: 8, color: "brown" },
+  { id: 2, name: "Ronda de Valencia", price: 60, rent: 10, color: "brown" },
+  { id: 3, name: "Atocha", price: 100, rent: 14, color: "lightblue" },
+  { id: 4, name: "Chueca", price: 120, rent: 16, color: "lightblue" },
+  { id: 5, name: "Gran Vía", price: 140, rent: 20, color: "pink" },
+  { id: 6, name: "Castellana", price: 160, rent: 22, color: "pink" },
+  { id: 7, name: "Sol", price: 180, rent: 26, color: "orange" },
+  { id: 8, name: "Malasaña", price: 200, rent: 28, color: "orange" },
+  { id: 9, name: "Goya", price: 220, rent: 32, color: "red" },
+  { id: 10, name: "Salamanca", price: 240, rent: 34, color: "red" },
+  { id: 11, name: "Retiro", price: 260, rent: 38, color: "yellow" },
+  { id: 12, name: "Alcalá", price: 280, rent: 40, color: "yellow" },
+  { id: 13, name: "Prado", price: 300, rent: 46, color: "green" },
+  { id: 14, name: "Recoletos", price: 320, rent: 50, color: "green" },
+  { id: 15, name: "Castelldefels", price: 350, rent: 58, color: "blue" },
+  { id: 16, name: "Diagonal", price: 400, rent: 70, color: "blue" },
+];
+
+function initMonopoly(room: BarajaRoom): MonopolyState {
+  const playerOrder = room.players.map((player) => player.id);
+  const positions: Record<string, number> = {};
+  const balances: Record<string, number> = {};
+  const inJail: Record<string, number> = {};
+  for (const id of playerOrder) { positions[id] = 0; balances[id] = 1500; inJail[id] = 0; }
+  return {
+    type: "monopoly", phase: "playing", playerOrder, currentIdx: 0, positions, balances,
+    properties: MONOPOLY_PROPERTIES.map((property) => ({ ...property, ownerId: null, houseCount: 0 })),
+    inJail, dice: null, lastMove: "La partida empieza. Tira los dados.", winnerId: null,
+  };
+}
+
+function initArena(room: BarajaRoom): ArenaState {
+  const playerOrder = room.players.map((player) => player.id);
+  const scores: Record<string, number> = {};
+  for (const id of playerOrder) scores[id] = 0;
+  return {
+    type: "arena", phase: "playing", playerOrder, scores, round: 1,
+    roundType: "reflejos", flashAt: null, bombHolder: playerOrder[0] ?? null,
+    memorySequence: [], memoryInput: {}, winnerId: null,
   };
 }
 
@@ -364,6 +412,17 @@ export function applyOcaRoll(
     gs.positions[playerId] = position;
     if (special.skip) gs.turnsToSkip[playerId] = special.skip;
     gs.lastMove = `${player} avanzó a la casilla ${position}`;
+    if (gs.partyMode) {
+      const partyEvents: Record<number, string> = {
+        5: "Oca: bebe y vuelve a tirar",
+        6: "Puente: 1 sorbo",
+        19: "Posada: bebe quien no esté jugando",
+        31: "Pozo: bebe la persona de tu izquierda",
+        52: "Cárcel: chupito para salir",
+        58: "Muerte: fondo/chupito general",
+      };
+      gs.partyEvent = partyEvents[position] ?? null;
+    }
     if (position === 63) {
       gs.phase = "ended";
       gs.winnerId = playerId;
@@ -375,6 +434,79 @@ export function applyOcaRoll(
   }
   room.version += 1;
   room.log.push(gs.lastMove);
+  return { room };
+}
+
+export type MonopolyAction = "roll" | "buy" | "end-turn" | "jail";
+
+export function applyMonopolyAction(
+  room: BarajaRoom,
+  playerId: string,
+  action: MonopolyAction,
+): BGameResult<{ room: BarajaRoom }> {
+  const gs = room.gameState as MonopolyState | null;
+  if (!gs || gs.type !== "monopoly") return { error: "Estado de Monopoly incorrecto" };
+  if (gs.phase !== "playing") return { error: "La partida ha terminado" };
+  if (gs.playerOrder[gs.currentIdx] !== playerId) return { error: "No es tu turno" };
+  const position = gs.positions[playerId] ?? 0;
+  if (action === "roll") {
+    if (gs.dice) return { error: "Ya has tirado. Compra o termina turno." };
+    const dice: [number, number] = [Math.ceil(Math.random() * 6), Math.ceil(Math.random() * 6)];
+    gs.dice = dice;
+    const next = (position + dice[0] + dice[1]) % 16;
+    if (position + dice[0] + dice[1] >= 16) gs.balances[playerId] += 200;
+    gs.positions[playerId] = next;
+    if (next === 5) gs.inJail[playerId] = 1;
+    const property = gs.properties.find((item) => item.id === next);
+    if (property?.ownerId && property.ownerId !== playerId) {
+      const rent = Math.min(gs.balances[playerId], property.rent);
+      gs.balances[playerId] -= rent;
+      gs.balances[property.ownerId] += rent;
+      gs.lastMove = `${room.players.find((p) => p.id === playerId)?.name ?? "Jugador"} paga ${rent}€ de alquiler`;
+    } else {
+      gs.lastMove = `${room.players.find((p) => p.id === playerId)?.name ?? "Jugador"} cae en ${property?.name ?? "una casilla especial"}`;
+    }
+  } else if (action === "buy") {
+    if (!gs.dice) return { error: "Tira primero" };
+    const property = gs.properties.find((item) => item.id === position);
+    if (!property || property.ownerId || gs.balances[playerId] < property.price) return { error: "No puedes comprar esta calle" };
+    property.ownerId = playerId;
+    gs.balances[playerId] -= property.price;
+    gs.lastMove = `${room.players.find((p) => p.id === playerId)?.name ?? "Jugador"} compra ${property.name}`;
+  } else if (action === "jail") {
+    if (!gs.inJail[playerId]) return { error: "No estás en la cárcel" };
+    if (gs.balances[playerId] < 50) return { error: "Necesitas 50€ para salir" };
+    gs.balances[playerId] -= 50;
+    gs.inJail[playerId] = 0;
+    gs.lastMove = "Pagas 50€ y sales de la cárcel";
+  } else {
+    if (!gs.dice) return { error: "Tira primero" };
+    gs.dice = null;
+    gs.currentIdx = (gs.currentIdx + 1) % gs.playerOrder.length;
+    gs.lastMove = `Turno de ${room.players.find((p) => p.id === gs.playerOrder[gs.currentIdx])?.name ?? "otro jugador"}`;
+  }
+  room.version += 1;
+  room.log.push(gs.lastMove ?? "Movimiento");
+  return { room };
+}
+
+export function applyArenaAction(
+  room: BarajaRoom,
+  playerId: string,
+  action: "score" | "pass",
+  points = 1,
+): BGameResult<{ room: BarajaRoom }> {
+  const gs = room.gameState as ArenaState | null;
+  if (!gs || gs.type !== "arena") return { error: "Estado de arena incorrecto" };
+  if (!gs.playerOrder.includes(playerId)) return { error: "Jugador no encontrado" };
+  if (action === "score") gs.scores[playerId] = (gs.scores[playerId] ?? 0) + Math.max(1, points);
+  gs.round += 1;
+  gs.roundType = gs.round % 3 === 1 ? "reflejos" : gs.round % 3 === 2 ? "bomba" : "memoria";
+  if (gs.round > 9) {
+    gs.phase = "ended";
+    gs.winnerId = Object.entries(gs.scores).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  }
+  room.version += 1;
   return { room };
 }
 
@@ -652,6 +784,10 @@ export function applyBarajaStartGame(
     room.gameState = initOca(room);
   } else if (room.gameId === "blackjack") {
     room.gameState = initBlackjack(room);
+  } else if (room.gameId === "monopoly") {
+    room.gameState = initMonopoly(room);
+  } else if (room.gameId === "arena") {
+    room.gameState = initArena(room);
   } else if (TRADITIONAL_VARIANTS.has(room.gameId as TraditionalGameId)) {
     room.gameState = initTraditional(room, room.gameId as TraditionalGameId);
   }

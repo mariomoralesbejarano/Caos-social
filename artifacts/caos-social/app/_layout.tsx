@@ -52,6 +52,8 @@ function RootLayoutNav() {
       <Stack.Screen name="poker-game" options={{ headerShown: false }} />
       <Stack.Screen name="parchis" options={{ headerShown: false }} />
       <Stack.Screen name="oca" options={{ headerShown: false }} />
+      <Stack.Screen name="monopoly" options={{ headerShown: false }} />
+      <Stack.Screen name="arena" options={{ headerShown: false }} />
       <Stack.Screen name="blackjack" options={{ headerShown: false }} />
       <Stack.Screen name="traditional" options={{ headerShown: false }} />
     </Stack>

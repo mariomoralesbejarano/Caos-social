@@ -73,6 +73,10 @@ export default function BarajaRoomScreen() {
         router.replace("/parchis" as never);
       } else if (gameId === "oca") {
         router.replace("/oca" as never);
+      } else if (gameId === "monopoly") {
+        router.replace("/monopoly" as never);
+      } else if (gameId === "arena") {
+        router.replace("/arena" as never);
       } else if (gameId === "blackjack") {
         router.replace("/blackjack" as never);
       } else if ([

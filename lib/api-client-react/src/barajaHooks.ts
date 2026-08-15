@@ -12,6 +12,8 @@ import {
   applyMentirosoCallMentira,
   applyMentirosoPlay,
   applyOcaRoll,
+  applyMonopolyAction,
+  applyArenaAction,
   applyParchisMove,
   applyParchisRoll,
   applyTraditionalPlay,
@@ -19,7 +21,7 @@ import {
   generateBarajaCode,
   serializeBarajaRoom,
 } from "./barajaGame";
-import { applyPokerAction, applyPokerNextHand } from "./pokerGame";
+import { applyPokerAction, applyPokerDrinkAward, applyPokerNextHand } from "./pokerGame";
 import { applyBlackjackAction, applyBlackjackNextRound } from "./blackjackGame";
 import {
   BARAJA_TABLE,
@@ -132,6 +134,8 @@ export function useCreateBarajaRoom() {
         smallBlind?: number;
         bigBlind?: number;
         maxPlayers?: number;
+        stakesMode?: "chips" | "sips";
+        partyMode?: boolean;
       };
     }) => {
       void gcBarajaRooms();
@@ -331,6 +335,25 @@ export function usePokerNextHand() {
   });
 }
 
+export function usePokerDrinkAward() {
+  return useMutation({
+    mutationFn: async ({
+      code,
+      playerId,
+      recipientIds,
+    }: {
+      code: string;
+      playerId: string;
+      recipientIds: string[];
+    }) => {
+      const result = await mutateBarajaRoom(code, (room) =>
+        applyPokerDrinkAward(room, playerId, recipientIds),
+      );
+      if ("error" in (result as object)) throw new Error((result as { error: string }).error);
+    },
+  });
+}
+
 export function useParchisRoll() {
   return useMutation({
     mutationFn: async ({ code, playerId }: { code: string; playerId: string }) => {
@@ -363,6 +386,42 @@ export function useOcaRoll() {
   return useMutation({
     mutationFn: async ({ code, playerId }: { code: string; playerId: string }) => {
       const result = await mutateBarajaRoom(code, (room) => applyOcaRoll(room, playerId));
+      if ("error" in (result as object)) throw new Error((result as { error: string }).error);
+    },
+  });
+}
+
+export function useMonopolyAction() {
+  return useMutation({
+    mutationFn: async ({
+      code,
+      playerId,
+      action,
+    }: {
+      code: string;
+      playerId: string;
+      action: "roll" | "buy" | "end-turn" | "jail";
+    }) => {
+      const result = await mutateBarajaRoom(code, (room) => applyMonopolyAction(room, playerId, action));
+      if ("error" in (result as object)) throw new Error((result as { error: string }).error);
+    },
+  });
+}
+
+export function useArenaAction() {
+  return useMutation({
+    mutationFn: async ({
+      code,
+      playerId,
+      action,
+      points,
+    }: {
+      code: string;
+      playerId: string;
+      action: "score" | "pass";
+      points?: number;
+    }) => {
+      const result = await mutateBarajaRoom(code, (room) => applyArenaAction(room, playerId, action, points));
       if ("error" in (result as object)) throw new Error((result as { error: string }).error);
     },
   });

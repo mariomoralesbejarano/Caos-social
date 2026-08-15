@@ -8,6 +8,7 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -102,7 +103,7 @@ export default function OcaScreen() {
           </Pressable>
         </View>
 
-        <OcaBoard state={gs} />
+        <OcaBoardImage state={gs} />
         <View style={[styles.status, { borderColor: colors.border, backgroundColor: colors.card }]}>
           <Text style={[styles.turn, { color: isMyTurn ? "#45A3FF" : colors.mutedForeground }]}>
             {isMyTurn ? "TU TURNO" : `Turno de ${currentName ?? "otro jugador"}`}
@@ -110,6 +111,12 @@ export default function OcaScreen() {
           <Text style={[styles.help, { color: colors.mutedForeground }]}>
             {gs.lastMove ?? "Tira los dados para avanzar"}
           </Text>
+          {gs.partyMode && gs.partyEvent && (
+            <View style={styles.partyEvent}>
+              <Text style={styles.partyEventKicker}>MODO FIESTA</Text>
+              <Text style={styles.partyEventText}>{gs.partyEvent}</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.playersCard}>
@@ -202,6 +209,37 @@ function OcaBoard({ state }: { state: OcaState }) {
   );
 }
 
+function OcaBoardImage({ state }: { state: OcaState }) {
+  return (
+    <View style={styles.assetBoard}>
+      <Image source={{ uri: "/assets/oca_board.svg" }} resizeMode="contain" style={StyleSheet.absoluteFillObject} />
+      {Array.from({ length: 63 }, (_, index) => index + 1).map((cell) => {
+        const point = ocaBoardPoint(cell);
+        const playersHere = state.playerOrder.filter((id) => (state.positions[id] ?? 0) === cell);
+        return (
+          <View key={cell} style={[styles.ocaCell, { left: `${point.x}%`, top: `${point.y}%` }]}>
+            <Text style={styles.ocaCellNumber}>{cell}</Text>
+            {playersHere.map((playerId, index) => (
+              <View key={playerId} style={[styles.ocaToken, { backgroundColor: PLAYER_COLORS[state.playerOrder.indexOf(playerId) % PLAYER_COLORS.length], marginLeft: index * 9 }]}>
+                <Text style={styles.assetTokenText}>{state.playerOrder.indexOf(playerId) + 1}</Text>
+              </View>
+            ))}
+          </View>
+        );
+      })}
+      <Text style={styles.assetCaption}>63 CASILLAS · OCA · PUENTE · POSADA · CÁRCEL · MUERTE</Text>
+    </View>
+  );
+}
+
+function ocaBoardPoint(cell: number) {
+  const n = cell - 1;
+  if (n < 16) return { x: 8 + (n / 15) * 84, y: 16 };
+  if (n < 32) return { x: 92, y: 16 + ((n - 16) / 15) * 68 };
+  if (n < 48) return { x: 92 - ((n - 32) / 15) * 84, y: 84 };
+  return { x: 8, y: 84 - ((n - 48) / 14) * 68 };
+}
+
 function ocaSpiralPosition(cell: number) {
   const progress = (cell - 1) / 62;
   const angle = progress * Math.PI * 4.2 - Math.PI / 2;
@@ -240,6 +278,15 @@ const styles = StyleSheet.create({
   title: { fontFamily: "Inter_700Bold", fontSize: 27, marginTop: 4 },
   smallButton: { borderWidth: 1, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10 },
   board: { borderRadius: 20, borderWidth: 2, borderColor: "#275C91", backgroundColor: "#102947", padding: 12, gap: 12 },
+  assetBoard: { width: "100%", aspectRatio: 1200 / 820, maxWidth: 760, alignSelf: "center", borderRadius: 20, overflow: "hidden", position: "relative", backgroundColor: "#fdf3ca" },
+  ocaCell: { position: "absolute", width: 25, height: 25, marginLeft: -12.5, marginTop: -12.5, alignItems: "center", justifyContent: "center" },
+  ocaCellNumber: { color: "#7d352d", fontFamily: "Inter_700Bold", fontSize: 8 },
+  ocaToken: { position: "absolute", top: 12, width: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: "#fff8df", alignItems: "center", justifyContent: "center" },
+  assetTokenText: { color: "#fff", fontSize: 7, fontFamily: "Inter_700Bold" },
+  assetCaption: { position: "absolute", bottom: 6, left: 0, right: 0, textAlign: "center", color: "#6d4029", fontFamily: "Inter_700Bold", fontSize: 7, letterSpacing: .5 },
+  partyEvent: { marginTop: 8, borderRadius: 10, borderWidth: 1, borderColor: "#FF7A45", backgroundColor: "#FF7A4518", padding: 10, width: "100%", alignItems: "center" },
+  partyEventKicker: { color: "#FF7A45", fontFamily: "Inter_700Bold", fontSize: 9, letterSpacing: 1.5 },
+  partyEventText: { color: "#FFD2BD", fontFamily: "Inter_700Bold", fontSize: 13, marginTop: 3, textAlign: "center" },
   boardLegend: { color: "#A9C6E2", fontFamily: "Inter_600SemiBold", fontSize: 8, lineHeight: 13, textAlign: "center" },
   status: { borderWidth: 1, borderRadius: 14, padding: 14, alignItems: "center", gap: 4 },
   turn: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 1.5 },

@@ -193,6 +193,9 @@ function initializePokerHand(
     deck,
     deckPos,
     roundNumber,
+    stakesMode: room.tableConfig?.stakesMode ?? "chips",
+    drinkPot: 0,
+    drinkAwards: {},
   };
 
   putChips(gs, smallBlindId, Math.min(smallBlind, startingStack));
@@ -448,8 +451,34 @@ export function applyPokerAction(
   } else {
     gs.currentIdx = nextAvailable(gs, gs.currentIdx, true);
   }
+  if (gs.stakesMode === "sips" && action !== "fold") {
+    gs.drinkPot = (gs.drinkPot ?? 0) + 1;
+  }
   room.version += 1;
   room.log.push(`${room.players.find((player) => player.id === playerId)?.name ?? "Jugador"} ${action}${action === "raise" ? ` a ${gs.currentBet}` : ""}`);
+  return { room };
+}
+
+export function applyPokerDrinkAward(
+  room: BarajaRoom,
+  playerId: string,
+  recipientIds: string[],
+): BGameResult<{ room: BarajaRoom }> {
+  const gs = room.gameState as PokerState | null;
+  if (!gs || gs.type !== "poker") return { error: "Estado de Póker incorrecto" };
+  if (gs.stakesMode !== "sips") return { error: "La mesa no está en modo Sorbos" };
+  if (gs.phase !== "ended") return { error: "Espera al final de la mano" };
+  if (!gs.winnerIds.includes(playerId)) return { error: "Solo el ganador reparte el bote" };
+  const recipients = [...new Set(recipientIds)].filter((id) => id !== playerId && gs.playerOrder.includes(id));
+  if (!recipients.length) return { error: "Selecciona al menos un rival" };
+  const pot = gs.drinkPot ?? 0;
+  if (!pot) return { error: "El bote de sorbos ya está vacío" };
+  const awards: Record<string, number> = {};
+  recipients.forEach((id, index) => { awards[id] = Math.floor(pot / recipients.length) + (index < pot % recipients.length ? 1 : 0); });
+  gs.drinkAwards = { ...(gs.drinkAwards ?? {}), ...awards };
+  gs.drinkPot = 0;
+  room.version += 1;
+  room.log.push(`🍺 ${room.players.find((p) => p.id === playerId)?.name ?? "El ganador"} reparte ${pot} sorbos`);
   return { room };
 }
 

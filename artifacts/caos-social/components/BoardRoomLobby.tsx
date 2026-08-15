@@ -22,7 +22,7 @@ import BetSlider from "@/components/BetSlider";
 
 const AVATARS = ["🦄", "🐙", "🦊", "🐲", "🦋", "🐸", "🦝", "🐼"];
 
-export type BoardLobbyKind = "poker" | "blackjack" | "parchis" | "oca";
+export type BoardLobbyKind = "poker" | "blackjack" | "parchis" | "oca" | "monopoly" | "arena";
 
 interface BoardRoomLobbyProps {
   kind: BoardLobbyKind;
@@ -54,6 +54,8 @@ export default function BoardRoomLobby({
   const [smallBlind, setSmallBlind] = useState(10);
   const [bigBlind, setBigBlind] = useState(20);
   const [roomMaxPlayers, setRoomMaxPlayers] = useState(defaultMaxPlayers);
+  const [stakesMode, setStakesMode] = useState<"chips" | "sips">("chips");
+  const [partyMode, setPartyMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const createMut = useCreateBarajaRoom();
@@ -61,6 +63,7 @@ export default function BoardRoomLobby({
   const busy = createMut.isPending || joinMut.isPending;
   const isPoker = kind === "poker";
   const isBlackjack = kind === "blackjack";
+  const isOca = kind === "oca";
 
   async function createRoom() {
     setError(null);
@@ -83,6 +86,8 @@ export default function BoardRoomLobby({
           ...(isPoker || isBlackjack
             ? { startingStack, smallBlind, bigBlind }
             : {}),
+          ...(isPoker ? { stakesMode } : {}),
+          ...(isOca ? { partyMode } : {}),
         },
       });
       await saveBarajaSession({
@@ -259,6 +264,37 @@ export default function BoardRoomLobby({
                     colors={colors}
                   />
                 )}
+              {isPoker && (
+                <View style={styles.option}>
+                  <Text style={[styles.label, { color: colors.mutedForeground }]}>Modo de mesa</Text>
+                  <View style={styles.optionRow}>
+                    {([
+                      ["chips", "Fichas"],
+                      ["sips", "Sorbos"],
+                    ] as const).map(([value, label]) => (
+                      <Pressable
+                        key={value}
+                        onPress={() => setStakesMode(value)}
+                        style={[styles.optionButton, { borderColor: stakesMode === value ? accent : colors.border, backgroundColor: stakesMode === value ? accent + "22" : "transparent" }]}
+                      >
+                        <Text style={{ color: stakesMode === value ? accent : colors.mutedForeground, fontFamily: "Inter_700Bold", fontSize: 12 }}>
+                          {value === "chips" ? "Fichas" : "Sorbos"}
+                        </Text>
+                        <Text style={{ color: colors.mutedForeground, fontSize: 10 }}>{label === "Sorbos" ? "bote repartible" : "modo clásico"}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              )}
+              {isOca && (
+                <Pressable onPress={() => setPartyMode((value) => !value)} style={[styles.partyToggle, { borderColor: partyMode ? "#FF7A45" : colors.border, backgroundColor: partyMode ? "#FF7A4518" : colors.input }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.label, { color: colors.foreground }]}>Modo fiesta</Text>
+                    <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>Castigos en Oca, Puente, Posada, Cárcel y Muerte</Text>
+                  </View>
+                  <Text style={{ color: partyMode ? "#FF7A45" : colors.mutedForeground, fontFamily: "Inter_700Bold" }}>{partyMode ? "ACTIVO" : "OFF"}</Text>
+                </Pressable>
+              )}
               </>
             )}
           </>
@@ -342,6 +378,7 @@ const styles = StyleSheet.create({
   option: { gap: 6 },
   optionRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   optionButton: { minWidth: 58, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9, alignItems: "center" },
+  partyToggle: { borderWidth: 1, borderRadius: 11, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
   sliderBlock: { gap: 4, paddingTop: 3 },
   error: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
   cta: { borderRadius: 10, alignItems: "center", paddingVertical: 14, marginTop: 4 },

@@ -7,6 +7,7 @@ import {
   useGetBarajaRoom,
   useLeaveBarajaRoom,
   usePokerAction,
+  usePokerDrinkAward,
   usePokerNextHand,
 } from "@workspace/api-client-react";
 import type { PokerState, PokerSuit } from "@workspace/api-client-react";
@@ -27,19 +28,7 @@ import { clearBarajaSession, loadBarajaSession } from "@/lib/barajaSession";
 import type { BarajaSession } from "@/lib/barajaSession";
 import { useColors } from "@/hooks/useColors";
 import BetSlider from "@/components/BetSlider";
-
-const SUIT_SYMBOL: Record<PokerSuit, string> = {
-  spades: "♠",
-  hearts: "♥",
-  diamonds: "♦",
-  clubs: "♣",
-};
-const SUIT_COLOR: Record<PokerSuit, string> = {
-  spades: "#1B2438",
-  hearts: "#D83A5B",
-  diamonds: "#D83A5B",
-  clubs: "#1B2438",
-};
+import PokerCard from "@/components/PokerCard";
 
 function PokerCardView({
   card,
@@ -50,23 +39,7 @@ function PokerCardView({
   hidden?: boolean;
   large?: boolean;
 }) {
-  if (hidden || !card) {
-    return (
-      <View style={[styles.pokerCard, large && styles.pokerCardLarge, styles.cardBack]}>
-        <Text style={styles.cardBackMark}>♠</Text>
-      </View>
-    );
-  }
-  return (
-    <View style={[styles.pokerCard, large && styles.pokerCardLarge]}>
-      <Text style={[styles.cardRank, large && styles.cardRankLarge, { color: SUIT_COLOR[card.suit] }]}>
-        {card.rank}
-      </Text>
-      <Text style={[styles.cardSuit, large && styles.cardSuitLarge, { color: SUIT_COLOR[card.suit] }]}>
-        {SUIT_SYMBOL[card.suit]}
-      </Text>
-    </View>
-  );
+  return <PokerCard rank={card?.rank} suit={card?.suit} hidden={hidden || !card} large={large} />;
 }
 
 function formatChips(amount: number): string {
@@ -81,6 +54,7 @@ export default function PokerRoomScreen() {
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [raiseTo, setRaiseTo] = useState(0);
+  const [drinkRecipients, setDrinkRecipients] = useState<string[]>([]);
 
   useEffect(() => {
     loadBarajaSession().then((value) => {
@@ -95,6 +69,7 @@ export default function PokerRoomScreen() {
   );
   const actionMut = usePokerAction();
   const nextHandMut = usePokerNextHand();
+  const drinkAwardMut = usePokerDrinkAward();
   const leaveMut = useLeaveBarajaRoom();
 
   const gs = room?.gameState?.type === "poker"
@@ -150,6 +125,21 @@ export default function PokerRoomScreen() {
     setError(null);
     try {
       await nextHandMut.mutateAsync({ code: room.code, playerId: session.playerId });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function handleDrinkAward() {
+    if (!session || !room) return;
+    setError(null);
+    try {
+      await drinkAwardMut.mutateAsync({
+        code: room.code,
+        playerId: session.playerId,
+        recipientIds: drinkRecipients,
+      });
+      setDrinkRecipients([]);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -238,6 +228,39 @@ export default function PokerRoomScreen() {
             Apuesta actual <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold" }}>{gs.currentBet}</Text>
           </Text>
         </View>
+        {gs.stakesMode === "sips" && (
+          <View style={[styles.sipsCard, { borderColor: "#FF7A45", backgroundColor: "#FF7A4514" }]}>
+            <View style={styles.sipsHeader}>
+              <Text style={styles.sipsTitle}>MODO SORBOS</Text>
+              <Text style={styles.sipsPot}>{gs.drinkPot ?? 0} tragos en el bote</Text>
+            </View>
+            {gs.phase === "ended" && gs.winnerIds.includes(myId) && (gs.drinkPot ?? 0) > 0 && (
+              <>
+                <Text style={styles.sipsHint}>Selecciona a quién repartir el bote</Text>
+                <View style={styles.recipientRow}>
+                  {room.players.filter((player) => player.id !== myId).map((player) => {
+                    const selected = drinkRecipients.includes(player.id);
+                    return (
+                      <Pressable
+                        key={player.id}
+                        onPress={() => setDrinkRecipients((current) => selected ? current.filter((id) => id !== player.id) : [...current, player.id])}
+                        style={[styles.recipient, { borderColor: selected ? "#FF7A45" : colors.border, backgroundColor: selected ? "#FF7A4528" : colors.background }]}
+                      >
+                        <Text style={{ color: selected ? "#FF7A45" : colors.mutedForeground, fontFamily: "Inter_700Bold", fontSize: 11 }}>{player.name}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Pressable onPress={handleDrinkAward} disabled={!drinkRecipients.length || drinkAwardMut.isPending} style={[styles.awardButton, { opacity: drinkRecipients.length ? 1 : .45 }]}>
+                  <Text style={styles.awardText}>REPARTIR SORBOS</Text>
+                </Pressable>
+              </>
+            )}
+            {!!Object.keys(gs.drinkAwards ?? {}).length && (
+              <Text style={styles.awarded}>Reparto: {Object.entries(gs.drinkAwards ?? {}).map(([id, amount]) => `${room.players.find((player) => player.id === id)?.name ?? "Jugador"} ${amount}`).join(" · ")}</Text>
+            )}
+          </View>
+        )}
 
         <View style={[styles.playersCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Jugadores</Text>
@@ -409,6 +432,16 @@ const styles = StyleSheet.create({
   tableHint: { color: "#C2F2DC", fontFamily: "Inter_600SemiBold", fontSize: 12, marginTop: 13 },
   infoStrip: { borderRadius: 10, borderWidth: 1, padding: 11, flexDirection: "row", justifyContent: "space-around", gap: 6 },
   infoText: { fontFamily: "Inter_400Regular", fontSize: 11, textAlign: "center" },
+  sipsCard: { borderRadius: 13, borderWidth: 1, padding: 13, gap: 9 },
+  sipsHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  sipsTitle: { color: "#FF7A45", fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 1.5 },
+  sipsPot: { color: "#FFD2BD", fontFamily: "Inter_700Bold", fontSize: 13 },
+  sipsHint: { color: "#D5B6A7", fontFamily: "Inter_400Regular", fontSize: 11 },
+  recipientRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
+  recipient: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 8 },
+  awardButton: { borderRadius: 8, backgroundColor: "#FF7A45", paddingVertical: 11, alignItems: "center" },
+  awardText: { color: "#1c0b07", fontFamily: "Inter_700Bold", letterSpacing: 1 },
+  awarded: { color: "#FFD2BD", fontFamily: "Inter_600SemiBold", fontSize: 11 },
   playersCard: { borderRadius: 14, borderWidth: 1, padding: 13, gap: 10 },
   sectionTitle: { fontFamily: "Inter_700Bold", fontSize: 14 },
   playersGrid: { gap: 6 },

@@ -9,6 +9,7 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -120,7 +121,7 @@ export default function ParchisScreen() {
           </Pressable>
         </View>
 
-        <ParchisBoard state={gs} />
+        <ParchisBoardImage state={gs} />
         <View style={[styles.status, { borderColor: colors.border, backgroundColor: colors.card }]}>
           <Text style={[styles.turn, { color: isMyTurn ? "#FFB800" : colors.mutedForeground }]}>
             {isMyTurn ? "TU TURNO" : `Turno de ${currentName ?? "otro jugador"}`}
@@ -240,6 +241,56 @@ function ParchisBoard({ state }: { state: ParchisState }) {
   );
 }
 
+function ParchisBoardImage({ state }: { state: ParchisState }) {
+  const tokens: Array<{ id: string; color: keyof typeof COLOR_META; index: number; position: number }> = [];
+  for (const [playerId, pieces] of Object.entries(state.pieces)) {
+    pieces.forEach((position, index) => tokens.push({
+      id: `${playerId}-${index}`,
+      color: state.colors[playerId],
+      index,
+      position,
+    }));
+  }
+  return (
+    <View style={styles.assetBoard}>
+      <Image source={{ uri: "/assets/parchis_board.svg" }} resizeMode="contain" style={StyleSheet.absoluteFillObject} />
+      {tokens.map((token) => {
+        const point = token.position < 0
+          ? homePoint(token.color, token.index)
+          : token.position >= 68
+            ? { x: 50, y: 50 }
+            : trackPoint(token.position);
+        return (
+          <View key={token.id} style={[styles.assetToken, { left: `${point.x}%`, top: `${point.y}%`, backgroundColor: COLOR_META[token.color], opacity: token.position < 0 ? 0.72 : 1 }]}>
+            <Text style={styles.assetTokenText}>{token.index + 1}</Text>
+          </View>
+        );
+      })}
+      <Text style={styles.assetCaption}>TABLERO ILUSTRADO · SALIDA, SEGUROS Y CASAS REALES</Text>
+    </View>
+  );
+}
+
+function trackPoint(index: number) {
+  const side = 15;
+  const span = 70;
+  const perSide = 17;
+  if (index < perSide) return { x: 40 + (index / (perSide - 1)) * 20, y: side };
+  if (index < perSide * 2) return { x: 85, y: 40 + ((index - perSide) / (perSide - 1)) * 20 };
+  if (index < perSide * 3) return { x: 60 - ((index - perSide * 2) / (perSide - 1)) * 20, y: 85 };
+  return { x: 15, y: 60 - ((index - perSide * 3) / (perSide - 1)) * 20 };
+}
+
+function homePoint(color: keyof typeof COLOR_META, index: number) {
+  const points = {
+    rojo: [{ x: 17, y: 17 }, { x: 26, y: 17 }, { x: 17, y: 26 }, { x: 26, y: 26 }],
+    amarillo: [{ x: 74, y: 17 }, { x: 83, y: 17 }, { x: 74, y: 26 }, { x: 83, y: 26 }],
+    azul: [{ x: 17, y: 74 }, { x: 26, y: 74 }, { x: 17, y: 83 }, { x: 26, y: 83 }],
+    verde: [{ x: 74, y: 74 }, { x: 83, y: 74 }, { x: 74, y: 83 }, { x: 83, y: 83 }],
+  } as const;
+  return points[color][index] ?? points.rojo[0];
+}
+
 function LoadingScreen({ color }: { color: string }) {
   return <View style={styles.loading}><ActivityIndicator color={color} size="large" /></View>;
 }
@@ -264,6 +315,10 @@ const styles = StyleSheet.create({
   title: { fontFamily: "Inter_700Bold", fontSize: 27, marginTop: 4 },
   smallButton: { borderWidth: 1, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10 },
   board: { minHeight: 340, borderRadius: 22, borderWidth: 2, borderColor: "#5C2F86", backgroundColor: "#25103D", padding: 8, justifyContent: "center", overflow: "hidden" },
+  assetBoard: { width: "100%", aspectRatio: 1, maxWidth: 620, alignSelf: "center", borderRadius: 22, overflow: "hidden", position: "relative", backgroundColor: "#f8e7bd" },
+  assetToken: { position: "absolute", width: 20, height: 20, marginLeft: -10, marginTop: -10, borderRadius: 10, borderWidth: 2, borderColor: "#fff8df", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: .35, shadowRadius: 3, elevation: 4 },
+  assetTokenText: { color: "#fff", fontSize: 8, fontFamily: "Inter_700Bold" },
+  assetCaption: { position: "absolute", bottom: 8, left: 0, right: 0, textAlign: "center", color: "#5f3b25", fontFamily: "Inter_700Bold", fontSize: 8, letterSpacing: .8 },
   boardCenter: { position: "absolute", alignSelf: "center", alignItems: "center", justifyContent: "center", width: 128, height: 128, borderRadius: 64, borderWidth: 2, borderColor: "#FFB800", backgroundColor: "#1A0A2B", zIndex: 2 },
   centerMark: { color: "#FFB800", fontFamily: "Inter_700Bold", fontSize: 17, letterSpacing: 2 },
   centerSub: { color: "#C8B9D6", fontFamily: "Inter_400Regular", fontSize: 9, textAlign: "center", marginTop: 4 },

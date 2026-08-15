@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 820">
+  <defs><linearGradient id="paper" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#fff2bd"/><stop offset="1" stop-color="#e4b76c"/></linearGradient></defs>
+  <rect width="1200" height="820" fill="#1d4051"/>
+  <rect x="22" y="22" width="1156" height="776" rx="34" fill="url(#paper)" stroke="#734326" stroke-width="18"/>
+  <rect x="56" y="56" width="1088" height="708" rx="22" fill="#fdf3ca" stroke="#a36a34" stroke-width="5"/>
+  <g fill="#fff8df" stroke="#a36a34" stroke-width="3">
+    <rect x="75" y="75" width="104" height="105"/><rect x="179" y="75" width="104" height="105"/><rect x="283" y="75" width="104" height="105"/><rect x="387" y="75" width="104" height="105"/><rect x="491" y="75" width="104" height="105"/><rect x="595" y="75" width="104" height="105"/><rect x="699" y="75" width="104" height="105"/><rect x="803" y="75" width="104" height="105"/><rect x="907" y="75" width="104" height="105"/><rect x="1011" y="75" width="104" height="105"/>
+    <rect x="1011" y="180" width="104" height="105"/><rect x="1011" y="285" width="104" height="105"/><rect x="1011" y="390" width="104" height="105"/><rect x="1011" y="495" width="104" height="105"/><rect x="1011" y="600" width="104" height="105"/>
+    <rect x="907" y="600" width="104" height="105"/><rect x="803" y="600" width="104" height="105"/><rect x="699" y="600" width="104" height="105"/><rect x="595" y="600" width="104" height="105"/><rect x="491" y="600" width="104" height="105"/><rect x="387" y="600" width="104" height="105"/><rect x="283" y="600" width="104" height="105"/><rect x="179" y="600" width="104" height="105"/><rect x="75" y="600" width="104" height="105"/>
+    <rect x="75" y="495" width="104" height="105"/><rect x="75" y="390" width="104" height="105"/><rect x="75" y="285" width="104" height="105"/><rect x="75" y="180" width="104" height="105"/>
+  </g>
+  <g fill="#db4f3e" stroke="#8b3028" stroke-width="2"><circle cx="127" cy="127" r="30"/><circle cx="387" cy="127" r="30"/><circle cx="803" cy="127" r="30"/><circle cx="1070" cy="127" r="30"/></g>
+  <g fill="#e4ad36" stroke="#8b6123" stroke-width="2"><circle cx="647" cy="127" r="30"/><circle cx="1070" cy="337" r="30"/><circle cx="127" cy="442" r="30"/></g>
+  <g fill="#d54b3c" font-family="Georgia,serif" font-weight="700" text-anchor="middle"><text x="127" y="140" font-size="38">1</text><text x="231" y="140" font-size="34">2</text><text x="335" y="140" font-size="34">3</text><text x="439" y="140" font-size="34">4</text><text x="543" y="140" font-size="34">5</text><text x="647" y="140" font-size="34">6</text><text x="751" y="140" font-size="34">7</text><text x="855" y="140" font-size="34">8</text><text x="959" y="140" font-size="34">9</text><text x="1063" y="140" font-size="34">10</text>
+  <text x="1063" y="245" font-size="34">11</text><text x="1063" y="350" font-size="34">12</text><text x="1063" y="455" font-size="34">13</text><text x="1063" y="560" font-size="34">14</text><text x="1063" y="665" font-size="34">15</text>
+  <text x="959" y="665" font-size="34">16</text><text x="855" y="665" font-size="34">17</text><text x="751" y="665" font-size="34">18</text><text x="647" y="665" font-size="34">19</text><text x="543" y="665" font-size="34">20</text><text x="439" y="665" font-size="34">21</text><text x="335" y="665" font-size="34">22</text><text x="231" y="665" font-size="34">23</text><text x="127" y="665" font-size="34">24</text>
+  <text x="127" y="560" font-size="34">25</text><text x="127" y="455" font-size="34">26</text><text x="127" y="350" font-size="34">27</text><text x="127" y="245" font-size="34">28</text></g>
+  <g font-family="Georgia,serif" text-anchor="middle" fill="#6d4029"><text x="600" y="340" font-size="58" font-weight="700">LA OCA</text><text x="600" y="382" font-size="21" letter-spacing="7">DE OCA EN OCA</text><text x="600" y="470" font-size="46">63</text><text x="600" y="510" font-size="20">META</text></g>
+  <g fill="none" stroke="#b57e37" stroke-width="4" opacity=".7"><path d="M170 220c220-130 640-130 860 0"/><path d="M170 600c220 130 640 130 860 0"/></g>
+</svg>

@@ -69,6 +69,10 @@ export interface PokerState {
   deck: string[];
   deckPos: number;
   roundNumber: number;
+  /** Party variant: chips keep the classic poker flow, drinks track a shared sip pot. */
+  stakesMode?: "chips" | "sips";
+  drinkPot?: number;
+  drinkAwards?: Record<string, number>;
 }
 
 // ── Parchís ───────────────────────────────────────────────────────────────────
@@ -104,6 +108,55 @@ export interface OcaState {
   lastDice: [number, number] | null;
   turnsToSkip: Record<string, number>;
   lastMove: string | null;
+  winnerId: string | null;
+  partyMode?: boolean;
+  partyEvent?: string | null;
+}
+
+// ── Monopoly Social ─────────────────────────────────────────────────────────
+
+export type MonopolyPropertyColor =
+  | "brown" | "lightblue" | "pink" | "orange" | "red"
+  | "yellow" | "green" | "blue";
+
+export interface MonopolyProperty {
+  id: number;
+  name: string;
+  price: number;
+  rent: number;
+  color: MonopolyPropertyColor;
+  ownerId: string | null;
+  houseCount: number;
+}
+
+export interface MonopolyState {
+  type: "monopoly";
+  phase: "playing" | "ended";
+  playerOrder: string[];
+  currentIdx: number;
+  positions: Record<string, number>;
+  balances: Record<string, number>;
+  properties: MonopolyProperty[];
+  inJail: Record<string, number>;
+  dice: [number, number] | null;
+  lastMove: string | null;
+  winnerId: string | null;
+}
+
+// ── Minigame arena ──────────────────────────────────────────────────────────
+
+export type ArenaRound = "reflejos" | "bomba" | "memoria";
+export interface ArenaState {
+  type: "arena";
+  phase: "lobby" | "playing" | "ended";
+  playerOrder: string[];
+  scores: Record<string, number>;
+  round: number;
+  roundType: ArenaRound;
+  flashAt: number | null;
+  bombHolder: string | null;
+  memorySequence: number[];
+  memoryInput: Record<string, number[]>;
   winnerId: string | null;
 }
 
@@ -273,7 +326,9 @@ export type BarajaGameState =
   | ParchisState
   | OcaState
   | BlackjackState
-  | TraditionalState;
+  | TraditionalState
+  | MonopolyState
+  | ArenaState;
 export type BGameResult<T = { room: BarajaRoom }> =
   | T
   | { error: string };
@@ -292,6 +347,8 @@ export interface BarajaRoom {
     smallBlind?: number;
     bigBlind?: number;
     maxPlayers?: number;
+    stakesMode?: "chips" | "sips";
+    partyMode?: boolean;
   };
   players: BarajaPlayer[];
   drawPile: string[];
@@ -314,6 +371,8 @@ export interface BarajaRoomState {
     smallBlind?: number;
     bigBlind?: number;
     maxPlayers?: number;
+    stakesMode?: "chips" | "sips";
+    partyMode?: boolean;
   };
   players: BarajaPlayerPublic[];
   myHand: BarajaNaipe[];

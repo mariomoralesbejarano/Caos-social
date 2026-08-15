@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">
+  <defs>
+    <linearGradient id="felt" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="#f8e7bd"/><stop offset="1" stop-color="#d8a45e"/>
+    </linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="14" stdDeviation="14" flood-opacity=".28"/></filter>
+  </defs>
+  <rect width="1000" height="1000" fill="#173d34"/>
+  <rect x="24" y="24" width="952" height="952" rx="42" fill="url(#felt)" stroke="#9a5b25" stroke-width="20" filter="url(#shadow)"/>
+  <rect x="66" y="66" width="868" height="868" rx="22" fill="#fff5d9" stroke="#5f3b25" stroke-width="8"/>
+  <path d="M66 66h292v292H66z" fill="#d94745"/><path d="M642 66h292v292H642z" fill="#e7b532"/>
+  <path d="M66 642h292v292H66z" fill="#3d91c7"/><path d="M642 642h292v292H642z" fill="#58a448"/>
+  <g fill="#fff5d9" stroke="#8c6d50" stroke-width="3">
+    <rect x="388" y="66" width="56" height="56"/><rect x="444" y="66" width="56" height="56"/><rect x="500" y="66" width="56" height="56"/>
+    <rect x="388" y="122" width="56" height="56"/><rect x="444" y="122" width="56" height="56"/><rect x="500" y="122" width="56" height="56"/>
+    <rect x="388" y="178" width="56" height="56"/><rect x="444" y="178" width="56" height="56"/><rect x="500" y="178" width="56" height="56"/>
+    <rect x="388" y="234" width="56" height="56"/><rect x="444" y="234" width="56" height="56"/><rect x="500" y="234" width="56" height="56"/>
+    <rect x="388" y="290" width="56" height="56"/><rect x="444" y="290" width="56" height="56"/><rect x="500" y="290" width="56" height="56"/>
+    <rect x="66" y="388" width="56" height="56"/><rect x="122" y="388" width="56" height="56"/><rect x="178" y="388" width="56" height="56"/><rect x="234" y="388" width="56" height="56"/><rect x="290" y="388" width="56" height="56"/>
+    <rect x="66" y="444" width="56" height="56"/><rect x="122" y="444" width="56" height="56"/><rect x="178" y="444" width="56" height="56"/><rect x="234" y="444" width="56" height="56"/><rect x="290" y="444" width="56" height="56"/>
+    <rect x="66" y="500" width="56" height="56"/><rect x="122" y="500" width="56" height="56"/><rect x="178" y="500" width="56" height="56"/><rect x="234" y="500" width="56" height="56"/><rect x="290" y="500" width="56" height="56"/>
+    <rect x="388" y="642" width="56" height="56"/><rect x="444" y="642" width="56" height="56"/><rect x="500" y="642" width="56" height="56"/>
+    <rect x="388" y="698" width="56" height="56"/><rect x="444" y="698" width="56" height="56"/><rect x="500" y="698" width="56" height="56"/>
+    <rect x="388" y="754" width="56" height="56"/><rect x="444" y="754" width="56" height="56"/><rect x="500" y="754" width="56" height="56"/>
+    <rect x="388" y="810" width="56" height="56"/><rect x="444" y="810" width="56" height="56"/><rect x="500" y="810" width="56" height="56"/>
+    <rect x="388" y="866" width="56" height="56"/><rect x="444" y="866" width="56" height="56"/><rect x="500" y="866" width="56" height="56"/>
+  </g>
+  <path d="M388 346h168v56H388zM598 388h56v168h-56zM388 598h168v56H388zM346 388h56v168h-56z" fill="#d94745" opacity=".82"/>
+  <path d="M388 346h168v56H388z" fill="#d94745"/><path d="M598 388h56v168h-56z" fill="#e7b532"/><path d="M388 598h168v56H388z" fill="#58a448"/><path d="M346 388h56v168h-56z" fill="#3d91c7"/>
+  <path d="M500 352l148 148-148 148-148-148z" fill="#fff5d9" stroke="#5f3b25" stroke-width="6"/>
+  <path d="M500 352v296" stroke="#5f3b25" stroke-width="4"/><path d="M352 500h296" stroke="#5f3b25" stroke-width="4"/>
+  <g fill="#fff5d9" stroke="#704522" stroke-width="8"><circle cx="165" cy="165" r="52"/><circle cx="259" cy="165" r="52"/><circle cx="165" cy="259" r="52"/><circle cx="259" cy="259" r="52"/>
+  <circle cx="741" cy="165" r="52"/><circle cx="835" cy="165" r="52"/><circle cx="741" cy="259" r="52"/><circle cx="835" cy="259" r="52"/>
+  <circle cx="165" cy="741" r="52"/><circle cx="259" cy="741" r="52"/><circle cx="165" cy="835" r="52"/><circle cx="259" cy="835" r="52"/>
+  <circle cx="741" cy="741" r="52"/><circle cx="835" cy="741" r="52"/><circle cx="741" cy="835" r="52"/><circle cx="835" cy="835" r="52"/></g>
+  <g font-family="Georgia,serif" font-weight="700" text-anchor="middle" fill="#5f3b25"><text x="500" y="520" font-size="38">PARCHÍS</text><text x="500" y="552" font-size="16" letter-spacing="5">CLÁSICO ESPAÑOL</text></g>
+</svg>
