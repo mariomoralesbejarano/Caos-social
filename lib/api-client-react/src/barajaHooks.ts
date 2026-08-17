@@ -20,6 +20,7 @@ import {
   createBarajaRoom,
   generateBarajaCode,
   serializeBarajaRoom,
+  type MonopolyAction,
 } from "./barajaGame";
 import { applyPokerAction, applyPokerDrinkAward, applyPokerNextHand } from "./pokerGame";
 import { applyBlackjackAction, applyBlackjackNextRound } from "./blackjackGame";
@@ -392,7 +393,11 @@ export function useOcaRoll() {
 }
 
 export function useMonopolyAction() {
-  return useMutation({
+  return useMutation<void, Error, {
+    code: string;
+    playerId: string;
+    action: MonopolyAction;
+  }>({
     mutationFn: async ({
       code,
       playerId,
@@ -400,7 +405,7 @@ export function useMonopolyAction() {
     }: {
       code: string;
       playerId: string;
-      action: "roll" | "buy" | "end-turn" | "jail";
+      action: MonopolyAction;
     }) => {
       const result = await mutateBarajaRoom(code, (room) => applyMonopolyAction(room, playerId, action));
       if ("error" in (result as object)) throw new Error((result as { error: string }).error);
@@ -415,13 +420,17 @@ export function useArenaAction() {
       playerId,
       action,
       points,
+      value,
     }: {
       code: string;
       playerId: string;
-      action: "score" | "pass";
+      action: "tap" | "pass-bomb" | "memory-input" | "score" | "pass";
       points?: number;
+      value?: number;
     }) => {
-      const result = await mutateBarajaRoom(code, (room) => applyArenaAction(room, playerId, action, points));
+      const result = await mutateBarajaRoom(code, (room) =>
+        applyArenaAction(room, playerId, action, points, value),
+      );
       if ("error" in (result as object)) throw new Error((result as { error: string }).error);
     },
   });

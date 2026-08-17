@@ -15,7 +15,6 @@ import {
   Text,
   View,
 } from "react-native";
-import Svg, { Circle, G, Line, Path, Rect, Text as SvgText } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BoardRoomLobby from "@/components/BoardRoomLobby";
@@ -172,53 +171,15 @@ export default function OcaScreen() {
   );
 }
 
-function OcaBoard({ state }: { state: OcaState }) {
-  const cells = useMemo(() => Array.from({ length: 63 }, (_, index) => index + 1), []);
-  const specialKinds: Record<number, "goose" | "bridge" | "inn" | "well" | "maze" | "jail" | "death"> = {
-    5: "goose", 6: "bridge", 9: "goose", 12: "bridge", 14: "goose", 19: "inn",
-    23: "goose", 27: "goose", 31: "well", 32: "goose", 36: "goose", 41: "goose",
-    42: "maze", 45: "goose", 50: "goose", 54: "goose", 56: "jail", 58: "death", 59: "goose",
-  };
-  return (
-    <View style={styles.board}>
-      <Svg width="100%" height={500} viewBox="0 0 560 560">
-        <Rect x="3" y="3" width="554" height="554" rx="26" fill="#081B2D" stroke="#275C91" strokeWidth="3" />
-        <Circle cx="280" cy="280" r="38" fill="#123A5C" stroke="#45A3FF" strokeWidth="2" />
-        <SvgText x="280" y="277" textAnchor="middle" fill="#D8E8F8" fontSize="13" fontWeight="700">LA OCA</SvgText>
-        <SvgText x="280" y="294" textAnchor="middle" fill="#A9D4F8" fontSize="8" fontWeight="600">63 CASILLAS</SvgText>
-        {cells.map((cell) => {
-          const { x, y } = ocaSpiralPosition(cell);
-          const kind = specialKinds[cell];
-          const playersHere = state.playerOrder.filter((id) => state.positions[id] === cell);
-          const cellColor = cell === 63 ? "#39FF14" : kind ? "#45A3FF" : "#3975A9";
-          return (
-            <G key={cell}>
-              <Circle cx={x} cy={y} r={cell <= 20 ? 18 : 16} fill={cell === 63 ? "#144B37" : kind ? "#173B5D" : "#102C49"} stroke={cellColor} strokeWidth={kind || cell === 63 ? 2 : 1} />
-              <SvgText x={x} y={kind ? y - 6 : y + 4} textAnchor="middle" fill="#E6F2FF" fontSize={cell <= 20 ? "11" : kind ? "8" : "10"} fontWeight="700">{cell}</SvgText>
-              {kind && <SpecialIcon kind={kind} x={x} y={y + 9} />}
-              {playersHere.map((playerId, index) => (
-                <Circle key={playerId} cx={x - 9 + (index % 3) * 9} cy={y + 12 + Math.floor(index / 3) * 8} r="3.5" fill={PLAYER_COLORS[state.playerOrder.indexOf(playerId) % PLAYER_COLORS.length]} stroke="#061321" strokeWidth="1" />
-              ))}
-            </G>
-          );
-        })}
-        <Path d={spiralPath()} fill="none" stroke="#75BFFF" strokeWidth="1.2" opacity="0.24" />
-      </Svg>
-      <Text style={styles.boardLegend}>OCA → OCA · PUENTE → PUENTE · POSADA · CÁRCEL · POZO · LABERINTO · CALAVERA</Text>
-    </View>
-  );
-}
-
 function OcaBoardImage({ state }: { state: OcaState }) {
   return (
     <View style={styles.assetBoard}>
-      <Image source={{ uri: "/assets/oca_board.svg" }} resizeMode="contain" style={StyleSheet.absoluteFillObject} />
+      <Image source={{ uri: "/assets/oca-board-real.png" }} resizeMode="cover" style={StyleSheet.absoluteFillObject} />
       {Array.from({ length: 63 }, (_, index) => index + 1).map((cell) => {
         const point = ocaBoardPoint(cell);
         const playersHere = state.playerOrder.filter((id) => (state.positions[id] ?? 0) === cell);
         return (
           <View key={cell} style={[styles.ocaCell, { left: `${point.x}%`, top: `${point.y}%` }]}>
-            <Text style={styles.ocaCellNumber}>{cell}</Text>
             {playersHere.map((playerId, index) => (
               <View key={playerId} style={[styles.ocaToken, { backgroundColor: PLAYER_COLORS[state.playerOrder.indexOf(playerId) % PLAYER_COLORS.length], marginLeft: index * 9 }]}>
                 <Text style={styles.assetTokenText}>{state.playerOrder.indexOf(playerId) + 1}</Text>
@@ -227,42 +188,22 @@ function OcaBoardImage({ state }: { state: OcaState }) {
           </View>
         );
       })}
-      <Text style={styles.assetCaption}>63 CASILLAS · OCA · PUENTE · POSADA · CÁRCEL · MUERTE</Text>
+      <View style={styles.assetLegend}>
+        <Text style={styles.assetLegendText}>63 CASILLAS</Text>
+        <Text style={styles.assetLegendSub}>OCAS · PUENTE · POSADA · POZO · LABERINTO · CÁRCEL · CALAVERA</Text>
+      </View>
     </View>
   );
 }
 
 function ocaBoardPoint(cell: number) {
-  const n = cell - 1;
-  if (n < 16) return { x: 8 + (n / 15) * 84, y: 16 };
-  if (n < 32) return { x: 92, y: 16 + ((n - 16) / 15) * 68 };
-  if (n < 48) return { x: 92 - ((n - 32) / 15) * 84, y: 84 };
-  return { x: 8, y: 84 - ((n - 48) / 14) * 68 };
-}
-
-function ocaSpiralPosition(cell: number) {
   const progress = (cell - 1) / 62;
-  const angle = progress * Math.PI * 4.2 - Math.PI / 2;
-  const radius = 32 + progress * 214;
-  return { x: 280 + Math.cos(angle) * radius, y: 280 + Math.sin(angle) * radius };
-}
-
-function spiralPath() {
-  return Array.from({ length: 63 }, (_, index) => {
-    const point = ocaSpiralPosition(index + 1);
-    return `${index === 0 ? "M" : "L"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
-  }).join(" ");
-}
-
-function SpecialIcon({ kind, x, y }: { kind: "goose" | "bridge" | "inn" | "well" | "maze" | "jail" | "death"; x: number; y: number }) {
-  const stroke = "#BFE4FF";
-  if (kind === "goose") return <G><Path d={`M${x - 5} ${y + 8}c-4-7 2-12 5-7 1-7 7-8 7-2 0 4-3 6-6 6`} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" /><Circle cx={x + 5} cy={y - 2} r="1.2" fill={stroke} /></G>;
-  if (kind === "bridge") return <G><Path d={`M${x - 10} ${y + 6}Q${x} ${y - 8} ${x + 10} ${y + 6}`} fill="none" stroke={stroke} strokeWidth="2" /><Line x1={x - 8} y1={y + 5} x2={x - 8} y2={y - 2} stroke={stroke} strokeWidth="1" /><Line x1={x + 8} y1={y + 5} x2={x + 8} y2={y - 2} stroke={stroke} strokeWidth="1" /></G>;
-  if (kind === "inn") return <G><Path d={`M${x - 10} ${y - 3}L${x} ${y - 11}L${x + 10} ${y - 3}Z`} fill="#FFB800" /><Rect x={x - 7} y={y - 3} width="14" height="11" fill="none" stroke={stroke} strokeWidth="1.5" /></G>;
-  if (kind === "well") return <G><Circle cx={x} cy={y + 2} r="9" fill="none" stroke={stroke} strokeWidth="2" /><Line x1={x - 8} y1={y - 7} x2={x + 8} y2={y - 7} stroke={stroke} strokeWidth="1.5" /></G>;
-  if (kind === "maze") return <Path d={`M${x - 9} ${y - 8}h18v16H${x - 4}v-4h8v-8H${x - 5}v8h-4Z`} fill="none" stroke={stroke} strokeWidth="1.5" />;
-  if (kind === "jail") return <G><Rect x={x - 9} y={y - 9} width="18" height="18" fill="none" stroke={stroke} strokeWidth="1.5" />{[-5, 0, 5].map((offset) => <Line key={offset} x1={x + offset} y1={y - 8} x2={x + offset} y2={y + 8} stroke={stroke} strokeWidth="1" />)}</G>;
-  return <G><Circle cx={x} cy={y} r="9" fill="#172235" stroke="#DCE8F5" strokeWidth="1.5" /><Circle cx={x - 3} cy={y - 2} r="1.5" fill="#DCE8F5" /><Circle cx={x + 3} cy={y - 2} r="1.5" fill="#DCE8F5" /><Path d={`M${x - 4} ${y + 4}h8`} stroke="#DCE8F5" strokeWidth="1.5" /></G>;
+  const angle = progress * Math.PI * 5.8 - Math.PI / 2;
+  const radius = 8 + progress * 40;
+  return {
+    x: 50 + Math.cos(angle) * radius * 1.08,
+    y: 50 + Math.sin(angle) * radius * 0.92,
+  };
 }
 
 function LoadingScreen({ color }: { color: string }) {
@@ -278,16 +219,16 @@ const styles = StyleSheet.create({
   title: { fontFamily: "Inter_700Bold", fontSize: 27, marginTop: 4 },
   smallButton: { borderWidth: 1, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10 },
   board: { borderRadius: 20, borderWidth: 2, borderColor: "#275C91", backgroundColor: "#102947", padding: 12, gap: 12 },
-  assetBoard: { width: "100%", aspectRatio: 1200 / 820, maxWidth: 760, alignSelf: "center", borderRadius: 20, overflow: "hidden", position: "relative", backgroundColor: "#fdf3ca" },
-  ocaCell: { position: "absolute", width: 25, height: 25, marginLeft: -12.5, marginTop: -12.5, alignItems: "center", justifyContent: "center" },
-  ocaCellNumber: { color: "#7d352d", fontFamily: "Inter_700Bold", fontSize: 8 },
+  assetBoard: { width: "100%", aspectRatio: 1, maxWidth: 760, alignSelf: "center", borderRadius: 20, overflow: "hidden", position: "relative", backgroundColor: "#fdf3ca" },
+  ocaCell: { position: "absolute", width: 22, height: 22, marginLeft: -11, marginTop: -11, alignItems: "center", justifyContent: "center", flexDirection: "row" },
   ocaToken: { position: "absolute", top: 12, width: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: "#fff8df", alignItems: "center", justifyContent: "center" },
   assetTokenText: { color: "#fff", fontSize: 7, fontFamily: "Inter_700Bold" },
-  assetCaption: { position: "absolute", bottom: 6, left: 0, right: 0, textAlign: "center", color: "#6d4029", fontFamily: "Inter_700Bold", fontSize: 7, letterSpacing: .5 },
+  assetLegend: { position: "absolute", bottom: 9, left: 0, right: 0, alignItems: "center", gap: 2 },
+  assetLegendText: { color: "#6d4029", fontFamily: "Inter_700Bold", fontSize: 9, letterSpacing: .7 },
+  assetLegendSub: { color: "#7d5030", fontFamily: "Inter_600SemiBold", fontSize: 6, letterSpacing: .25 },
   partyEvent: { marginTop: 8, borderRadius: 10, borderWidth: 1, borderColor: "#FF7A45", backgroundColor: "#FF7A4518", padding: 10, width: "100%", alignItems: "center" },
   partyEventKicker: { color: "#FF7A45", fontFamily: "Inter_700Bold", fontSize: 9, letterSpacing: 1.5 },
   partyEventText: { color: "#FFD2BD", fontFamily: "Inter_700Bold", fontSize: 13, marginTop: 3, textAlign: "center" },
-  boardLegend: { color: "#A9C6E2", fontFamily: "Inter_600SemiBold", fontSize: 8, lineHeight: 13, textAlign: "center" },
   status: { borderWidth: 1, borderRadius: 14, padding: 14, alignItems: "center", gap: 4 },
   turn: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 1.5 },
   help: { fontFamily: "Inter_400Regular", fontSize: 11, textAlign: "center" },

@@ -12,3 +12,9 @@ El `tsconfig.json` raíz solo debe referenciar `lib/api-client-react` — las ca
 **Why:** Los artifacts de Expo usan el lib como fuente directa (exports apuntan a ./src/index.ts), no a dist/, así que Metro bundlea directamente. Pero `tsc --noEmit` del artifact sí necesita las declaraciones generadas por `tsc --build`.
 
 Comando de build: `pnpm run typecheck:libs` (ejecuta `tsc --build` en raíz).
+
+Cuando cambien los contratos de `barajaTypes` o `barajaHooks`, hay que ejecutar este comando antes del typecheck del artifact para regenerar las declaraciones enlazadas; de lo contrario la app puede diagnosticar un contrato antiguo aunque el código fuente ya esté actualizado.
+
+**Why:** El workspace enlaza el paquete compartido por symlink y TypeScript puede conservar declaraciones incrementales anteriores durante el typecheck del artifact.
+
+**How to apply:** Ejecutar `pnpm typecheck:libs` y después `pnpm build` antes de declarar válidos cambios de motores, estados o hooks compartidos.

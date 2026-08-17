@@ -16,7 +16,6 @@ import {
   Text,
   View,
 } from "react-native";
-import Svg, { Circle, G, Path, Rect, Text as SvgText } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BoardRoomLobby from "@/components/BoardRoomLobby";
@@ -171,76 +170,6 @@ export default function ParchisScreen() {
   );
 }
 
-function ParchisBoard({ state }: { state: ParchisState }) {
-  const occupied = new Map<number, Array<{ color: string; playerId: string }>>();
-  for (const playerId of state.playerOrder) {
-    for (const piece of state.pieces[playerId] ?? []) {
-      if (piece < 1 || piece >= 68) continue;
-      const track = (piece + ({ rojo: 0, amarillo: 13, verde: 26, azul: 39 }[state.colors[playerId]]) % 52) % 52;
-      occupied.set(track, [...(occupied.get(track) ?? []), { color: state.colors[playerId], playerId }]);
-    }
-  }
-  const track = [
-    [6, 0], [7, 0], [8, 0], [9, 0], [10, 0], [10, 1], [10, 2], [10, 3], [10, 4], [10, 5],
-    [11, 5], [12, 5], [13, 5], [14, 5], [14, 6], [14, 7], [14, 8], [14, 9], [14, 10], [13, 10],
-    [12, 10], [11, 10], [10, 10], [10, 11], [10, 12], [10, 13], [10, 14], [9, 14], [8, 14], [7, 14],
-    [6, 14], [6, 13], [6, 12], [6, 11], [6, 10], [5, 10], [4, 10], [3, 10], [2, 10], [1, 10],
-    [0, 10], [0, 9], [0, 8], [0, 7], [0, 6], [1, 6], [2, 6], [3, 6], [4, 6], [5, 6],
-    [6, 6], [7, 6], [8, 6], [9, 6],
-  ];
-  const homes = [
-    { x: 1, y: 1, color: COLOR_META.rojo, label: "ROJO", playerId: state.playerOrder.find((id) => state.colors[id] === "rojo") },
-    { x: 9, y: 1, color: COLOR_META.amarillo, label: "AMARILLO", playerId: state.playerOrder.find((id) => state.colors[id] === "amarillo") },
-    { x: 1, y: 9, color: COLOR_META.azul, label: "AZUL", playerId: state.playerOrder.find((id) => state.colors[id] === "azul") },
-    { x: 9, y: 9, color: COLOR_META.verde, label: "VERDE", playerId: state.playerOrder.find((id) => state.colors[id] === "verde") },
-  ];
-  const homePieces = (playerId?: string) => (playerId ? state.pieces[playerId] ?? [] : []);
-  const cell = 20;
-  return (
-    <View style={styles.board}>
-      <Svg width="100%" height={330} viewBox="0 0 300 300">
-        <Rect x="2" y="2" width="296" height="296" rx="12" fill="#170B2A" stroke="#5C2F86" strokeWidth="3" />
-        <Rect x="0" y="0" width="100" height="100" fill={COLOR_META.rojo} opacity="0.9" />
-        <Rect x="200" y="0" width="100" height="100" fill={COLOR_META.amarillo} opacity="0.9" />
-        <Rect x="0" y="200" width="100" height="100" fill={COLOR_META.azul} opacity="0.9" />
-        <Rect x="200" y="200" width="100" height="100" fill={COLOR_META.verde} opacity="0.9" />
-        <Rect x="100" y="0" width="100" height="300" fill="#F5F2E9" opacity="0.94" />
-        <Rect x="0" y="100" width="300" height="100" fill="#F5F2E9" opacity="0.94" />
-        {track.map(([x, y], index) => {
-          const safe = [0, 8, 13, 21, 26, 34, 39, 47].includes(index);
-          const pieces = occupied.get(index) ?? [];
-          return (
-            <G key={`track-${index}`}>
-              <Rect x={x * cell} y={y * cell} width={cell} height={cell} fill={safe ? "#FFE09A" : "#FFFFFF"} stroke="#B8AFC1" strokeWidth="0.8" />
-              {safe && <Circle cx={x * cell + 10} cy={y * cell + 10} r="4" fill="#FFB800" opacity="0.75" />}
-              {pieces.map((piece, pieceIndex) => (
-                <Circle key={`${piece.playerId}-${pieceIndex}`} cx={x * cell + 6 + (pieceIndex % 2) * 7} cy={y * cell + 6 + Math.floor(pieceIndex / 2) * 7} r="3.2" fill={COLOR_META[piece.color as keyof typeof COLOR_META]} stroke="#1A1126" strokeWidth="0.8" />
-              ))}
-            </G>
-          );
-        })}
-        <Path d="M100 100H200V120H180V140H160V160H140V180H120V200H100Z" fill={COLOR_META.rojo} opacity="0.7" />
-        <Path d="M200 100V200H180V180H160V160H140V140H120V120H100V100Z" fill={COLOR_META.amarillo} opacity="0.7" />
-        <Path d="M200 200H100V180H120V160H140V140H160V120H180V100H200Z" fill={COLOR_META.verde} opacity="0.7" />
-        <Path d="M100 200V100H120V120H140V140H160V160H180V180H200V200Z" fill={COLOR_META.azul} opacity="0.7" />
-        <Rect x="100" y="100" width="100" height="100" fill="#241334" stroke="#FFB800" strokeWidth="2" />
-        <SvgText x="150" y="146" textAnchor="middle" fill="#FFB800" fontSize="13" fontWeight="700">META</SvgText>
-        <SvgText x="150" y="162" textAnchor="middle" fill="#F5D7FF" fontSize="6" fontWeight="600">20 · 10</SvgText>
-        {homes.map((home) => (
-          <G key={home.label}>
-            <Rect x={home.x * cell} y={home.y * cell} width="100" height="100" rx="15" fill={home.color} opacity="0.22" stroke={home.color} strokeWidth="2" />
-            {[0, 1, 2, 3].map((index) => (
-              <Circle key={index} cx={home.x * cell + 28 + (index % 2) * 44} cy={home.y * cell + 30 + Math.floor(index / 2) * 42} r="12" fill="#21102E" stroke={home.color} strokeWidth="3" opacity={(homePieces(home.playerId)[index] ?? -1) < 0 ? 0.95 : 0.55} />
-            ))}
-            <SvgText x={home.x * cell + 50} y={home.y * cell + 94} textAnchor="middle" fill={home.color} fontSize="8" fontWeight="700">{home.label}</SvgText>
-          </G>
-        ))}
-      </Svg>
-      <Text style={styles.boardCaption}>CRUZ CLÁSICA · CASILLAS DORADAS = SEGURO · SALIDA CON 5 O 6</Text>
-    </View>
-  );
-}
-
 function ParchisBoardImage({ state }: { state: ParchisState }) {
   const tokens: Array<{ id: string; color: keyof typeof COLOR_META; index: number; position: number }> = [];
   for (const [playerId, pieces] of Object.entries(state.pieces)) {
@@ -253,13 +182,13 @@ function ParchisBoardImage({ state }: { state: ParchisState }) {
   }
   return (
     <View style={styles.assetBoard}>
-      <Image source={{ uri: "/assets/parchis_board.svg" }} resizeMode="contain" style={StyleSheet.absoluteFillObject} />
+      <Image source={{ uri: "/assets/parchis-board-real.png" }} resizeMode="cover" style={StyleSheet.absoluteFillObject} />
       {tokens.map((token) => {
         const point = token.position < 0
           ? homePoint(token.color, token.index)
           : token.position >= 68
             ? { x: 50, y: 50 }
-            : trackPoint(token.position);
+            : parchisPoint(token.color, token.position);
         return (
           <View key={token.id} style={[styles.assetToken, { left: `${point.x}%`, top: `${point.y}%`, backgroundColor: COLOR_META[token.color], opacity: token.position < 0 ? 0.72 : 1 }]}>
             <Text style={styles.assetTokenText}>{token.index + 1}</Text>
@@ -271,17 +200,32 @@ function ParchisBoardImage({ state }: { state: ParchisState }) {
   );
 }
 
-function trackPoint(index: number) {
-  const side = 15;
-  const span = 70;
-  const perSide = 17;
-  if (index < perSide) return { x: 40 + (index / (perSide - 1)) * 20, y: side };
-  if (index < perSide * 2) return { x: 85, y: 40 + ((index - perSide) / (perSide - 1)) * 20 };
-  if (index < perSide * 3) return { x: 60 - ((index - perSide * 2) / (perSide - 1)) * 20, y: 85 };
-  return { x: 15, y: 60 - ((index - perSide * 3) / (perSide - 1)) * 20 };
+const PARCHIS_TRACK = [
+  [41, 6], [47, 6], [53, 6], [59, 6], [65, 6], [65, 12], [65, 18], [65, 24], [65, 30], [65, 36],
+  [71, 41], [77, 41], [83, 41], [89, 41], [89, 47], [89, 53], [89, 59], [89, 65], [89, 71], [83, 71],
+  [77, 71], [71, 71], [65, 71], [65, 77], [65, 83], [65, 89], [59, 89], [53, 89], [47, 89], [41, 89],
+  [41, 83], [41, 77], [41, 71], [35, 71], [29, 71], [23, 71], [17, 71], [11, 71], [11, 65], [11, 59],
+  [11, 53], [11, 47], [17, 41], [23, 41], [29, 41], [35, 41], [41, 36], [41, 30], [41, 24], [41, 18],
+  [41, 12], [47, 12],
+ ] as const;
+
+const PARCHIS_LANES: Record<keyof typeof COLOR_META, Array<[number, number]>> = {
+  rojo: Array.from({ length: 16 }, (_, index) => [50, 36 - index * 1.55]),
+  amarillo: Array.from({ length: 16 }, (_, index) => [36 - index * 1.55, 50]),
+  verde: Array.from({ length: 16 }, (_, index) => [50, 64 + index * 1.55]),
+  azul: Array.from({ length: 16 }, (_, index) => [64 + index * 1.55, 50]),
+ };
+
+function parchisPoint(color: keyof typeof COLOR_META, progress: number): { x: number; y: number } {
+  if (progress > 52) {
+    const [x, y] = PARCHIS_LANES[color][Math.min(progress - 53, 15)] ?? [50, 50];
+    return { x, y };
+  }
+  const [x, y] = PARCHIS_TRACK[(progress - 1 + ({ rojo: 0, amarillo: 13, verde: 26, azul: 39 }[color])) % PARCHIS_TRACK.length];
+  return { x, y };
 }
 
-function homePoint(color: keyof typeof COLOR_META, index: number) {
+function homePoint(color: keyof typeof COLOR_META, index: number): { x: number; y: number } {
   const points = {
     rojo: [{ x: 17, y: 17 }, { x: 26, y: 17 }, { x: 17, y: 26 }, { x: 26, y: 26 }],
     amarillo: [{ x: 74, y: 17 }, { x: 83, y: 17 }, { x: 74, y: 26 }, { x: 83, y: 26 }],
@@ -316,7 +260,7 @@ const styles = StyleSheet.create({
   smallButton: { borderWidth: 1, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10 },
   board: { minHeight: 340, borderRadius: 22, borderWidth: 2, borderColor: "#5C2F86", backgroundColor: "#25103D", padding: 8, justifyContent: "center", overflow: "hidden" },
   assetBoard: { width: "100%", aspectRatio: 1, maxWidth: 620, alignSelf: "center", borderRadius: 22, overflow: "hidden", position: "relative", backgroundColor: "#f8e7bd" },
-  assetToken: { position: "absolute", width: 20, height: 20, marginLeft: -10, marginTop: -10, borderRadius: 10, borderWidth: 2, borderColor: "#fff8df", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: .35, shadowRadius: 3, elevation: 4 },
+  assetToken: { position: "absolute", width: 16, height: 16, marginLeft: -8, marginTop: -8, borderRadius: 8, borderWidth: 1.5, borderColor: "#fff8df", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: .35, shadowRadius: 3, elevation: 4 },
   assetTokenText: { color: "#fff", fontSize: 8, fontFamily: "Inter_700Bold" },
   assetCaption: { position: "absolute", bottom: 8, left: 0, right: 0, textAlign: "center", color: "#5f3b25", fontFamily: "Inter_700Bold", fontSize: 8, letterSpacing: .8 },
   boardCenter: { position: "absolute", alignSelf: "center", alignItems: "center", justifyContent: "center", width: 128, height: 128, borderRadius: 64, borderWidth: 2, borderColor: "#FFB800", backgroundColor: "#1A0A2B", zIndex: 2 },
@@ -331,7 +275,6 @@ const styles = StyleSheet.create({
   piecesRow: { flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 8 },
   pieceButton: { minWidth: 82, borderWidth: 1, borderRadius: 10, padding: 9, alignItems: "center", gap: 3 },
   pieceLabel: { fontFamily: "Inter_600SemiBold", fontSize: 10 },
-  boardCaption: { color: "#C8B9D6", fontFamily: "Inter_600SemiBold", fontSize: 8, textAlign: "center", letterSpacing: 0.4 },
   error: { fontFamily: "Inter_600SemiBold", fontSize: 12, textAlign: "center" },
   winner: { fontFamily: "Inter_700Bold", fontSize: 15, textAlign: "center" },
   log: { borderWidth: 1, borderRadius: 13, padding: 13, gap: 5 },

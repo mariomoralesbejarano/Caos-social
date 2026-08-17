@@ -14,6 +14,9 @@ import type {
   BGameResult,
   ArenaState,
   BlackjackState,
+  MonopolyBoardSpace,
+  MonopolyCard,
+  MonopolyDeck,
   MentirosoState,
   MonopolyProperty,
   MonopolyState,
@@ -92,23 +95,70 @@ function initOca(room: BarajaRoom): OcaState {
   };
 }
 
-const MONOPOLY_PROPERTIES: Array<Omit<MonopolyProperty, "ownerId" | "houseCount">> = [
-  { id: 1, name: "Lavapiés", price: 60, rent: 8, color: "brown" },
-  { id: 2, name: "Ronda de Valencia", price: 60, rent: 10, color: "brown" },
-  { id: 3, name: "Atocha", price: 100, rent: 14, color: "lightblue" },
-  { id: 4, name: "Chueca", price: 120, rent: 16, color: "lightblue" },
-  { id: 5, name: "Gran Vía", price: 140, rent: 20, color: "pink" },
-  { id: 6, name: "Castellana", price: 160, rent: 22, color: "pink" },
-  { id: 7, name: "Sol", price: 180, rent: 26, color: "orange" },
-  { id: 8, name: "Malasaña", price: 200, rent: 28, color: "orange" },
-  { id: 9, name: "Goya", price: 220, rent: 32, color: "red" },
-  { id: 10, name: "Salamanca", price: 240, rent: 34, color: "red" },
-  { id: 11, name: "Retiro", price: 260, rent: 38, color: "yellow" },
-  { id: 12, name: "Alcalá", price: 280, rent: 40, color: "yellow" },
-  { id: 13, name: "Prado", price: 300, rent: 46, color: "green" },
-  { id: 14, name: "Recoletos", price: 320, rent: 50, color: "green" },
-  { id: 15, name: "Castelldefels", price: 350, rent: 58, color: "blue" },
-  { id: 16, name: "Diagonal", price: 400, rent: 70, color: "blue" },
+const MONOPOLY_SPACE_DEFS: Array<Omit<MonopolyBoardSpace, "ownerId" | "houseCount">> = [
+  { id: 0, name: "SALIDA", type: "go" },
+  { id: 1, name: "Lavapiés", type: "property", color: "brown", price: 60, rent: 8 },
+  { id: 2, name: "Caja de Comunidad", type: "community" },
+  { id: 3, name: "Ronda de Valencia", type: "property", color: "brown", price: 60, rent: 10 },
+  { id: 4, name: "Impuesto de lujo", type: "tax" },
+  { id: 5, name: "Cárcel / De visita", type: "jail" },
+  { id: 6, name: "Estación Atocha", type: "railroad", price: 200, rent: 25 },
+  { id: 7, name: "Suerte", type: "luck" },
+  { id: 8, name: "Chueca", type: "property", color: "lightblue", price: 100, rent: 14 },
+  { id: 9, name: "Atocha", type: "property", color: "lightblue", price: 120, rent: 16 },
+  { id: 10, name: "De visita", type: "jail" },
+  { id: 11, name: "Gran Vía", type: "property", color: "pink", price: 140, rent: 20 },
+  { id: 12, name: "Compañía eléctrica", type: "utility", price: 150, rent: 30 },
+  { id: 13, name: "Castellana", type: "property", color: "pink", price: 160, rent: 22 },
+  { id: 14, name: "Sol", type: "property", color: "orange", price: 180, rent: 26 },
+  { id: 15, name: "Estación Chamartín", type: "railroad", price: 200, rent: 25 },
+  { id: 16, name: "Malasaña", type: "property", color: "orange", price: 200, rent: 28 },
+  { id: 17, name: "Caja de Comunidad", type: "community" },
+  { id: 18, name: "Goya", type: "property", color: "red", price: 220, rent: 32 },
+  { id: 19, name: "Salamanca", type: "property", color: "red", price: 240, rent: 34 },
+  { id: 20, name: "Parking gratuito", type: "free-parking" },
+  { id: 21, name: "Retiro", type: "property", color: "yellow", price: 260, rent: 38 },
+  { id: 22, name: "Suerte", type: "luck" },
+  { id: 23, name: "Alcalá", type: "property", color: "yellow", price: 280, rent: 40 },
+  { id: 24, name: "Prado", type: "property", color: "green", price: 300, rent: 46 },
+  { id: 25, name: "Estación Delicias", type: "railroad", price: 200, rent: 25 },
+  { id: 26, name: "Recoletos", type: "property", color: "green", price: 320, rent: 50 },
+  { id: 27, name: "Diagonal", type: "property", color: "green", price: 320, rent: 50 },
+  { id: 28, name: "Compañía de aguas", type: "utility", price: 150, rent: 30 },
+  { id: 29, name: "Castelldefels", type: "property", color: "blue", price: 350, rent: 58 },
+  { id: 30, name: "Ir a la cárcel", type: "go-to-jail" },
+  { id: 31, name: "Plaza Mayor", type: "property", color: "blue", price: 400, rent: 70 },
+  { id: 32, name: "Puerta del Sol", type: "property", color: "blue", price: 420, rent: 76 },
+  { id: 33, name: "Caja de Comunidad", type: "community" },
+  { id: 34, name: "Granada", type: "property", color: "blue", price: 440, rent: 82 },
+  { id: 35, name: "Estación Sants", type: "railroad", price: 200, rent: 25 },
+  { id: 36, name: "Suerte", type: "luck" },
+  { id: 37, name: "Barcelona", type: "property", color: "blue", price: 460, rent: 90 },
+  { id: 38, name: "Impuesto sobre el capital", type: "tax" },
+  { id: 39, name: "Valencia", type: "property", color: "blue", price: 480, rent: 100 },
+];
+
+const MONOPOLY_PROPERTIES: Array<Omit<MonopolyProperty, "ownerId" | "houseCount">> =
+  MONOPOLY_SPACE_DEFS
+    .filter((space) => space.type === "property" && space.color && space.price && space.rent)
+    .map((space) => ({
+      id: space.id,
+      name: space.name,
+      price: space.price!,
+      rent: space.rent!,
+      color: space.color!,
+    }));
+
+const MONOPOLY_LUCK_CARDS: MonopolyCard[] = [
+  { id: "luck-advance-go", deck: "luck", title: "Avanza hasta la salida", text: "Pasa por la salida y cobra 200€.", moveTo: 0, amount: 200 },
+  { id: "luck-repair", deck: "luck", title: "Reparación urgente", text: "Paga 100€ al banco.", amount: -100 },
+  { id: "luck-bonus", deck: "luck", title: "Premio del concurso", text: "Recibes 150€ del banco.", amount: 150 },
+];
+
+const MONOPOLY_COMMUNITY_CARDS: MonopolyCard[] = [
+  { id: "community-birthday", deck: "community", title: "Cumpleaños", text: "Cada jugador te paga 25€.", amount: 25 },
+  { id: "community-fine", deck: "community", title: "Multa de tráfico", text: "Paga 50€ al banco.", amount: -50 },
+  { id: "community-inheritance", deck: "community", title: "Herencia", text: "Recibes 100€.", amount: 100 },
 ];
 
 function initMonopoly(room: BarajaRoom): MonopolyState {
@@ -117,10 +167,14 @@ function initMonopoly(room: BarajaRoom): MonopolyState {
   const balances: Record<string, number> = {};
   const inJail: Record<string, number> = {};
   for (const id of playerOrder) { positions[id] = 0; balances[id] = 1500; inJail[id] = 0; }
+  const spaces = MONOPOLY_SPACE_DEFS.map((space) => ({ ...space, ownerId: null, houseCount: 0 }));
   return {
     type: "monopoly", phase: "playing", playerOrder, currentIdx: 0, positions, balances,
     properties: MONOPOLY_PROPERTIES.map((property) => ({ ...property, ownerId: null, houseCount: 0 })),
-    inJail, dice: null, lastMove: "La partida empieza. Tira los dados.", winnerId: null,
+    spaces, inJail, dice: null, lastMove: "La partida empieza. Tira los dados.", winnerId: null,
+    luckDeck: MONOPOLY_LUCK_CARDS.map((card) => ({ ...card })),
+    communityDeck: MONOPOLY_COMMUNITY_CARDS.map((card) => ({ ...card })),
+    cardModal: null, canDraw: null,
   };
 }
 
@@ -128,10 +182,12 @@ function initArena(room: BarajaRoom): ArenaState {
   const playerOrder = room.players.map((player) => player.id);
   const scores: Record<string, number> = {};
   for (const id of playerOrder) scores[id] = 0;
+  const now = Date.now();
   return {
     type: "arena", phase: "playing", playerOrder, scores, round: 1,
-    roundType: "reflejos", flashAt: null, bombHolder: playerOrder[0] ?? null,
-    memorySequence: [], memoryInput: {}, winnerId: null,
+    roundType: "reflejos", flashAt: now + 1500, bombHolder: playerOrder[0] ?? null,
+    memorySequence: [0, 2, 1], memoryInput: {}, roundStartedAt: now,
+    roundDeadline: now + 8000, bombDeadline: null, roundWinnerId: null, winnerId: null,
   };
 }
 
@@ -232,6 +288,7 @@ function parchisTrackPosition(color: ParchisColor, progress: number): number {
   const offsets: Record<ParchisColor, number> = {
     rojo: 0, amarillo: 13, verde: 26, azul: 39,
   };
+  if (progress > 52) return -1;
   return (offsets[color] + progress) % 52;
 }
 
@@ -243,7 +300,7 @@ function parchisOccupied(
   for (const playerId of gs.playerOrder) {
     if (playerId === ignorePlayerId) continue;
     for (const piece of gs.pieces[playerId] ?? []) {
-      if (piece < 1 || piece >= 68) continue;
+      if (piece < 1 || piece > 52) continue;
       const track = parchisTrackPosition(gs.colors[playerId], piece);
       const current = occupied.get(track);
       occupied.set(track, { playerId, count: (current?.count ?? 0) + 1 });
@@ -330,7 +387,7 @@ export function applyParchisMove(
     if (otherId === playerId) continue;
     const otherColor = gs.colors[otherId];
     gs.pieces[otherId] = gs.pieces[otherId].map((otherPiece) => {
-      if (otherPiece < 1 || otherPiece >= 68) return otherPiece;
+      if (otherPiece < 1 || otherPiece > 52) return otherPiece;
       if (
         parchisTrackPosition(otherColor, otherPiece) !== track ||
         PARCHIS_SAFE_TRACKS.has(track)
@@ -437,7 +494,41 @@ export function applyOcaRoll(
   return { room };
 }
 
-export type MonopolyAction = "roll" | "buy" | "end-turn" | "jail";
+export type MonopolyAction =
+  | "roll"
+  | "buy"
+  | "end-turn"
+  | "jail"
+  | "draw-luck"
+  | "draw-community";
+
+function syncMonopolyProperty(gs: MonopolyState, space: MonopolyBoardSpace) {
+  const property = gs.properties.find((item) => item.id === space.id);
+  if (property) {
+    property.ownerId = space.ownerId;
+    property.houseCount = space.houseCount;
+  }
+}
+
+function applyMonopolyCard(
+  gs: MonopolyState,
+  room: BarajaRoom,
+  playerId: string,
+  card: MonopolyCard,
+) {
+  if (card.moveTo !== undefined) gs.positions[playerId] = card.moveTo;
+  if (card.amount) {
+    if (card.deck === "community" && card.id === "community-birthday") {
+      const gift = Math.min(25, ...Object.values(gs.balances).filter((_, index) => room.players[index]?.id !== playerId));
+      for (const id of gs.playerOrder) {
+        if (id !== playerId) gs.balances[id] = Math.max(0, gs.balances[id] - gift);
+      }
+      gs.balances[playerId] += gift * Math.max(0, gs.playerOrder.length - 1);
+    } else {
+      gs.balances[playerId] = Math.max(0, gs.balances[playerId] + card.amount);
+    }
+  }
+}
 
 export function applyMonopolyAction(
   room: BarajaRoom,
@@ -453,35 +544,59 @@ export function applyMonopolyAction(
     if (gs.dice) return { error: "Ya has tirado. Compra o termina turno." };
     const dice: [number, number] = [Math.ceil(Math.random() * 6), Math.ceil(Math.random() * 6)];
     gs.dice = dice;
-    const next = (position + dice[0] + dice[1]) % 16;
-    if (position + dice[0] + dice[1] >= 16) gs.balances[playerId] += 200;
+    gs.cardModal = null;
+    gs.canDraw = null;
+    const rawNext = position + dice[0] + dice[1];
+    const next = rawNext % 40;
+    if (rawNext >= 40) gs.balances[playerId] += 200;
     gs.positions[playerId] = next;
-    if (next === 5) gs.inJail[playerId] = 1;
-    const property = gs.properties.find((item) => item.id === next);
-    if (property?.ownerId && property.ownerId !== playerId) {
-      const rent = Math.min(gs.balances[playerId], property.rent);
+    const space = gs.spaces.find((item) => item.id === next);
+    if (space?.type === "go-to-jail") {
+      gs.positions[playerId] = 5;
+      gs.inJail[playerId] = 2;
+      gs.lastMove = `${room.players.find((p) => p.id === playerId)?.name ?? "Jugador"} va a la cárcel`;
+    } else if (space?.type === "luck" || space?.type === "community") {
+      gs.canDraw = space.type === "luck" ? "luck" : "community";
+      gs.lastMove = `${room.players.find((p) => p.id === playerId)?.name ?? "Jugador"} cae en ${space.name}`;
+    } else if (space?.ownerId && space.ownerId !== playerId && space.rent) {
+      const rent = Math.min(gs.balances[playerId], space.rent);
       gs.balances[playerId] -= rent;
-      gs.balances[property.ownerId] += rent;
+      gs.balances[space.ownerId] += rent;
       gs.lastMove = `${room.players.find((p) => p.id === playerId)?.name ?? "Jugador"} paga ${rent}€ de alquiler`;
     } else {
-      gs.lastMove = `${room.players.find((p) => p.id === playerId)?.name ?? "Jugador"} cae en ${property?.name ?? "una casilla especial"}`;
+      gs.lastMove = `${room.players.find((p) => p.id === playerId)?.name ?? "Jugador"} cae en ${space?.name ?? "una casilla especial"}`;
     }
   } else if (action === "buy") {
     if (!gs.dice) return { error: "Tira primero" };
-    const property = gs.properties.find((item) => item.id === position);
-    if (!property || property.ownerId || gs.balances[playerId] < property.price) return { error: "No puedes comprar esta calle" };
-    property.ownerId = playerId;
-    gs.balances[playerId] -= property.price;
-    gs.lastMove = `${room.players.find((p) => p.id === playerId)?.name ?? "Jugador"} compra ${property.name}`;
+    const space = gs.spaces.find((item) => item.id === position);
+    if (!space || !["property", "railroad", "utility"].includes(space.type) || space.ownerId || !space.price || gs.balances[playerId] < space.price) {
+      return { error: "No puedes comprar esta casilla" };
+    }
+    space.ownerId = playerId;
+    gs.balances[playerId] -= space.price;
+    syncMonopolyProperty(gs, space);
+    gs.lastMove = `${room.players.find((p) => p.id === playerId)?.name ?? "Jugador"} compra ${space.name}`;
   } else if (action === "jail") {
     if (!gs.inJail[playerId]) return { error: "No estás en la cárcel" };
     if (gs.balances[playerId] < 50) return { error: "Necesitas 50€ para salir" };
     gs.balances[playerId] -= 50;
     gs.inJail[playerId] = 0;
     gs.lastMove = "Pagas 50€ y sales de la cárcel";
+  } else if (action === "draw-luck" || action === "draw-community") {
+    const deck: MonopolyDeck = action === "draw-luck" ? "luck" : "community";
+    if (!gs.dice || gs.canDraw !== deck) return { error: "No hay una carta disponible en esta casilla" };
+    const cards = deck === "luck" ? gs.luckDeck : gs.communityDeck;
+    const card = cards.shift();
+    if (!card) return { error: "El mazo está vacío" };
+    cards.push(card);
+    applyMonopolyCard(gs, room, playerId, card);
+    gs.cardModal = card;
+    gs.canDraw = null;
+    gs.lastMove = `${room.players.find((p) => p.id === playerId)?.name ?? "Jugador"} roba ${card.title}`;
   } else {
-    if (!gs.dice) return { error: "Tira primero" };
+    if (!gs.dice || gs.canDraw) return { error: gs.canDraw ? "Roba la carta antes de terminar" : "Tira primero" };
     gs.dice = null;
+    gs.cardModal = null;
     gs.currentIdx = (gs.currentIdx + 1) % gs.playerOrder.length;
     gs.lastMove = `Turno de ${room.players.find((p) => p.id === gs.playerOrder[gs.currentIdx])?.name ?? "otro jugador"}`;
   }
@@ -493,20 +608,64 @@ export function applyMonopolyAction(
 export function applyArenaAction(
   room: BarajaRoom,
   playerId: string,
-  action: "score" | "pass",
+  action: "tap" | "pass-bomb" | "memory-input" | "score" | "pass",
   points = 1,
+  value?: number,
 ): BGameResult<{ room: BarajaRoom }> {
   const gs = room.gameState as ArenaState | null;
   if (!gs || gs.type !== "arena") return { error: "Estado de arena incorrecto" };
   if (!gs.playerOrder.includes(playerId)) return { error: "Jugador no encontrado" };
-  if (action === "score") gs.scores[playerId] = (gs.scores[playerId] ?? 0) + Math.max(1, points);
-  gs.round += 1;
-  gs.roundType = gs.round % 3 === 1 ? "reflejos" : gs.round % 3 === 2 ? "bomba" : "memoria";
-  if (gs.round > 9) {
-    gs.phase = "ended";
-    gs.winnerId = Object.entries(gs.scores).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  if (gs.phase !== "playing") return { error: "La arena ha terminado" };
+  const now = Date.now();
+  const finishRound = (winnerId: string | null, awardedPoints = 0) => {
+    if (winnerId) gs.scores[winnerId] = (gs.scores[winnerId] ?? 0) + awardedPoints;
+    gs.roundWinnerId = winnerId;
+    gs.round += 1;
+    if (gs.round > 9) {
+      gs.phase = "ended";
+      gs.winnerId = Object.entries(gs.scores).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+      return;
+    }
+    gs.roundType = gs.round % 3 === 1 ? "reflejos" : gs.round % 3 === 2 ? "bomba" : "memoria";
+    gs.roundStartedAt = now;
+    gs.roundDeadline = now + 8000;
+    gs.flashAt = gs.roundType === "reflejos" ? now + 1200 + Math.floor(Math.random() * 1800) : null;
+    gs.bombHolder = gs.roundType === "bomba" ? gs.playerOrder[gs.round % gs.playerOrder.length] : null;
+    gs.bombDeadline = gs.roundType === "bomba" ? now + 2500 + Math.floor(Math.random() * 3500) : null;
+    gs.memorySequence = gs.roundType === "memoria"
+      ? Array.from({ length: 3 + (gs.round - 1) % 2 }, () => Math.floor(Math.random() * 4))
+      : [];
+    gs.memoryInput = {};
+  };
+  if (action === "tap") {
+    if (gs.roundType !== "reflejos") return { error: "Esta ronda no es de reflejos" };
+    if (gs.flashAt === null || now < gs.flashAt) return { error: "Demasiado pronto: espera el cambio" };
+    finishRound(playerId, 3);
+  } else if (action === "pass-bomb" || action === "pass") {
+    if (gs.roundType !== "bomba" || gs.bombHolder !== playerId) return { error: "La bomba no está contigo" };
+    if ((gs.bombDeadline ?? 0) <= now) {
+      gs.scores[playerId] = Math.max(0, (gs.scores[playerId] ?? 0) - 1);
+      finishRound(null);
+    } else {
+      const next = nextPlayer(gs.playerOrder.indexOf(playerId), gs.playerOrder.length);
+      gs.bombHolder = gs.playerOrder[next];
+      gs.bombDeadline = now + 2500 + Math.floor(Math.random() * 3500);
+    }
+  } else if (action === "memory-input") {
+    if (gs.roundType !== "memoria" || value === undefined || value < 0 || value > 3) return { error: "Entrada de memoria no válida" };
+    const input = [...(gs.memoryInput[playerId] ?? []), value];
+    gs.memoryInput[playerId] = input;
+    const expected = gs.memorySequence[input.length - 1];
+    if (value !== expected) {
+      finishRound(null);
+    } else if (input.length === gs.memorySequence.length) {
+      finishRound(playerId, 4);
+    }
+  } else {
+    finishRound(playerId, Math.max(1, points));
   }
   room.version += 1;
+  room.log.push(`${room.players.find((p) => p.id === playerId)?.name ?? "Jugador"} completa la ronda ${Math.max(1, gs.round - 1)}`);
   return { room };
 }
 

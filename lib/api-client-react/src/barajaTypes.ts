@@ -129,6 +129,40 @@ export interface MonopolyProperty {
   houseCount: number;
 }
 
+export type MonopolySpaceType =
+  | "go"
+  | "property"
+  | "railroad"
+  | "utility"
+  | "tax"
+  | "jail"
+  | "free-parking"
+  | "go-to-jail"
+  | "luck"
+  | "community";
+
+export interface MonopolyBoardSpace {
+  id: number;
+  name: string;
+  type: MonopolySpaceType;
+  color?: MonopolyPropertyColor;
+  price?: number;
+  rent?: number;
+  ownerId: string | null;
+  houseCount: number;
+}
+
+export type MonopolyDeck = "luck" | "community";
+
+export interface MonopolyCard {
+  id: string;
+  deck: MonopolyDeck;
+  title: string;
+  text: string;
+  amount?: number;
+  moveTo?: number;
+}
+
 export interface MonopolyState {
   type: "monopoly";
   phase: "playing" | "ended";
@@ -137,10 +171,15 @@ export interface MonopolyState {
   positions: Record<string, number>;
   balances: Record<string, number>;
   properties: MonopolyProperty[];
+  spaces: MonopolyBoardSpace[];
   inJail: Record<string, number>;
   dice: [number, number] | null;
   lastMove: string | null;
   winnerId: string | null;
+  luckDeck: MonopolyCard[];
+  communityDeck: MonopolyCard[];
+  cardModal: MonopolyCard | null;
+  canDraw: MonopolyDeck | null;
 }
 
 // ── Minigame arena ──────────────────────────────────────────────────────────
@@ -157,6 +196,10 @@ export interface ArenaState {
   bombHolder: string | null;
   memorySequence: number[];
   memoryInput: Record<string, number[]>;
+  roundStartedAt: number;
+  roundDeadline: number;
+  bombDeadline: number | null;
+  roundWinnerId: string | null;
   winnerId: string | null;
 }
 
@@ -349,6 +392,7 @@ export interface BarajaRoom {
     maxPlayers?: number;
     stakesMode?: "chips" | "sips";
     partyMode?: boolean;
+    arenaRounds?: number;
   };
   players: BarajaPlayer[];
   drawPile: string[];

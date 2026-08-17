@@ -12,6 +12,7 @@ import React, { useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
+import { Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -70,6 +71,11 @@ export default function RootLayout() {
   const [splashDone, setSplashDone] = React.useState(false);
 
   useEffect(() => {
+    const splashFallback = setTimeout(() => setSplashDone(true), 2800);
+    return () => clearTimeout(splashFallback);
+  }, []);
+
+  useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
     }
@@ -97,7 +103,9 @@ export default function RootLayout() {
                 <RootLayoutNav />
                 <FloatingMusicToggle />
                 <FloatingSpotifyWidget />
-                {!splashDone && <CaosSplash onDone={() => setSplashDone(true)} />}
+                {Platform.OS !== "web" && !splashDone && (
+                  <CaosSplash onDone={() => setSplashDone(true)} />
+                )}
               </KeyboardProvider>
             </GestureHandlerRootView>
           </RoomProvider>

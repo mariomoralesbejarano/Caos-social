@@ -3,7 +3,7 @@
  * Only the numeric value and a vector suit illustration are shown.
  */
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, G, Line, Path, Rect } from "react-native-svg";
 
 export type Palo = "oros" | "copas" | "espadas" | "bastos";
@@ -119,6 +119,8 @@ export function SpanishCard({
     >
       {faceDown ? (
         <View style={[styles.faceDown, { borderRadius: s.borderRadius - 2 }]}>
+          <Image source={{ uri: "/assets/card-back-real.png" }} resizeMode="cover" style={StyleSheet.absoluteFillObject} />
+          <View style={styles.faceDownWash} />
           <CardBack size={s.centerSym * 1.5} />
         </View>
       ) : (
@@ -230,6 +232,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 2,
     borderColor: "#374151",
+    overflow: "hidden",
+  },
+  faceDownWash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#61233a",
+    opacity: 0.42,
   },
   corner: {
     position: "absolute",
