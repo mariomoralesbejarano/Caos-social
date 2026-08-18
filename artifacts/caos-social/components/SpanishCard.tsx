@@ -3,8 +3,7 @@
  * Only the numeric value and a vector suit illustration are shown.
  */
 import React from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
-import Svg, { Circle, G, Line, Path, Rect } from "react-native-svg";
+import { Image, Pressable, StyleSheet } from "react-native";
 
 export type Palo = "oros" | "copas" | "espadas" | "bastos";
 
@@ -83,9 +82,6 @@ export function SpanishCard({
   }
 
   const s = SIZES[size];
-  const color = PALO_COLOR[palo];
-  const short = VALOR_SHORT[valor];
-  const bgColor = faceDown ? "#182033" : PALO_BG[palo];
   const borderColor = selected
     ? "#F59E0B"
     : highlight
@@ -104,7 +100,7 @@ export function SpanishCard({
           width: s.w,
           height: s.h,
           borderRadius: s.borderRadius,
-          backgroundColor: bgColor,
+          backgroundColor: faceDown ? "#182033" : PALO_BG[palo],
           borderColor,
           borderWidth: selected || highlight ? 2.5 : 1.5,
           opacity: disabled && !selected ? 0.5 : pressed ? 0.8 : 1,
@@ -117,92 +113,16 @@ export function SpanishCard({
         },
       ]}
     >
-      {faceDown ? (
-        <View style={[styles.faceDown, { borderRadius: s.borderRadius - 2 }]}>
-          <Image source={{ uri: "/assets/card-back-real.png" }} resizeMode="cover" style={StyleSheet.absoluteFillObject} />
-          <View style={styles.faceDownWash} />
-          <CardBack size={s.centerSym * 1.5} />
-        </View>
-      ) : (
-        <>
-          <View style={[styles.corner, { top: s.cornerPad, left: s.cornerPad }]}>
-            <Text style={[styles.cornerNum, { fontSize: s.cornerNum, color }]}>
-              {short}
-            </Text>
-          </View>
-          <View style={styles.center}>
-            <SuitIllustration palo={palo} size={s.centerSym * 1.65} color={color} />
-          </View>
-          <View style={[styles.corner, styles.cornerBR, { bottom: s.cornerPad, right: s.cornerPad }]}>
-            <Text style={[styles.cornerNum, { fontSize: s.cornerNum, color }]}>
-              {short}
-            </Text>
-          </View>
-        </>
-      )}
+      <Image
+        source={{
+          uri: faceDown
+            ? "/cards/spanish/card-back.png"
+            : `/cards/spanish/${palo}-${valor}.png`,
+        }}
+        resizeMode="cover"
+        style={[styles.cardImage, { borderRadius: s.borderRadius - 2 }]}
+      />
     </Pressable>
-  );
-}
-
-function SuitIllustration({
-  palo,
-  size,
-  color,
-}: {
-  palo: Palo;
-  size: number;
-  color: string;
-}) {
-  const goldEdge = "#8B5A17";
-  return (
-    <Svg width={size} height={size} viewBox="0 0 48 48">
-      {palo === "oros" && (
-        <G>
-          <Circle cx="24" cy="24" r="14" fill="#F4B728" stroke={goldEdge} strokeWidth="2" />
-          <Circle cx="24" cy="24" r="9" fill="none" stroke="#FFE28A" strokeWidth="2" />
-          <Path d="M19 18c3-2 7-2 10 0" fill="none" stroke="#FFF4BD" strokeWidth="2" strokeLinecap="round" />
-          <Circle cx="20" cy="27" r="1.5" fill="#FFF4BD" />
-        </G>
-      )}
-      {palo === "copas" && (
-        <G>
-          <Path d="M10 10h28c0 11-5 17-12 18v7h7v4H15v-4h7v-7c-7-1-12-7-12-18Z" fill="#D8A629" stroke={goldEdge} strokeWidth="2" strokeLinejoin="round" />
-          <Path d="M14 14h20c-1 6-4 10-10 11-6-1-9-5-10-11Z" fill="#F5D66B" />
-          <Path d="M16 17c3 2 12 2 16 0" fill="none" stroke="#FFF2A8" strokeWidth="2" strokeLinecap="round" />
-        </G>
-      )}
-      {palo === "espadas" && (
-        <G stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-          <Path d="M13 10 27 24 16 35" fill="none" />
-          <Path d="M35 10 21 24 32 35" fill="none" />
-          <Line x1="10" y1="34" x2="21" y2="23" />
-          <Line x1="38" y1="34" x2="27" y2="23" />
-          <Line x1="13" y1="37" x2="20" y2="37" />
-          <Line x1="28" y1="37" x2="35" y2="37" />
-        </G>
-      )}
-      {palo === "bastos" && (
-        <G stroke="#75451F" strokeWidth="5" strokeLinecap="round">
-          <Line x1="24" y1="38" x2="24" y2="16" />
-          <Line x1="24" y1="23" x2="13" y2="12" />
-          <Line x1="24" y1="27" x2="35" y2="15" />
-          <Circle cx="12" cy="11" r="4" fill="#A9652D" strokeWidth="2" />
-          <Circle cx="36" cy="14" r="4" fill="#A9652D" strokeWidth="2" />
-          <Circle cx="24" cy="14" r="4" fill="#A9652D" strokeWidth="2" />
-        </G>
-      )}
-    </Svg>
-  );
-}
-
-function CardBack({ size }: { size: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 48 48">
-      <Rect x="4" y="4" width="40" height="40" rx="5" fill="none" stroke="#5C6B88" strokeWidth="2" />
-      <Rect x="9" y="9" width="30" height="30" rx="3" fill="none" stroke="#33415F" strokeWidth="2" />
-      <Path d="m24 12 4 12-4 12-4-12 4-12Z" fill="#5C6B88" opacity=".7" />
-      <Circle cx="24" cy="24" r="3" fill="#A8B4CC" />
-    </Svg>
   );
 }
 
@@ -225,35 +145,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     shadowColor: "#000",
   },
-  faceDown: {
+  cardImage: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#1a1a2e",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#374151",
-    overflow: "hidden",
-  },
-  faceDownWash: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#61233a",
-    opacity: 0.42,
-  },
-  corner: {
-    position: "absolute",
-    alignItems: "center",
-  },
-  cornerBR: {
-    transform: [{ rotate: "180deg" }],
-  },
-  cornerNum: {
-    fontFamily: "Inter_700Bold",
-    lineHeight: undefined,
-    includeFontPadding: false,
-  },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    width: undefined,
+    height: undefined,
   },
 });

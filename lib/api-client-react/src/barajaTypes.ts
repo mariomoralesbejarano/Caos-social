@@ -73,6 +73,7 @@ export interface PokerState {
   stakesMode?: "chips" | "sips";
   drinkPot?: number;
   drinkAwards?: Record<string, number>;
+  lastAllInId?: string | null;
 }
 
 // ── Parchís ───────────────────────────────────────────────────────────────────
@@ -180,6 +181,8 @@ export interface MonopolyState {
   communityDeck: MonopolyCard[];
   cardModal: MonopolyCard | null;
   canDraw: MonopolyDeck | null;
+  partyMode?: boolean;
+  partyEvent?: string | null;
 }
 
 // ── Minigame arena ──────────────────────────────────────────────────────────
@@ -201,6 +204,33 @@ export interface ArenaState {
   bombDeadline: number | null;
   roundWinnerId: string | null;
   winnerId: string | null;
+  tapCounts?: Record<string, number>;
+  stopwatchStops?: Record<string, number>;
+  stopwatchTarget?: number;
+  stroopWord?: string;
+  stroopInk?: number;
+  stroopOptions?: string[];
+}
+
+// ── Sala social / party ─────────────────────────────────────────────────────
+
+export type PartyPromptKind = "incómoda" | "yo-nunca";
+export type PartyVote = "sí" | "no" | "paso";
+
+export interface PartyState {
+  type: "party";
+  phase: "playing" | "ended";
+  playerOrder: string[];
+  currentIdx: number;
+  coinSide: "cara" | "cruz" | null;
+  coinStarterId: string | null;
+  sipPot: number;
+  promptKind: PartyPromptKind;
+  promptText: string | null;
+  promptAuthorId: string | null;
+  promptVotes: Record<string, PartyVote>;
+  promptRound: number;
+  lastMove: string | null;
 }
 
 // ── Blackjack 21 ──────────────────────────────────────────────────────────────
@@ -371,7 +401,8 @@ export type BarajaGameState =
   | BlackjackState
   | TraditionalState
   | MonopolyState
-  | ArenaState;
+  | ArenaState
+  | PartyState;
 export type BGameResult<T = { room: BarajaRoom }> =
   | T
   | { error: string };

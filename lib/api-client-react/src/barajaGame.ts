@@ -13,6 +13,7 @@ import type {
   BarajaRoomState,
   BGameResult,
   ArenaState,
+  ArenaRound,
   BlackjackState,
   MonopolyBoardSpace,
   MonopolyCard,
@@ -21,6 +22,9 @@ import type {
   MonopolyProperty,
   MonopolyState,
   OcaState,
+  PartyPromptKind,
+  PartyState,
+  PartyVote,
   ParchisColor,
   ParchisState,
   PokerCard,
@@ -37,7 +41,20 @@ const PARCHIS_COLORS: ParchisColor[] = ["rojo", "amarillo", "verde", "azul"];
 const OCA_COLORS = ["rojo", "amarillo", "verde", "azul", "morado", "naranja"];
 const PARCHIS_SAFE_TRACKS = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
 const OCA_POSITIONS = [5, 9, 14, 18, 23, 27, 32, 36, 41, 45, 50, 54, 59];
-
+const PARTY_PROMPTS: Record<PartyPromptKind, string[]> = {
+  "incómoda": [
+    "¿Cuál es la última mentira piadosa que has contado?",
+    "¿A quién de la sala llamarías para una aventura imposible?",
+    "¿Qué secreto absurdo nunca habías contado en voz alta?",
+    "¿Cuál ha sido tu peor cita o mensaje enviado por error?",
+  ],
+  "yo-nunca": [
+    "Yo nunca he enviado un mensaje a la persona equivocada.",
+    "Yo nunca he fingido entender una conversación.",
+    "Yo nunca he cotilleado un chat que no era mío.",
+    "Yo nunca he bailado solo cuando nadie miraba.",
+  ],
+};
 const TRADITIONAL_VARIANTS = new Set<TraditionalGameId>([
   "culo", "mico", "pesca", "cuatrola", "tute", "7ymedio", "chinchon",
   "burro", "escoba", "brisca", "remigio", "chanchullo", "golfo", "cauca",
@@ -175,6 +192,8 @@ function initMonopoly(room: BarajaRoom): MonopolyState {
     luckDeck: MONOPOLY_LUCK_CARDS.map((card) => ({ ...card })),
     communityDeck: MONOPOLY_COMMUNITY_CARDS.map((card) => ({ ...card })),
     cardModal: null, canDraw: null,
+    partyMode: room.tableConfig?.partyMode ?? false,
+    partyEvent: null,
   };
 }
 
@@ -188,6 +207,25 @@ function initArena(room: BarajaRoom): ArenaState {
     roundType: "reflejos", flashAt: now + 1500, bombHolder: playerOrder[0] ?? null,
     memorySequence: [0, 2, 1], memoryInput: {}, roundStartedAt: now,
     roundDeadline: now + 8000, bombDeadline: null, roundWinnerId: null, winnerId: null,
+  };
+}
+
+function initParty(room: BarajaRoom): PartyState {
+  const playerOrder = room.players.map((player) => player.id);
+  return {
+    type: "party",
+    phase: "playing",
+    playerOrder,
+    currentIdx: 0,
+    coinSide: null,
+    coinStarterId: playerOrder[0] ?? null,
+    sipPot: 0,
+    promptKind: "incómoda",
+    promptText: null,
+    promptAuthorId: null,
+    promptVotes: {},
+    promptRound: 0,
+    lastMove: "La sala Party está lista: lanza la moneda o roba una tarjeta.",
   };
 }
 

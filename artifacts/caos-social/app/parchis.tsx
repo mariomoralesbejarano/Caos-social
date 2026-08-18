@@ -182,7 +182,7 @@ function ParchisBoardImage({ state }: { state: ParchisState }) {
   }
   return (
     <View style={styles.assetBoard}>
-      <Image source={{ uri: "/assets/parchis-board-real.png" }} resizeMode="cover" style={StyleSheet.absoluteFillObject} />
+       <Image source={{ uri: "/assets/parchis_board.png" }} resizeMode="cover" style={StyleSheet.absoluteFillObject} />
       {tokens.map((token) => {
         const point = token.position < 0
           ? homePoint(token.color, token.index)
@@ -190,7 +190,7 @@ function ParchisBoardImage({ state }: { state: ParchisState }) {
             ? { x: 50, y: 50 }
             : parchisPoint(token.color, token.position);
         return (
-          <View key={token.id} style={[styles.assetToken, { left: `${point.x}%`, top: `${point.y}%`, backgroundColor: COLOR_META[token.color], opacity: token.position < 0 ? 0.72 : 1 }]}>
+           <View key={token.id} style={[styles.assetToken, { left: `${point.x}%`, top: `${point.y}%`, backgroundColor: COLOR_META[token.color], opacity: token.position < 0 ? 0.72 : 1 }]}>
             <Text style={styles.assetTokenText}>{token.index + 1}</Text>
           </View>
         );
@@ -200,14 +200,23 @@ function ParchisBoardImage({ state }: { state: ParchisState }) {
   );
 }
 
-const PARCHIS_TRACK = [
-  [41, 6], [47, 6], [53, 6], [59, 6], [65, 6], [65, 12], [65, 18], [65, 24], [65, 30], [65, 36],
-  [71, 41], [77, 41], [83, 41], [89, 41], [89, 47], [89, 53], [89, 59], [89, 65], [89, 71], [83, 71],
-  [77, 71], [71, 71], [65, 71], [65, 77], [65, 83], [65, 89], [59, 89], [53, 89], [47, 89], [41, 89],
-  [41, 83], [41, 77], [41, 71], [35, 71], [29, 71], [23, 71], [17, 71], [11, 71], [11, 65], [11, 59],
-  [11, 53], [11, 47], [17, 41], [23, 41], [29, 41], [35, 41], [41, 36], [41, 30], [41, 24], [41, 18],
-  [41, 12], [47, 12],
- ] as const;
+const PARCHIS_COORDINATES = [
+  { x: 41, y: 6 }, { x: 47, y: 6 }, { x: 53, y: 6 }, { x: 59, y: 6 }, { x: 65, y: 6 },
+  { x: 65, y: 12 }, { x: 65, y: 18 }, { x: 65, y: 24 }, { x: 65, y: 30 }, { x: 65, y: 36 },
+  { x: 71, y: 41 }, { x: 77, y: 41 }, { x: 83, y: 41 }, { x: 89, y: 41 }, { x: 89, y: 47 },
+  { x: 89, y: 53 }, { x: 89, y: 59 }, { x: 89, y: 65 }, { x: 89, y: 71 }, { x: 83, y: 71 },
+  { x: 77, y: 71 }, { x: 71, y: 71 }, { x: 65, y: 71 }, { x: 65, y: 77 }, { x: 65, y: 83 },
+  { x: 65, y: 89 }, { x: 59, y: 89 }, { x: 53, y: 89 }, { x: 47, y: 89 }, { x: 41, y: 89 },
+  { x: 41, y: 83 }, { x: 41, y: 77 }, { x: 41, y: 71 }, { x: 35, y: 71 }, { x: 29, y: 71 },
+  { x: 23, y: 71 }, { x: 17, y: 71 }, { x: 11, y: 71 }, { x: 11, y: 65 }, { x: 11, y: 59 },
+  { x: 11, y: 53 }, { x: 11, y: 47 }, { x: 17, y: 41 }, { x: 23, y: 41 }, { x: 29, y: 41 },
+  { x: 35, y: 41 }, { x: 41, y: 36 }, { x: 41, y: 30 }, { x: 41, y: 24 }, { x: 41, y: 18 },
+  { x: 41, y: 12 }, { x: 47, y: 12 },
+  { x: 50, y: 36 }, { x: 50, y: 34 }, { x: 50, y: 32 }, { x: 50, y: 30 },
+  { x: 50, y: 28 }, { x: 50, y: 26 }, { x: 50, y: 24 }, { x: 50, y: 22 },
+  { x: 50, y: 20 }, { x: 50, y: 18 }, { x: 50, y: 16 }, { x: 50, y: 14 },
+  { x: 50, y: 12 }, { x: 50, y: 10 }, { x: 50, y: 8 }, { x: 50, y: 6 },
+] as const;
 
 const PARCHIS_LANES: Record<keyof typeof COLOR_META, Array<[number, number]>> = {
   rojo: Array.from({ length: 16 }, (_, index) => [50, 36 - index * 1.55]),
@@ -218,11 +227,12 @@ const PARCHIS_LANES: Record<keyof typeof COLOR_META, Array<[number, number]>> = 
 
 function parchisPoint(color: keyof typeof COLOR_META, progress: number): { x: number; y: number } {
   if (progress > 52) {
-    const [x, y] = PARCHIS_LANES[color][Math.min(progress - 53, 15)] ?? [50, 50];
+    const point = PARCHIS_LANES[color][Math.min(progress - 53, 15)] ?? [50, 50];
+    const [x, y] = point;
     return { x, y };
   }
-  const [x, y] = PARCHIS_TRACK[(progress - 1 + ({ rojo: 0, amarillo: 13, verde: 26, azul: 39 }[color])) % PARCHIS_TRACK.length];
-  return { x, y };
+  const offset = { rojo: 0, amarillo: 13, verde: 26, azul: 39 }[color];
+  return PARCHIS_COORDINATES[(progress + offset) % 52] ?? { x: 50, y: 50 };
 }
 
 function homePoint(color: keyof typeof COLOR_META, index: number): { x: number; y: number } {
@@ -260,8 +270,8 @@ const styles = StyleSheet.create({
   smallButton: { borderWidth: 1, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10 },
   board: { minHeight: 340, borderRadius: 22, borderWidth: 2, borderColor: "#5C2F86", backgroundColor: "#25103D", padding: 8, justifyContent: "center", overflow: "hidden" },
   assetBoard: { width: "100%", aspectRatio: 1, maxWidth: 620, alignSelf: "center", borderRadius: 22, overflow: "hidden", position: "relative", backgroundColor: "#f8e7bd" },
-  assetToken: { position: "absolute", width: 16, height: 16, marginLeft: -8, marginTop: -8, borderRadius: 8, borderWidth: 1.5, borderColor: "#fff8df", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: .35, shadowRadius: 3, elevation: 4 },
-  assetTokenText: { color: "#fff", fontSize: 8, fontFamily: "Inter_700Bold" },
+  assetToken: { position: "absolute", width: 11, height: 11, marginLeft: -5.5, marginTop: -5.5, borderRadius: 5.5, borderWidth: 1, borderColor: "#fff8df", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: .35, shadowRadius: 3, elevation: 4 },
+  assetTokenText: { color: "#fff", fontSize: 6, fontFamily: "Inter_700Bold" },
   assetCaption: { position: "absolute", bottom: 8, left: 0, right: 0, textAlign: "center", color: "#5f3b25", fontFamily: "Inter_700Bold", fontSize: 8, letterSpacing: .8 },
   boardCenter: { position: "absolute", alignSelf: "center", alignItems: "center", justifyContent: "center", width: 128, height: 128, borderRadius: 64, borderWidth: 2, borderColor: "#FFB800", backgroundColor: "#1A0A2B", zIndex: 2 },
   centerMark: { color: "#FFB800", fontFamily: "Inter_700Bold", fontSize: 17, letterSpacing: 2 },

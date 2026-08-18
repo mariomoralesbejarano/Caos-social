@@ -120,6 +120,12 @@ export default function PokerRoomScreen() {
     }
   }
 
+  function handleAllIn() {
+    if (!isMyTurn || maxRaiseTarget <= gs.currentBet) return;
+    setRaiseTo(maxRaiseTarget);
+    void perform("raise", maxRaiseTarget);
+  }
+
   async function handleNextHand() {
     if (!session || !room) return;
     setError(null);
@@ -335,6 +341,20 @@ export default function PokerRoomScreen() {
               >
                 <Text style={{ color: colors.secondary, fontFamily: "Inter_700Bold" }}>SUBIR A {raiseTo || sliderMin}</Text>
               </Pressable>
+              <Pressable
+                disabled={!isMyTurn || maxRaiseTarget <= gs.currentBet}
+                onPress={handleAllIn}
+                style={[
+                  styles.allInBtn,
+                  {
+                    backgroundColor: isMyTurn ? "#F05D7526" : colors.border + "44",
+                    borderColor: "#F05D75",
+                    opacity: isMyTurn && maxRaiseTarget > gs.currentBet ? 1 : 0.45,
+                  },
+                ]}
+              >
+                <Text style={styles.allInText}>ALL-IN · {maxRaiseTarget.toLocaleString("es-ES")}</Text>
+              </Pressable>
             </View>
           </View>
         )}
@@ -461,7 +481,9 @@ const styles = StyleSheet.create({
   actionBtn: { flex: 1, minHeight: 64, borderRadius: 9, borderWidth: 1, alignItems: "center", justifyContent: "center", gap: 3, paddingHorizontal: 3 },
   raisePanel: { gap: 9 },
   raiseLabel: { fontFamily: "Inter_700Bold", fontSize: 10, letterSpacing: 1 },
-  raiseBtn: { flex: 1, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  raiseBtn: { flex: 1, minHeight: 42, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  allInBtn: { minHeight: 42, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  allInText: { color: "#F05D75", fontFamily: "Inter_700Bold", letterSpacing: 0.8 },
   errorText: { fontFamily: "Inter_600SemiBold", fontSize: 12, textAlign: "center" },
   showdownCard: { borderRadius: 14, borderWidth: 2, padding: 15, gap: 8 },
   showdownTitle: { fontFamily: "Inter_700Bold", fontSize: 18, letterSpacing: 2, textAlign: "center", marginBottom: 3 },

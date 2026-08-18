@@ -174,9 +174,9 @@ export default function OcaScreen() {
 function OcaBoardImage({ state }: { state: OcaState }) {
   return (
     <View style={styles.assetBoard}>
-      <Image source={{ uri: "/assets/oca-board-real.png" }} resizeMode="cover" style={StyleSheet.absoluteFillObject} />
+       <Image source={{ uri: "/assets/oca_board.png" }} resizeMode="cover" style={StyleSheet.absoluteFillObject} />
       {Array.from({ length: 63 }, (_, index) => index + 1).map((cell) => {
-        const point = ocaBoardPoint(cell);
+        const point = OCA_COORDINATES[cell - 1] ?? OCA_COORDINATES[0];
         const playersHere = state.playerOrder.filter((id) => (state.positions[id] ?? 0) === cell);
         return (
           <View key={cell} style={[styles.ocaCell, { left: `${point.x}%`, top: `${point.y}%` }]}>
@@ -196,15 +196,24 @@ function OcaBoardImage({ state }: { state: OcaState }) {
   );
 }
 
-function ocaBoardPoint(cell: number) {
-  const progress = (cell - 1) / 62;
-  const angle = progress * Math.PI * 5.8 - Math.PI / 2;
-  const radius = 8 + progress * 40;
-  return {
-    x: 50 + Math.cos(angle) * radius * 1.08,
-    y: 50 + Math.sin(angle) * radius * 0.92,
-  };
-}
+const OCA_COORDINATES = [
+  { x: 50.00, y: 42.64 }, { x: 52.70, y: 42.40 }, { x: 55.54, y: 42.91 }, { x: 58.24, y: 44.22 },
+  { x: 60.48, y: 46.27 }, { x: 61.98, y: 48.96 }, { x: 62.48, y: 52.07 }, { x: 61.84, y: 55.33 },
+  { x: 60.00, y: 58.43 }, { x: 57.03, y: 61.05 }, { x: 53.11, y: 62.88 }, { x: 48.53, y: 63.67 },
+  { x: 43.69, y: 63.26 }, { x: 39.03, y: 61.58 }, { x: 35.00, y: 58.70 }, { x: 32.03, y: 54.80 },
+  { x: 30.49, y: 50.17 }, { x: 30.62, y: 45.19 }, { x: 32.52, y: 40.29 }, { x: 36.13, y: 35.95 },
+  { x: 41.23, y: 32.60 }, { x: 47.45, y: 30.61 }, { x: 54.28, y: 30.24 }, { x: 61.13, y: 31.63 },
+  { x: 67.37, y: 34.75 }, { x: 72.40, y: 39.41 }, { x: 75.71, y: 45.27 }, { x: 76.89, y: 51.86 },
+  { x: 75.74, y: 58.63 }, { x: 72.23, y: 64.97 }, { x: 66.58, y: 70.29 }, { x: 59.18, y: 74.06 },
+  { x: 50.62, y: 75.87 }, { x: 41.61, y: 75.47 }, { x: 32.94, y: 72.80 }, { x: 25.40, y: 67.99 },
+  { x: 19.72, y: 61.38 }, { x: 16.47, y: 53.49 }, { x: 16.05, y: 44.97 }, { x: 18.61, y: 36.55 },
+  { x: 24.04, y: 28.98 }, { x: 31.97, y: 22.97 }, { x: 41.78, y: 19.12 }, { x: 52.68, y: 17.84 },
+  { x: 63.75, y: 19.34 }, { x: 74.00, y: 23.59 }, { x: 82.51, y: 30.31 }, { x: 88.46, y: 38.99 },
+  { x: 91.23, y: 48.93 }, { x: 90.48, y: 59.30 }, { x: 86.16, y: 69.20 }, { x: 78.53, y: 77.73 },
+  { x: 68.15, y: 84.11 }, { x: 55.86, y: 87.70 }, { x: 42.68, y: 88.10 }, { x: 29.74, y: 85.18 },
+  { x: 18.18, y: 79.10 }, { x: 9.06, y: 70.29 }, { x: 3.26, y: 59.45 }, { x: 1.37, y: 47.48 },
+  { x: 3.67, y: 35.38 }, { x: 10.09, y: 24.23 }, { x: 20.16, y: 15.02 },
+] as const;
 
 function LoadingScreen({ color }: { color: string }) {
   return <View style={styles.loading}><ActivityIndicator color={color} size="large" /></View>;
