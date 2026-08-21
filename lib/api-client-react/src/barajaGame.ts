@@ -604,6 +604,23 @@ export function applyMonopolyAction(
     } else {
       gs.lastMove = `${room.players.find((p) => p.id === playerId)?.name ?? "Jugador"} cae en ${space?.name ?? "una casilla especial"}`;
     }
+    if (gs.partyMode) {
+      const partyEvents: Record<number, string> = {
+        0: "Salida: reparte 2 sorbos",
+        4: "Impuesto de lujo: 2 sorbos",
+        5: "Cárcel: 1 chupito para entrar",
+        7: "Suerte: roba carta y bebe 1 sorbo si no te gusta",
+        10: "De visita: elige a alguien para que beba 1 sorbo",
+        20: "Parking gratuito: todos beben 1 sorbo",
+        22: "Suerte: el jugador de tu izquierda bebe 1 sorbo",
+        30: "Ir a la cárcel: 2 sorbos y pierdes el próximo turno",
+        38: "Impuesto: 2 sorbos",
+      };
+      gs.partyEvent = partyEvents[next] ?? null;
+      if (space?.type === "go-to-jail") gs.partyEvent = "Ir a la cárcel: 2 sorbos y pierdes el próximo turno";
+    } else {
+      gs.partyEvent = null;
+    }
   } else if (action === "buy") {
     if (!gs.dice) return { error: "Tira primero" };
     const space = gs.spaces.find((item) => item.id === position);
