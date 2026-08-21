@@ -64,6 +64,7 @@ export default function BoardRoomLobby({
   const isPoker = kind === "poker";
   const isBlackjack = kind === "blackjack";
   const isOca = kind === "oca";
+  const isMonopoly = kind === "monopoly";
 
   async function createRoom() {
     setError(null);
@@ -87,7 +88,7 @@ export default function BoardRoomLobby({
             ? { startingStack, smallBlind, bigBlind }
             : {}),
           ...(isPoker ? { stakesMode } : {}),
-          ...(isOca ? { partyMode } : {}),
+          ...(isOca || isMonopoly ? { partyMode } : {}),
         },
       });
       await saveBarajaSession({
@@ -286,11 +287,15 @@ export default function BoardRoomLobby({
                   </View>
                 </View>
               )}
-              {isOca && (
+              {(isOca || isMonopoly) && (
                 <Pressable onPress={() => setPartyMode((value) => !value)} style={[styles.partyToggle, { borderColor: partyMode ? "#FF7A45" : colors.border, backgroundColor: partyMode ? "#FF7A4518" : colors.input }]}>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.label, { color: colors.foreground }]}>Modo fiesta</Text>
-                    <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>Castigos en Oca, Puente, Posada, Cárcel y Muerte</Text>
+                    <Text style={[styles.label, { color: colors.foreground }]}>Modo Fiesta / Beber</Text>
+                    <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>
+                      {isOca
+                        ? "Sorbos y chupitos en Oca, Puente, Posada, Pozo, Cárcel y Muerte"
+                        : "Penalizaciones de sorbos y chupitos en casillas y cartas"}
+                    </Text>
                   </View>
                   <Text style={{ color: partyMode ? "#FF7A45" : colors.mutedForeground, fontFamily: "Inter_700Bold" }}>{partyMode ? "ACTIVO" : "OFF"}</Text>
                 </Pressable>
