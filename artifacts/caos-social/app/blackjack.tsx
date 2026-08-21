@@ -154,10 +154,10 @@ export default function BlackjackScreen() {
         {error && <Text style={styles.error}>{error}</Text>}
         {isMyTurn && (
           <View style={styles.actionGrid}>
-            <ActionButton label="HIT" onPress={() => action("hit")} disabled={actionMut.isPending} />
-            <ActionButton label="STAND" onPress={() => action("stand")} disabled={actionMut.isPending} />
-            <ActionButton label="DOUBLE" onPress={() => action("double")} disabled={actionMut.isPending} />
-            <ActionButton label="SPLIT" onPress={() => action("split")} disabled={actionMut.isPending} />
+             <ActionButton label="PEDIR" onPress={() => action("hit")} disabled={actionMut.isPending} />
+             <ActionButton label="PLANTARSE" onPress={() => action("stand")} disabled={actionMut.isPending} />
+             <ActionButton label="DOBLAR" onPress={() => action("double")} disabled={actionMut.isPending} />
+             <ActionButton label="DIVIDIR" onPress={() => action("split")} disabled={actionMut.isPending} />
           </View>
         )}
         {gs.phase === "ended" && (
