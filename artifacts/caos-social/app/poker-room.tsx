@@ -353,7 +353,7 @@ export default function PokerRoomScreen() {
                   },
                 ]}
               >
-                <Text style={styles.allInText}>ALL-IN · {maxRaiseTarget.toLocaleString("es-ES")}</Text>
+                <Text style={styles.allInText}>{gs.stakesMode === "sips" ? "HIDALGO · CUBATA ENTERO" : `ALL-IN · ${maxRaiseTarget.toLocaleString("es-ES")}`}</Text>
               </Pressable>
             </View>
           </View>
