@@ -116,6 +116,11 @@ export default function OcaScreen() {
               <Text style={styles.partyEventText}>{gs.partyEvent}</Text>
             </View>
           )}
+          {gs.partyMode && !gs.partyEvent && (
+            <Text style={[styles.partyHint, { color: "#FFB800" }]}>
+              Modo Fiesta activo · las casillas especiales aplican sorbos/chupitos
+            </Text>
+          )}
         </View>
 
         <View style={styles.playersCard}>
@@ -238,6 +243,7 @@ const styles = StyleSheet.create({
   partyEvent: { marginTop: 8, borderRadius: 10, borderWidth: 1, borderColor: "#FF7A45", backgroundColor: "#FF7A4518", padding: 10, width: "100%", alignItems: "center" },
   partyEventKicker: { color: "#FF7A45", fontFamily: "Inter_700Bold", fontSize: 9, letterSpacing: 1.5 },
   partyEventText: { color: "#FFD2BD", fontFamily: "Inter_700Bold", fontSize: 13, marginTop: 3, textAlign: "center" },
+  partyHint: { fontFamily: "Inter_600SemiBold", fontSize: 11, textAlign: "center", marginTop: 5 },
   status: { borderWidth: 1, borderRadius: 14, padding: 14, alignItems: "center", gap: 4 },
   turn: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 1.5 },
   help: { fontFamily: "Inter_400Regular", fontSize: 11, textAlign: "center" },
