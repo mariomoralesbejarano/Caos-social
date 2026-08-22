@@ -8,3 +8,5 @@ El remoto HTTPS puede rechazar el `git push` local aunque el repositorio esté c
 **Why:** La autenticación administrada por Replit no siempre está disponible para el proceso Git del shell.
 
 **How to apply:** Tras crear el commit y verificar el build, usar la conexión GitHub administrada (`gitPush` con la rama y proveedor) en lugar de intentar exponer o gestionar tokens manualmente.
+
+**Nota de entorno:** Si el callback de push no está disponible, la conexión `github` permite publicar mediante la API Git (blobs → tree → commit → ref) sin manejar tokens en el workspace.
