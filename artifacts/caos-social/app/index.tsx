@@ -106,7 +106,7 @@ const GAME_MODES: GameMode[] = [
     subtitle: "Reflejos, bomba y memoria en rondas rápidas",
     tag: "JUGAR",
     active: true,
-    route: "/arena",
+    route: "/minigames",
     glowColor: "#FF4F9A",
   },
   {
