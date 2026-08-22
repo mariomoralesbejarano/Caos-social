@@ -22,7 +22,7 @@ import BetSlider from "@/components/BetSlider";
 
 const AVATARS = ["🦄", "🐙", "🦊", "🐲", "🦋", "🐸", "🦝", "🐼"];
 
-export type BoardLobbyKind = "poker" | "blackjack" | "parchis" | "oca" | "monopoly" | "arena";
+export type BoardLobbyKind = "poker" | "blackjack" | "parchis" | "oca" | "monopoly" | "arena" | "party";
 
 interface BoardRoomLobbyProps {
   kind: BoardLobbyKind;

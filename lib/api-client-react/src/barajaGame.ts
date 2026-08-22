@@ -204,9 +204,10 @@ function initArena(room: BarajaRoom): ArenaState {
   const now = Date.now();
   return {
     type: "arena", phase: "playing", playerOrder, scores, round: 1,
-    roundType: "reflejos", flashAt: now + 1500, bombHolder: playerOrder[0] ?? null,
+    roundType: "tap", flashAt: null, bombHolder: playerOrder[0] ?? null,
     memorySequence: [0, 2, 1], memoryInput: {}, roundStartedAt: now,
-    roundDeadline: now + 8000, bombDeadline: null, roundWinnerId: null, winnerId: null,
+    roundDeadline: now + 5000, bombDeadline: null, roundWinnerId: null, winnerId: null,
+    tapCounts: Object.fromEntries(playerOrder.map((id) => [id, 0])),
   };
 }
 
@@ -663,7 +664,7 @@ export function applyMonopolyAction(
 export function applyArenaAction(
   room: BarajaRoom,
   playerId: string,
-  action: "tap" | "pass-bomb" | "memory-input" | "score" | "pass",
+  action: "tap" | "pass-bomb" | "memory-input" | "score" | "pass" | "stopwatch" | "stroop" | "target" | "answer",
   points = 1,
   value?: number,
 ): BGameResult<{ room: BarajaRoom }> {
@@ -681,9 +682,10 @@ export function applyArenaAction(
       gs.winnerId = Object.entries(gs.scores).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
       return;
     }
-    gs.roundType = gs.round % 3 === 1 ? "reflejos" : gs.round % 3 === 2 ? "bomba" : "memoria";
+    const rounds: ArenaRound[] = ["tap", "bomba", "reflejos", "cronometro", "stroop", "memoria", "diana", "calculo"];
+    gs.roundType = rounds[(gs.round - 1) % rounds.length];
     gs.roundStartedAt = now;
-    gs.roundDeadline = now + 8000;
+    gs.roundDeadline = now + (gs.roundType === "tap" ? 5000 : gs.roundType === "diana" ? 10000 : 8000);
     gs.flashAt = gs.roundType === "reflejos" ? now + 1200 + Math.floor(Math.random() * 1800) : null;
     gs.bombHolder = gs.roundType === "bomba" ? gs.playerOrder[gs.round % gs.playerOrder.length] : null;
     gs.bombDeadline = gs.roundType === "bomba" ? now + 2500 + Math.floor(Math.random() * 3500) : null;
@@ -691,11 +693,29 @@ export function applyArenaAction(
       ? Array.from({ length: 3 + (gs.round - 1) % 2 }, () => Math.floor(Math.random() * 4))
       : [];
     gs.memoryInput = {};
+    gs.tapCounts = Object.fromEntries(gs.playerOrder.map((id) => [id, 0]));
+    gs.stopwatchStops = {};
+    gs.stopwatchTarget = 5000;
+    gs.stroopWord = gs.roundType === "stroop" ? ["ROJO", "AZUL", "VERDE", "AMARILLO"][Math.floor(Math.random() * 4)] : undefined;
+    gs.stroopInk = gs.roundType === "stroop" ? Math.floor(Math.random() * 4) : undefined;
+    gs.stroopOptions = ["ROJO", "AZUL", "VERDE", "AMARILLO"];
+    gs.mathQuestion = gs.roundType === "calculo" ? "3 + 4 × 2" : undefined;
+    gs.mathOptions = gs.roundType === "calculo" ? [11, 14, 10] : undefined;
+    gs.targetPosition = gs.roundType === "diana" ? { x: 25 + Math.floor(Math.random() * 50), y: 25 + Math.floor(Math.random() * 50) } : null;
   };
   if (action === "tap") {
-    if (gs.roundType !== "reflejos") return { error: "Esta ronda no es de reflejos" };
-    if (gs.flashAt === null || now < gs.flashAt) return { error: "Demasiado pronto: espera el cambio" };
-    finishRound(playerId, 3);
+    if (gs.roundType === "tap") {
+      if (now >= gs.roundDeadline) {
+        const winner = Object.entries(gs.tapCounts ?? {}).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+        finishRound(winner, 3);
+      } else {
+        gs.tapCounts = { ...(gs.tapCounts ?? {}), [playerId]: (gs.tapCounts?.[playerId] ?? 0) + 1 };
+      }
+    } else {
+      if (gs.roundType !== "reflejos") return { error: "Esta ronda no admite toques" };
+      if (gs.flashAt === null || now < gs.flashAt) return { error: "Demasiado pronto: espera el cambio" };
+      finishRound(playerId, 3);
+    }
   } else if (action === "pass-bomb" || action === "pass") {
     if (gs.roundType !== "bomba" || gs.bombHolder !== playerId) return { error: "La bomba no está contigo" };
     if ((gs.bombDeadline ?? 0) <= now) {
@@ -716,11 +736,48 @@ export function applyArenaAction(
     } else if (input.length === gs.memorySequence.length) {
       finishRound(playerId, 4);
     }
-  } else {
+  } else if (action === "stopwatch") {
+    if (gs.roundType !== "cronometro") return { error: "Esta ronda no es de cronómetro" };
+    const elapsed = Math.max(0, now - gs.roundStartedAt);
+    gs.stopwatchStops = { ...(gs.stopwatchStops ?? {}), [playerId]: elapsed };
+    finishRound(playerId, Math.max(1, 5 - Math.round(Math.abs(elapsed - 5000) / 1000)));
+  } else if (action === "stroop" || action === "answer" || action === "target" || action === "score") {
     finishRound(playerId, Math.max(1, points));
   }
   room.version += 1;
   room.log.push(`${room.players.find((p) => p.id === playerId)?.name ?? "Jugador"} completa la ronda ${Math.max(1, gs.round - 1)}`);
+  return { room };
+}
+
+export function applyPartyAction(
+  room: BarajaRoom,
+  playerId: string,
+  action: "coin" | "prompt" | "vote" | "probable",
+  value?: string,
+  kind?: PartyPromptKind,
+): BGameResult<{ room: BarajaRoom }> {
+  const gs = room.gameState as PartyState | null;
+  if (!gs || gs.type !== "party") return { error: "Estado de Party incorrecto" };
+  if (!gs.playerOrder.includes(playerId)) return { error: "Jugador no encontrado" };
+  if (action === "coin") {
+    gs.coinSide = Math.random() > 0.5 ? "cara" : "cruz";
+    gs.coinStarterId = gs.playerOrder[Math.floor(Math.random() * gs.playerOrder.length)] ?? playerId;
+    gs.sipPot = gs.coinSide === "cara" ? 1 : Math.min(5, gs.sipPot + 1);
+    gs.lastMove = `Moneda: ${gs.coinSide}. Empieza ${room.players.find((p) => p.id === gs.coinStarterId)?.name ?? "un jugador"}`;
+  } else if (action === "prompt" || action === "probable") {
+    gs.promptText = value ?? "¿Quién es más probable que llegue tarde?";
+    gs.promptKind = kind ?? "incómoda";
+    gs.promptAuthorId = playerId;
+    gs.promptVotes = {};
+    gs.promptRound += 1;
+    gs.lastMove = action === "probable" ? "Nueva votación anónima abierta" : "Nueva tarjeta abierta";
+  } else {
+    if (!value || !["sí", "no", "paso"].includes(value)) return { error: "Voto no válido" };
+    gs.promptVotes[playerId] = value as PartyVote;
+    gs.lastMove = "Votación actualizada";
+  }
+  room.version += 1;
+  room.log.push(gs.lastMove);
   return { room };
 }
 
@@ -1002,6 +1059,8 @@ export function applyBarajaStartGame(
     room.gameState = initMonopoly(room);
   } else if (room.gameId === "arena") {
     room.gameState = initArena(room);
+  } else if (room.gameId === "party") {
+    room.gameState = initParty(room);
   } else if (TRADITIONAL_VARIANTS.has(room.gameId as TraditionalGameId)) {
     room.gameState = initTraditional(room, room.gameId as TraditionalGameId);
   }

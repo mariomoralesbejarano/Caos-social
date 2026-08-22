@@ -14,6 +14,7 @@ import {
   applyOcaRoll,
   applyMonopolyAction,
   applyArenaAction,
+  applyPartyAction,
   applyParchisMove,
   applyParchisRoll,
   applyTraditionalPlay,
@@ -424,13 +425,24 @@ export function useArenaAction() {
     }: {
       code: string;
       playerId: string;
-      action: "tap" | "pass-bomb" | "memory-input" | "score" | "pass";
+      action: "tap" | "pass-bomb" | "memory-input" | "score" | "pass" | "stopwatch" | "stroop" | "target" | "answer";
       points?: number;
       value?: number;
     }) => {
       const result = await mutateBarajaRoom(code, (room) =>
         applyArenaAction(room, playerId, action, points, value),
       );
+      if ("error" in (result as object)) throw new Error((result as { error: string }).error);
+    },
+  });
+}
+
+export function usePartyAction() {
+  return useMutation({
+    mutationFn: async ({ code, playerId, action, value, kind }: {
+      code: string; playerId: string; action: "coin" | "prompt" | "vote" | "probable"; value?: string; kind?: "incómoda" | "yo-nunca";
+    }) => {
+      const result = await mutateBarajaRoom(code, (room) => applyPartyAction(room, playerId, action, value, kind));
       if ("error" in (result as object)) throw new Error((result as { error: string }).error);
     },
   });

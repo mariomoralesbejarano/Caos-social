@@ -187,7 +187,15 @@ export interface MonopolyState {
 
 // ── Minigame arena ──────────────────────────────────────────────────────────
 
-export type ArenaRound = "reflejos" | "bomba" | "memoria";
+export type ArenaRound =
+  | "tap"
+  | "bomba"
+  | "reflejos"
+  | "cronometro"
+  | "stroop"
+  | "memoria"
+  | "diana"
+  | "calculo";
 export interface ArenaState {
   type: "arena";
   phase: "lobby" | "playing" | "ended";
@@ -210,6 +218,9 @@ export interface ArenaState {
   stroopWord?: string;
   stroopInk?: number;
   stroopOptions?: string[];
+  mathQuestion?: string;
+  mathOptions?: number[];
+  targetPosition?: { x: number; y: number } | null;
 }
 
 // ── Sala social / party ─────────────────────────────────────────────────────

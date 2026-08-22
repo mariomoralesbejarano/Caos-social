@@ -118,6 +118,16 @@ const GAME_MODES: GameMode[] = [
     active: false,
     glowColor: "#FF2D6F",
   },
+  {
+    id: "party",
+    emoji: "🎉",
+    title: "Sala Social Party",
+    subtitle: "Moneda, Yo Nunca, Verdad o Reto y votaciones",
+    tag: "JUGAR",
+    active: true,
+    route: "/party-room",
+    glowColor: "#FF7A45",
+  },
 ];
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
