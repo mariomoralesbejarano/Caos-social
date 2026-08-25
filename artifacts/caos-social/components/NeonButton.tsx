@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, ViewStyle } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, ViewStyle } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 
@@ -30,13 +30,18 @@ export function NeonButton({
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        if (Platform.OS === "web") {
+          if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.([25]);
+        }
+        onPress?.();
+      }}
       disabled={disabled}
       style={({ pressed }) => [
         styles.btn,
         small && styles.btnSmall,
         {
-          backgroundColor: palette.bg,
+          backgroundColor: variant === "ghost" ? "rgba(255,255,255,0.04)" : palette.bg,
           shadowColor: palette.glow,
           opacity: disabled ? 0.4 : 1,
           borderColor: variant === "ghost" ? colors.border : palette.bg,

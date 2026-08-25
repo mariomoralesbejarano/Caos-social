@@ -26,6 +26,8 @@ interface GameMode {
   active: boolean;
   route?: string;
   glowColor: string;
+  category: "Juegos de Tablero" | "Casino & Apuestas" | "Arena Competitiva" | "Sala de Fiesta";
+  badges: string[];
 }
 
 const GAME_MODES: GameMode[] = [
@@ -38,6 +40,8 @@ const GAME_MODES: GameMode[] = [
     active: true,
     route: "/caos",
     glowColor: "#39FF14",
+    category: "Sala de Fiesta",
+    badges: ["Multijugador", "Modo Tragos"],
   },
   {
     id: "baraja",
@@ -48,6 +52,8 @@ const GAME_MODES: GameMode[] = [
     active: true,
     route: "/baraja",
     glowColor: "#B026FF",
+    category: "Juegos de Tablero",
+    badges: ["Multijugador", "8 Modos"],
   },
   {
     id: "blackjack",
@@ -58,6 +64,8 @@ const GAME_MODES: GameMode[] = [
     active: true,
     route: "/blackjack",
     glowColor: "#39FF14",
+    category: "Casino & Apuestas",
+    badges: ["1–7 jugadores", "21 puntos"],
   },
   {
     id: "poker",
@@ -68,6 +76,8 @@ const GAME_MODES: GameMode[] = [
     active: true,
     route: "/poker-game",
     glowColor: "#B026FF",
+    category: "Casino & Apuestas",
+    badges: ["Multijugador", "Texas Hold'em"],
   },
   {
     id: "parchis",
@@ -78,6 +88,8 @@ const GAME_MODES: GameMode[] = [
     active: true,
     route: "/parchis",
     glowColor: "#FFB800",
+    category: "Juegos de Tablero",
+    badges: ["Multijugador", "Carrera"],
   },
   {
     id: "oca",
@@ -88,6 +100,8 @@ const GAME_MODES: GameMode[] = [
     active: true,
     route: "/oca",
     glowColor: "#B026FF",
+    category: "Juegos de Tablero",
+    badges: ["Multijugador", "63 casillas"],
   },
   {
     id: "monopoly",
@@ -98,6 +112,8 @@ const GAME_MODES: GameMode[] = [
     active: true,
     route: "/monopoly",
     glowColor: "#55D6FF",
+    category: "Juegos de Tablero",
+    badges: ["Multijugador", "Estrategia"],
   },
   {
     id: "arena",
@@ -108,15 +124,20 @@ const GAME_MODES: GameMode[] = [
     active: true,
     route: "/minigames",
     glowColor: "#FF4F9A",
+    category: "Arena Competitiva",
+    badges: ["Multijugador", "30 Minijuegos"],
   },
   {
     id: "mini",
     emoji: "👾",
     title: "Sala de Minijuegos",
     subtitle: "Trivia, palabras, retos relámpago…",
-    tag: "PRONTO",
-    active: false,
+    tag: "JUGAR",
+    active: true,
+    route: "/minigames",
     glowColor: "#FF2D6F",
+    category: "Arena Competitiva",
+    badges: ["Multijugador", "Rondas rápidas"],
   },
   {
     id: "party",
@@ -127,6 +148,8 @@ const GAME_MODES: GameMode[] = [
     active: true,
     route: "/party-room",
     glowColor: "#FF7A45",
+    category: "Sala de Fiesta",
+    badges: ["Multijugador", "Modo Tragos"],
   },
 ];
 
@@ -156,16 +179,17 @@ export default function HubScreen() {
   }
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.background }}
-      contentContainerStyle={[
-        styles.container,
-        {
-          paddingTop: (isWeb ? 67 : insets.top) + 24,
-          paddingBottom: (isWeb ? 34 : insets.bottom) + 48,
-        },
-      ]}
-    >
+    <LinearGradient colors={["#0B0E14", "#121824"]} style={{ flex: 1 }}>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: "transparent" }}
+        contentContainerStyle={[
+          styles.container,
+          {
+            paddingTop: (isWeb ? 67 : insets.top) + 24,
+            paddingBottom: (isWeb ? 34 : insets.bottom) + 48,
+          },
+        ]}
+      >
       {/* ── Hero ── */}
       <View style={styles.hero}>
         <Text style={[styles.eyebrow, { color: colors.primary }]}>
@@ -182,23 +206,32 @@ export default function HubScreen() {
       </View>
 
       {/* ── Grid ── */}
-      <View style={styles.grid}>
-        {GAME_MODES.map((mode) => (
-          <GameCard
-            key={mode.id}
-            mode={mode}
-            onPress={() => {
-              if (mode.active && mode.route) router.push(mode.route as never);
-            }}
-          />
-        ))}
-      </View>
+      {(["Juegos de Tablero", "Casino & Apuestas", "Arena Competitiva", "Sala de Fiesta"] as const).map((category) => {
+        const modes = GAME_MODES.filter((mode) => mode.category === category);
+        return (
+          <View key={category} style={styles.categorySection}>
+            <Text style={[styles.categoryTitle, { color: category === "Casino & Apuestas" ? colors.secondary : colors.primary }]}>
+              {category.toUpperCase()}
+            </Text>
+            <View style={styles.grid}>
+              {modes.map((mode) => (
+                <GameCard
+                  key={mode.id}
+                  mode={mode}
+                  onPress={() => mode.route && router.push(mode.route as never)}
+                />
+              ))}
+            </View>
+          </View>
+        );
+      })}
 
       {/* ── Footer ── */}
       <Text style={[styles.footer, { color: colors.mutedForeground }]}>
         CAOS ARCADE · v3.5
       </Text>
-    </ScrollView>
+      </ScrollView>
+    </LinearGradient>
   );
 }
 
@@ -211,12 +244,13 @@ function GameCard({ mode, onPress }: { mode: GameMode; onPress: () => void }) {
   return (
     <Pressable
       onPress={onPress}
-      disabled={!isActive}
+      disabled={false}
       style={({ pressed }) => [
         styles.card,
         {
-          borderColor: isActive ? mode.glowColor : colors.border,
-          opacity: isActive ? (pressed ? 0.85 : 1) : 0.45,
+          borderColor: mode.glowColor,
+          opacity: pressed ? 0.82 : 1,
+          transform: pressed ? [{ scale: 0.97 }] : undefined,
         },
       ]}
     >
@@ -224,8 +258,8 @@ function GameCard({ mode, onPress }: { mode: GameMode; onPress: () => void }) {
       <LinearGradient
         colors={
           isActive
-            ? [`${mode.glowColor}18`, "#15042A"]
-            : ["#15042A", "#15042A"]
+            ? [`${mode.glowColor}20`, "#121824"]
+            : ["rgba(255,255,255,0.06)", "#121824"]
         }
         style={StyleSheet.absoluteFill}
         start={{ x: 0, y: 0 }}
@@ -256,6 +290,13 @@ function GameCard({ mode, onPress }: { mode: GameMode; onPress: () => void }) {
         <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
           {mode.subtitle}
         </Text>
+        <View style={styles.badges}>
+          {mode.badges.map((badge) => (
+            <View key={badge} style={[styles.badge, { borderColor: `${mode.glowColor}88`, backgroundColor: `${mode.glowColor}12` }]}>
+              <Text style={[styles.badgeText, { color: mode.glowColor }]}>{badge}</Text>
+            </View>
+          ))}
+        </View>
       </View>
 
       <View
@@ -273,7 +314,7 @@ function GameCard({ mode, onPress }: { mode: GameMode; onPress: () => void }) {
             { color: isActive ? mode.glowColor : colors.mutedForeground },
           ]}
         >
-          {mode.tag}
+          JUGAR
         </Text>
       </View>
     </Pressable>
@@ -283,7 +324,7 @@ function GameCard({ mode, onPress }: { mode: GameMode; onPress: () => void }) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { paddingHorizontal: 20, gap: 28 },
+  container: { paddingHorizontal: 20, gap: 24, maxWidth: 820, width: "100%", alignSelf: "center" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
 
   // Hero
@@ -308,7 +349,9 @@ const styles = StyleSheet.create({
   },
 
   // Grid
-  grid: { gap: 14 },
+  categorySection: { gap: 10 },
+  categoryTitle: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 2, marginLeft: 3 },
+  grid: { gap: 12 },
 
   // Card
   card: {
@@ -317,7 +360,7 @@ const styles = StyleSheet.create({
     gap: 14,
     padding: 18,
     borderRadius: 16,
-    borderWidth: 2,
+    borderWidth: 1,
     overflow: "hidden",
     position: "relative",
   },
@@ -346,6 +389,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
   },
+  badges: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 5 },
+  badge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 },
+  badgeText: { fontFamily: "Inter_600SemiBold", fontSize: 9, letterSpacing: 0.2 },
   cardTag: {
     paddingHorizontal: 9,
     paddingVertical: 4,

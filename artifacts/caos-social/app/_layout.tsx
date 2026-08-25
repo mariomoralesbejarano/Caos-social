@@ -34,10 +34,10 @@ function RootLayoutNav() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: "#0A0014" },
-        headerTintColor: "#39FF14",
+        headerStyle: { backgroundColor: "#0B0E14" },
+        headerTintColor: "#06B6D4",
         headerTitleStyle: { fontFamily: "Inter_700Bold" },
-        contentStyle: { backgroundColor: "#0A0014" },
+        contentStyle: { backgroundColor: "#0B0E14" },
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -98,7 +98,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <RoomProvider>
             <GestureHandlerRootView
-              style={{ flex: 1, backgroundColor: "#0A0014" }}
+              style={{ flex: 1, backgroundColor: "#0B0E14" }}
             >
               <KeyboardProvider>
                 <StatusBar style="light" />
